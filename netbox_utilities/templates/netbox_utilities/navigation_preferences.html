@@ -1,0 +1,88 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Navigation personalisieren{% endblock %}
+
+{% block header %}
+  <div class="container-fluid mt-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <h1>Navigation personalisieren</h1>
+    </div>
+  </div>
+{% endblock header %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col col-md-10 col-xl-8">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Linke Navigation</h2></div>
+        <div class="card-body">
+          {% if not feature_enabled %}
+            <div class="alert alert-warning mb-0">
+              Die Navigationspersonalisierung wurde durch die NetBox-Konfiguration deaktiviert.
+            </div>
+          {% else %}
+            <p class="text-secondary">
+              Verschiebe Menüs mit den Pfeilen und blende nicht benötigte Bereiche aus.
+              Berechtigungen von NetBox werden dadurch nicht verändert.
+            </p>
+            <form method="post" id="navigation-preferences-form">
+              {% csrf_token %}
+              <div class="list-group mb-3" id="navigation-menu-editor">
+                {% for menu in menus %}
+                  <div class="list-group-item d-flex align-items-center gap-3 navigation-menu-row">
+                    <input type="hidden" name="menu_order" value="{{ menu.key }}">
+                    <i class="{{ menu.icon_class }} fs-2" aria-hidden="true"></i>
+                    <span class="flex-fill fw-medium">{{ menu.label }}</span>
+                    <label class="form-check form-switch mb-0" title="Menü ausblenden">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="hidden_menus"
+                        value="{{ menu.key }}"
+                        {% if menu.hidden %}checked{% endif %}
+                      >
+                      <span class="form-check-label">Ausblenden</span>
+                    </label>
+                    <div class="btn-group" role="group" aria-label="Reihenfolge ändern">
+                      <button class="btn btn-sm btn-outline-secondary move-up" type="button" title="Nach oben">
+                        <i class="mdi mdi-arrow-up" aria-hidden="true"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-secondary move-down" type="button" title="Nach unten">
+                        <i class="mdi mdi-arrow-down" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+                {% empty %}
+                  <div class="alert alert-info mb-0">Für diesen Benutzer sind keine Menüs verfügbar.</div>
+                {% endfor %}
+              </div>
+              <div class="d-flex justify-content-between">
+                <button class="btn btn-outline-danger" type="submit" name="reset" value="1">
+                  Zurücksetzen
+                </button>
+                <button class="btn btn-primary" type="submit">Speichern</button>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const editor = document.getElementById('navigation-menu-editor');
+      if (!editor) return;
+      editor.addEventListener('click', (event) => {
+        const button = event.target.closest('.move-up, .move-down');
+        if (!button) return;
+        const row = button.closest('.navigation-menu-row');
+        if (button.classList.contains('move-up') && row.previousElementSibling) {
+          editor.insertBefore(row, row.previousElementSibling);
+        }
+        if (button.classList.contains('move-down') && row.nextElementSibling) {
+          editor.insertBefore(row.nextElementSibling, row);
+        }
+      });
+    })();
+  </script>
+{% endblock content %}

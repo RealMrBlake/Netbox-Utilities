@@ -1,0 +1,11 @@
+.netbox-utilities-tenant .tenant-filter-menu {
+  min-width: 20rem;
+}
+
+.netbox-utilities-tenant .tenant-filter-label {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}

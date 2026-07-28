@@ -1,0 +1,44 @@
+<div class="nav-item dropdown netbox-utilities-tenant">
+  <button
+    class="nav-link px-2"
+    type="button"
+    data-bs-toggle="dropdown"
+    aria-expanded="false"
+    title="Globaler Mandantenfilter"
+    aria-label="Globaler Mandantenfilter"
+  >
+    <i class="mdi mdi-domain" aria-hidden="true"></i>
+    <span class="d-none d-xl-inline ms-1 tenant-filter-label">
+      {% if selected_tenant %}{{ selected_tenant }}{% else %}Alle Mandanten{% endif %}
+    </span>
+    <i class="mdi mdi-chevron-down" aria-hidden="true"></i>
+  </button>
+  <div class="dropdown-menu dropdown-menu-end p-3 tenant-filter-menu">
+    <form action="{% url 'plugins:netbox_utilities:select_tenant' %}" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ return_url }}">
+      <label class="form-label fw-bold">
+        Mandant
+      </label>
+      <select
+        class="form-select"
+        name="tenant"
+        onchange="this.form.submit()"
+        aria-label="Mandant global auswählen"
+      >
+        <option value="">Alle Mandanten</option>
+        {% for tenant in tenants %}
+          <option value="{{ tenant.pk }}"{% if selected_tenant.pk == tenant.pk %} selected{% endif %}>
+            {{ tenant.name }}
+          </option>
+        {% endfor %}
+      </select>
+      <noscript>
+        <button class="btn btn-primary w-100 mt-2" type="submit">Anwenden</button>
+      </noscript>
+      <p class="text-secondary small mb-0 mt-2">
+        Wirkt auf mandantenfähige Listen und die globale Suche.
+      </p>
+    </form>
+  </div>
+</div>
