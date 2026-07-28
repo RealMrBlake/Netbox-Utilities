@@ -1,5 +1,5 @@
 from netbox.plugins import PluginTemplateExtension
-from tenancy.models import Tenant
+from tenancy.models import Tenant, TenantGroup
 
 from .models import NavigationPreference
 from .navigation_helpers import get_visible_menus, normalize_preferences
@@ -37,11 +37,14 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
             return ""
 
         tenants = Tenant.objects.restrict(request.user, "view").order_by("name")
+        tenant_groups = TenantGroup.objects.restrict(request.user, "view").order_by("name")
         return self.render(
             "netbox_utilities/tenant_dropdown.html",
             {
                 "tenants": tenants,
+                "tenant_groups": tenant_groups,
                 "selected_tenant": getattr(request, "netbox_utilities_tenant", None),
+                "selected_tenant_group": getattr(request, "netbox_utilities_tenant_group", None),
                 "return_url": request.get_full_path(),
             },
         )

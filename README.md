@@ -1,11 +1,12 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit zwei Funktionen:
+Plugin für **NetBox 4.6.5** mit drei Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
-- Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Mandantenfilter für mandantenfähige Listen und die globale Suche.
+- Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
+- Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
 
-Die Navigationseinstellungen sind benutzerbezogen. Der aktive Mandant wird in der jeweiligen Browser-Session gespeichert.
+Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
 ## Kompatibilität
 
@@ -28,7 +29,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.1.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.2.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -61,6 +62,7 @@ PLUGINS_CONFIG = {
     "netbox_utilities": {
         "navigation_customization_enabled": True,
         "tenant_filter_enabled": True,
+        "tenant_required": True,
     },
 }
 ```
@@ -129,23 +131,42 @@ Unter **Plugins > NetBox Utilities > Navigation personalisieren** sieht der Benu
 
 Die Funktion kann installationsweit über `navigation_customization_enabled = False` in `PLUGINS_CONFIG` abgeschaltet werden.
 
-### Globaler Mandantenfilter
+### Globaler Mandanten- und Gruppenfilter
 
-Das Gebäude-Symbol in der Kopfleiste öffnet die Mandantenauswahl. Zur Auswahl stehen nur Mandanten, die der angemeldete Benutzer gemäß NetBox-Objektberechtigungen sehen darf. **Alle Mandanten** hebt den Filter auf.
+Das Gebäude-Symbol in der Kopfleiste öffnet die Auswahl. Zur Auswahl stehen
+Mandanten und Mandantengruppen, die der angemeldete Benutzer gemäß
+NetBox-Objektberechtigungen sehen darf. Eine Mandantengruppe umfasst auch die
+Mandanten ihrer untergeordneten Gruppen. **Alle Mandanten** hebt den Filter auf.
 
 Der Filter:
 
-- erzwingt `tenant_id` in allen NetBox-Listen, deren FilterSet dieses Feld unterstützt;
-- beschränkt die Mandantenliste auf den gewählten Mandanten;
+- erzwingt je nach Auswahl `tenant_id` oder `tenant_group_id` in unterstützten NetBox-Listen;
+- beschränkt die Mandantenliste auf den gewählten Mandanten beziehungsweise die gewählte Gruppe;
 - beschränkt Ergebnisse der globalen NetBox-Suche;
 - gilt auch für HTMX-Tabellenupdates und Exporte aus einer gefilterten Liste;
 - verändert keine REST- oder GraphQL-Anfrage.
 
 Superuser können die Funktion unter **Plugins > NetBox Utilities > Einstellungen** zur Laufzeit deaktivieren. Zusätzlich kann `tenant_filter_enabled = False` in `PLUGINS_CONFIG` sie hart abschalten; diese Konfiguration hat Vorrang vor der Einstellung in der Oberfläche.
 
+### Verpflichtende Mandantenzuordnung
+
+Standardmäßig ist unter **Plugins > NetBox Utilities > Einstellungen** die
+verpflichtende Mandantenzuordnung aktiviert. Bei allen Objekttypen, die in
+NetBox ein `tenant`-Feld besitzen, wird dieses Feld als Pflichtfeld behandelt.
+Die Prüfung greift in Formularen, CSV-Importen, der REST-API und bei normalen
+Aufrufen von `Model.save()` aus Skripten.
+
+Bestehende Objekte ohne Mandant bleiben nach Aktivierung zunächst bestehen.
+Beim nächsten Speichern eines solchen Objekts muss ein Mandant ergänzt werden.
+Globale Referenzmodelle ohne `tenant`-Feld sind nicht betroffen.
+
+Die Einstellung kann durch einen Superuser deaktiviert werden. Mit
+`tenant_required = False` in `PLUGINS_CONFIG` wird sie installationsweit fest
+deaktiviert; diese Konfiguration hat Vorrang vor der Admin-Oberfläche.
+
 ## Wichtige Semantik
 
-Der Mandantenfilter ist ein **Ansichtsfilter und keine Zugriffskontrolle**. Direkte Objekt-URLs werden nicht gesperrt. NetBox-Objektberechtigungen bleiben die maßgebliche Sicherheitsgrenze.
+Der Mandantenfilter ist ein **Ansichtsfilter und keine Zugriffskontrolle**. Direkte Objekt-URLs werden nicht gesperrt. NetBox-Objektberechtigungen bleiben die maßgebliche Sicherheitsgrenze. Die verpflichtende Mandantenzuordnung ist dagegen eine serverseitige Datenvalidierung.
 
 Nur Modelle mit einer Mandantenzuordnung werden eingeschränkt. Globale Referenzdaten wie Hersteller, Rollen oder Plattformen bleiben sichtbar, weil sie keinem Mandanten gehören und für die Darstellung bzw. Bearbeitung mandantengebundener Objekte benötigt werden.
 

@@ -28,6 +28,7 @@ class UtilitiesSettings(models.Model):
         validators=[MinValueValidator(1)],
     )
     tenant_filter_enabled = models.BooleanField(default=True)
+    tenant_required = models.BooleanField(default=True)
     updated = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "netbox-utilities"
-version = "0.1.0"
+version = "0.2.0"
 description = "Personal navigation and a global tenant filter for NetBox 4.6"
 readme = "README.md"
 requires-python = ">=3.12"

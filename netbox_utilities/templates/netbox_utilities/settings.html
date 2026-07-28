@@ -10,11 +10,16 @@
   <div class="row justify-content-center">
     <div class="col col-md-9 col-xl-7">
       <div class="card">
-        <div class="card-header"><h2 class="card-title">Mandantenfilter</h2></div>
+        <div class="card-header"><h2 class="card-title">Mandanten</h2></div>
         <div class="card-body">
-          {% if config_forces_disabled %}
+          {% if tenant_filter_locked %}
             <div class="alert alert-warning">
               Der Mandantenfilter ist in <code>PLUGINS_CONFIG</code> fest deaktiviert und kann hier nicht aktiviert werden.
+            </div>
+          {% endif %}
+          {% if tenant_required_locked %}
+            <div class="alert alert-warning">
+              Die verpflichtende Mandantenzuordnung ist in <code>PLUGINS_CONFIG</code> fest deaktiviert.
             </div>
           {% endif %}
           <form method="post">
@@ -27,9 +32,18 @@
               </label>
             </div>
             <div class="form-text mb-3">{{ form.tenant_filter_enabled.help_text }}</div>
-            <button class="btn btn-primary" type="submit"{% if config_forces_disabled %} disabled{% endif %}>
-              Speichern
-            </button>
+            <div class="form-check form-switch mt-4">
+              {{ form.tenant_required }}
+              <label class="form-check-label fw-bold" for="{{ form.tenant_required.id_for_label }}">
+                {{ form.tenant_required.label }}
+              </label>
+            </div>
+            <div class="form-text mb-3">{{ form.tenant_required.help_text }}</div>
+            <div class="alert alert-info">
+              Die Pflicht gilt nur für Objekttypen, die in NetBox ein Mandantenfeld besitzen.
+              Bestehende Objekte ohne Mandant müssen beim nächsten Speichern ergänzt werden.
+            </div>
+            <button class="btn btn-primary" type="submit">Speichern</button>
           </form>
         </div>
       </div>

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from netbox_utilities.tenant_scope import object_matches_tenant
+from netbox_utilities.tenant_scope import object_matches_tenant, object_matches_tenant_ids
 
 
 class FakeMeta:
@@ -32,3 +32,8 @@ class TenantScopeTest(SimpleTestCase):
     def test_unassigned_tenant_object_is_hidden(self):
         obj = SimpleNamespace(_meta=FakeMeta("tenant"), tenant_id=None)
         self.assertFalse(object_matches_tenant(obj, 42))
+
+    def test_object_matches_any_tenant_in_group_scope(self):
+        obj = SimpleNamespace(_meta=FakeMeta("tenant"), tenant_id=43)
+        self.assertTrue(object_matches_tenant_ids(obj, frozenset({42, 43})))
+        self.assertFalse(object_matches_tenant_ids(obj, frozenset({7, 8})))

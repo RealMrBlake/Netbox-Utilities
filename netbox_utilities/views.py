@@ -6,10 +6,14 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from netbox.plugins import get_plugin_config
-from tenancy.models import Tenant
+from tenancy.models import Tenant, TenantGroup
 
 from .forms import UtilitiesSettingsForm
-from .middleware import SESSION_TENANT_KEY
+from .middleware import (
+    SESSION_TENANT_GROUP_KEY,
+    SESSION_TENANT_KEY,
+    GlobalTenantFilterMiddleware,
+)
 from .models import NavigationPreference, UtilitiesSettings
 from .navigation_helpers import get_visible_menus, normalize_preferences
 from .runtime import (
@@ -87,25 +91,35 @@ class UtilitiesSettingsView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def get(self, request):
         instance, _ = UtilitiesSettings.objects.get_or_create(singleton_id=1)
+        tenant_filter_locked = not get_plugin_config("netbox_utilities", "tenant_filter_enabled")
+        tenant_required_locked = not get_plugin_config("netbox_utilities", "tenant_required")
         return render(
             request,
             self.template_name,
             {
-                "form": UtilitiesSettingsForm(instance=instance),
-                "config_forces_disabled": not get_plugin_config("netbox_utilities", "tenant_filter_enabled"),
+                "form": UtilitiesSettingsForm(
+                    instance=instance,
+                    tenant_filter_locked=tenant_filter_locked,
+                    tenant_required_locked=tenant_required_locked,
+                ),
+                "tenant_filter_locked": tenant_filter_locked,
+                "tenant_required_locked": tenant_required_locked,
             },
         )
 
     def post(self, request):
-        if not get_plugin_config("netbox_utilities", "tenant_filter_enabled"):
-            return HttpResponseBadRequest("Der Mandantenfilter ist in PLUGINS_CONFIG deaktiviert.")
         instance, _ = UtilitiesSettings.objects.get_or_create(singleton_id=1)
-        form = UtilitiesSettingsForm(request.POST, instance=instance)
+        form = UtilitiesSettingsForm(
+            request.POST,
+            instance=instance,
+            tenant_filter_locked=not get_plugin_config("netbox_utilities", "tenant_filter_enabled"),
+            tenant_required_locked=not get_plugin_config("netbox_utilities", "tenant_required"),
+        )
         if form.is_valid():
             form.save()
             clear_runtime_settings_cache()
-            if not form.cleaned_data["tenant_filter_enabled"]:
-                request.session.pop(SESSION_TENANT_KEY, None)
+            if not tenant_filter_enabled():
+                GlobalTenantFilterMiddleware.clear_scope(request)
             messages.success(request, "Die Plugin-Einstellungen wurden gespeichert.")
             return redirect("plugins:netbox_utilities:settings")
         return render(request, self.template_name, {"form": form})
@@ -118,15 +132,32 @@ class SelectTenantView(LoginRequiredMixin, View):
         if not tenant_filter_enabled():
             return HttpResponseBadRequest("Der globale Mandantenfilter ist deaktiviert.")
 
-        tenant_id = request.POST.get("tenant")
-        if tenant_id:
-            tenant = Tenant.objects.restrict(request.user, "view").filter(pk=tenant_id).first()
+        scope_value = request.POST.get("scope") or request.POST.get("tenant", "")
+        if not scope_value:
+            GlobalTenantFilterMiddleware.clear_scope(request)
+            messages.success(request, "Der globale Mandantenfilter wurde aufgehoben.")
+            return redirect(_safe_return_url(request))
+
+        if ":" in scope_value:
+            scope_kind, object_id = scope_value.split(":", 1)
+        else:
+            scope_kind, object_id = "tenant", scope_value
+
+        if scope_kind == "tenant":
+            tenant = Tenant.objects.restrict(request.user, "view").filter(pk=object_id).first()
             if tenant is None:
                 return HttpResponseBadRequest("Unbekannter oder nicht erlaubter Mandant.")
+            request.session.pop(SESSION_TENANT_GROUP_KEY, None)
             request.session[SESSION_TENANT_KEY] = tenant.pk
             messages.success(request, f"Globaler Mandantenfilter: {tenant}")
-        else:
+        elif scope_kind == "group":
+            group = TenantGroup.objects.restrict(request.user, "view").filter(pk=object_id).first()
+            if group is None:
+                return HttpResponseBadRequest("Unbekannte oder nicht erlaubte Mandantengruppe.")
             request.session.pop(SESSION_TENANT_KEY, None)
-            messages.success(request, "Der globale Mandantenfilter wurde aufgehoben.")
+            request.session[SESSION_TENANT_GROUP_KEY] = group.pk
+            messages.success(request, f"Globale Mandantengruppe: {group}")
+        else:
+            return HttpResponseBadRequest("Ungültiger Mandantenfilter.")
 
         return redirect(_safe_return_url(request))

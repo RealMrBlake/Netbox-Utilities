@@ -9,7 +9,13 @@
   >
     <i class="mdi mdi-domain" aria-hidden="true"></i>
     <span class="d-none d-xl-inline ms-1 tenant-filter-label">
-      {% if selected_tenant %}{{ selected_tenant }}{% else %}Alle Mandanten{% endif %}
+      {% if selected_tenant %}
+        {{ selected_tenant }}
+      {% elif selected_tenant_group %}
+        {{ selected_tenant_group }}
+      {% else %}
+        Alle Mandanten
+      {% endif %}
     </span>
     <i class="mdi mdi-chevron-down" aria-hidden="true"></i>
   </button>
@@ -18,26 +24,39 @@
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ return_url }}">
       <label class="form-label fw-bold">
-        Mandant
+        Mandant oder Mandantengruppe
       </label>
       <select
         class="form-select"
-        name="tenant"
+        name="scope"
         onchange="this.form.submit()"
         aria-label="Mandant global auswählen"
       >
         <option value="">Alle Mandanten</option>
-        {% for tenant in tenants %}
-          <option value="{{ tenant.pk }}"{% if selected_tenant.pk == tenant.pk %} selected{% endif %}>
-            {{ tenant.name }}
-          </option>
-        {% endfor %}
+        {% if tenant_groups %}
+          <optgroup label="Mandantengruppen">
+            {% for group in tenant_groups %}
+              <option value="group:{{ group.pk }}"{% if selected_tenant_group.pk == group.pk %} selected{% endif %}>
+                {{ group.name }}
+              </option>
+            {% endfor %}
+          </optgroup>
+        {% endif %}
+        {% if tenants %}
+          <optgroup label="Mandanten">
+            {% for tenant in tenants %}
+              <option value="tenant:{{ tenant.pk }}"{% if selected_tenant.pk == tenant.pk %} selected{% endif %}>
+                {{ tenant.name }}
+              </option>
+            {% endfor %}
+          </optgroup>
+        {% endif %}
       </select>
       <noscript>
         <button class="btn btn-primary w-100 mt-2" type="submit">Anwenden</button>
       </noscript>
       <p class="text-secondary small mb-0 mt-2">
-        Wirkt auf mandantenfähige Listen und die globale Suche.
+        Gruppen schließen alle direkt und untergeordnet zugeordneten Mandanten ein.
       </p>
     </form>
   </div>
