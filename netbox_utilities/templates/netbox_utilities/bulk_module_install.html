@@ -1,0 +1,36 @@
+{% extends 'base/layout.html' %}
+{% load form_helpers %}
+
+{% block title %}Module mehrfach einbauen{% endblock %}
+
+{% render_errors form %}
+
+{% block content %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="row mb-3">
+      <div class="col col-md-8 col-xl-6 offset-md-2 offset-xl-3">
+        <div class="card">
+          <h2 class="card-header">Module mehrfach einbauen</h2>
+          <div class="card-body">
+            <div class="alert alert-info">
+              In alle ausgewählten Modulschächte wird derselbe Modultyp eingebaut.
+              Seriennummern und Asset-Tags können anschließend je Modul ergänzt werden.
+              Tritt bei einem Modul ein Fehler auf, wird keines der ausgewählten Module gespeichert.
+            </div>
+            {% render_form form %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col col-md-8 col-xl-6 offset-md-2 offset-xl-3 text-end">
+        <a href="{{ return_url }}" class="btn btn-outline-secondary">Abbrechen</a>
+        <button type="submit" class="btn btn-primary">
+          <i class="mdi mdi-package-variant-plus" aria-hidden="true"></i>
+          Module einbauen
+        </button>
+      </div>
+    </div>
+  </form>
+{% endblock content %}

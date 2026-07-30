@@ -1,3 +1,4 @@
+from dcim.models import ModuleBay
 from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
@@ -50,4 +51,25 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
         )
 
 
-template_extensions = [UtilitiesGlobalContent]
+class DeviceUtilitiesContent(PluginTemplateExtension):
+    models = ["dcim.device"]
+
+    def buttons(self):
+        request = self.context["request"]
+        device = self.context["object"]
+        if not request.user.has_perm("dcim.add_module"):
+            return ""
+        if (
+            not ModuleBay.objects.restrict(request.user, "view")
+            .filter(
+                device=device,
+                enabled=True,
+                installed_module__isnull=True,
+            )
+            .exists()
+        ):
+            return ""
+        return self.render("netbox_utilities/device_bulk_module_button.html")
+
+
+template_extensions = [UtilitiesGlobalContent, DeviceUtilitiesContent]

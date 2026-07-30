@@ -1,10 +1,11 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit drei Funktionen:
+Plugin für **NetBox 4.6.5** mit vier Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
 - Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
+- Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
@@ -29,7 +30,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.2.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.3.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -124,6 +125,27 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### Module mehrfach einbauen
+
+Unter **Plugins > NetBox Utilities > Module mehrfach einbauen** kann ein
+Benutzer ein Gerät, einen Modultyp und mehrere freie Modulschächte auswählen.
+Auf Geräteseiten mit freien Modulschächten steht dieselbe Funktion zusätzlich
+über die Schaltfläche **Module mehrfach einbauen** zur Verfügung; das Gerät ist
+dort bereits vorausgewählt. Das funktioniert sowohl für modulare Patchpanels
+als auch für andere NetBox-Geräte mit Modulschächten.
+
+Alle ausgewählten Schächte erhalten denselben Modultyp, Status und dieselbe
+Beschreibung. Optional werden die Komponenten aus den Vorlagen des Modultyps
+für jedes Modul repliziert. NetBox prüft dabei jeden Einbau mit derselben Logik
+wie beim einzelnen Modul. Der Vorgang ist atomar: Ist ein Schacht inzwischen
+belegt oder entsteht ein Komponenten-/Namenskonflikt, wird keines der Module
+gespeichert. Individuelle Seriennummern und Asset-Tags werden anschließend an
+den einzelnen Modulen gepflegt.
+
+Benötigt wird die NetBox-Berechtigung zum Hinzufügen von Modulen. Geräte,
+Modultypen und Modulschächte werden zusätzlich durch die bestehenden
+NetBox-Objektberechtigungen des Benutzers eingeschränkt.
 
 ### Navigation personalisieren
 

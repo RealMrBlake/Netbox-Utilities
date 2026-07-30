@@ -4,8 +4,8 @@ from netbox.plugins import PluginConfig
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Personal navigation and a global tenant filter"
-    version = "0.2.0"
+    description = "Personal navigation, global tenant filtering, and bulk module installation"
+    version = "0.3.0"
     author = "LKE"
     base_url = "utilities"
     min_version = "4.6.5"

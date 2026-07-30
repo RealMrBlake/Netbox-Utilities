@@ -1,3 +1,4 @@
+from dcim.models import Device, Module
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseBadRequest
@@ -7,14 +8,16 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from netbox.plugins import get_plugin_config
 from tenancy.models import Tenant, TenantGroup
+from utilities.views import ContentTypePermissionRequiredMixin
 
-from .forms import UtilitiesSettingsForm
+from .forms import BulkModuleInstallForm, UtilitiesSettingsForm
 from .middleware import (
     SESSION_TENANT_GROUP_KEY,
     SESSION_TENANT_KEY,
     GlobalTenantFilterMiddleware,
 )
 from .models import NavigationPreference, UtilitiesSettings
+from .module_installation import BulkModuleInstallError, install_modules
 from .navigation_helpers import get_visible_menus, normalize_preferences
 from .runtime import (
     clear_runtime_settings_cache,
@@ -32,6 +35,71 @@ def _safe_return_url(request, default_name="home"):
     ):
         return candidate
     return reverse(default_name)
+
+
+class BulkModuleInstallView(ContentTypePermissionRequiredMixin, View):
+    template_name = "netbox_utilities/bulk_module_install.html"
+
+    def get_required_permission(self):
+        return "dcim.add_module"
+
+    def get(self, request):
+        initial_device = self._get_device(request.GET.get("device"), request.user)
+        form = BulkModuleInstallForm(
+            user=request.user,
+            initial={"device": initial_device} if initial_device else None,
+        )
+        return self._render(request, form, initial_device)
+
+    def post(self, request):
+        form = BulkModuleInstallForm(request.POST, user=request.user)
+        if form.is_valid():
+            try:
+                installed_modules = install_modules(
+                    device=form.cleaned_data["device"],
+                    module_type=form.cleaned_data["module_type"],
+                    module_bays=form.cleaned_data["module_bays"],
+                    status=form.cleaned_data["status"],
+                    replicate_components=form.cleaned_data["replicate_components"],
+                    description=form.cleaned_data["description"],
+                    permitted_modules=Module.objects.restrict(request.user, "add"),
+                )
+            except BulkModuleInstallError as error:
+                form.add_error(None, str(error))
+            else:
+                device = form.cleaned_data["device"]
+                count = len(installed_modules)
+                if count == 1:
+                    success_message = f"Ein Modul des Typs {form.cleaned_data['module_type']} wurde eingebaut."
+                else:
+                    success_message = f"{count} Module des Typs {form.cleaned_data['module_type']} wurden eingebaut."
+                messages.success(request, success_message)
+                return redirect("dcim:device_modulebays", pk=device.pk)
+
+        selected_device = form.cleaned_data.get("device") if hasattr(form, "cleaned_data") else None
+        if selected_device is None:
+            selected_device = self._get_device(request.POST.get("device"), request.user)
+        return self._render(request, form, selected_device)
+
+    @staticmethod
+    def _get_device(device_id, user):
+        if not device_id:
+            return None
+        return Device.objects.restrict(user, "view").filter(pk=device_id).first()
+
+    def _render(self, request, form, device):
+        if device:
+            return_url = reverse("dcim:device_modulebays", kwargs={"pk": device.pk})
+        else:
+            return_url = reverse("dcim:module_list")
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "return_url": return_url,
+            },
+        )
 
 
 class NavigationPreferencesView(LoginRequiredMixin, View):
