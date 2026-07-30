@@ -21,9 +21,19 @@ class BulkModuleInstallForm(forms.Form):
     module_bays = DynamicModelMultipleChoiceField(
         label="Modulschächte",
         queryset=ModuleBay.objects.all(),
+        required=False,
         query_params={"device_id": "$device"},
         context={"disabled": "_occupied"},
-        help_text="Alle ausgewählten Modulschächte erhalten ein Modul des gewählten Typs.",
+        help_text="Bestimmte freie Schächte auswählen. Alternativ kann die Anzahl verwendet werden.",
+    )
+    quantity = forms.IntegerField(
+        label="Anzahl (1–x)",
+        required=False,
+        min_value=1,
+        help_text=(
+            "Baut die angegebene Anzahl automatisch in die ersten freien Modulschächte ein. "
+            "Nicht zusammen mit einer manuellen Schachtauswahl verwenden."
+        ),
     )
     status = forms.ChoiceField(
         label="Status",
@@ -56,12 +66,35 @@ class BulkModuleInstallForm(forms.Form):
             device = device.pk
         if device:
             module_bays = module_bays.filter(device_id=device)
+        self.available_module_bays = module_bays
         self.fields["module_bays"].queryset = module_bays
 
     def clean(self):
         cleaned_data = super().clean()
         device = cleaned_data.get("device")
         module_bays = cleaned_data.get("module_bays")
+        quantity = cleaned_data.get("quantity")
+
+        if module_bays and quantity:
+            self.add_error("quantity", "Anzahl und manuelle Schachtauswahl können nicht kombiniert werden.")
+        elif not module_bays and not quantity and "module_bays" not in self.errors and "quantity" not in self.errors:
+            self.add_error(None, "Wählen Sie Modulschächte aus oder geben Sie eine Anzahl ein.")
+        elif quantity and device:
+            available_bays = self.available_module_bays
+            available_count = available_bays.count()
+            if quantity > available_count:
+                availability = (
+                    "nur ein freier Modulschacht"
+                    if available_count == 1
+                    else f"nur {available_count} freie Modulschächte"
+                )
+                self.add_error(
+                    "quantity",
+                    f"Für dieses Gerät sind {availability} verfügbar.",
+                )
+            else:
+                cleaned_data["module_bays"] = list(available_bays[:quantity])
+
         if device and module_bays:
             invalid_bays = [
                 module_bay.name

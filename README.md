@@ -30,7 +30,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.3.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.3.1"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -135,7 +135,12 @@ Auf Geräteseiten mit freien Modulschächten steht dieselbe Funktion zusätzlich
 dort bereits vorausgewählt. Das funktioniert sowohl für modulare Patchpanels
 als auch für andere NetBox-Geräte mit Modulschächten.
 
-Alle ausgewählten Schächte erhalten denselben Modultyp, Status und dieselbe
+Der Benutzer kann entweder bestimmte freie Modulschächte auswählen oder über
+**Anzahl (1–x)** eine Menge eingeben. Bei der Mengenangabe verwendet das Plugin
+die ersten freien Modulschächte in der natürlichen NetBox-Reihenfolge. Beide
+Eingabearten können nicht miteinander kombiniert werden.
+
+Alle gewählten Schächte erhalten denselben Modultyp, Status und dieselbe
 Beschreibung. Optional werden die Komponenten aus den Vorlagen des Modultyps
 für jedes Modul repliziert. NetBox prüft dabei jeden Einbau mit derselben Logik
 wie beim einzelnen Modul. Der Vorgang ist atomar: Ist ein Schacht inzwischen
