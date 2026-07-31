@@ -2,7 +2,6 @@ from netbox.navigation.menu import get_menus
 
 SIDEBAR_WIDTH_MIN = 216
 SIDEBAR_WIDTH_MAX = 408
-SIDEBAR_WIDTH_STEP = 24
 SIDEBAR_WIDTH_DEFAULT = 288
 
 
@@ -12,19 +11,15 @@ def normalize_sidebar_width(value):
     except (TypeError, ValueError):
         return SIDEBAR_WIDTH_DEFAULT
 
-    width = min(SIDEBAR_WIDTH_MAX, max(SIDEBAR_WIDTH_MIN, width))
-    steps = (width - SIDEBAR_WIDTH_MIN + SIDEBAR_WIDTH_STEP // 2) // SIDEBAR_WIDTH_STEP
-    return SIDEBAR_WIDTH_MIN + steps * SIDEBAR_WIDTH_STEP
+    return min(SIDEBAR_WIDTH_MAX, max(SIDEBAR_WIDTH_MIN, width))
 
 
-def update_sidebar_layout(collapsed, width, action):
+def update_sidebar_layout(collapsed, width, action, requested_width=None):
     width = normalize_sidebar_width(width)
     if action == "toggle":
         return not collapsed, width
-    if action == "smaller":
-        return collapsed, max(SIDEBAR_WIDTH_MIN, width - SIDEBAR_WIDTH_STEP)
-    if action == "larger":
-        return collapsed, min(SIDEBAR_WIDTH_MAX, width + SIDEBAR_WIDTH_STEP)
+    if action == "resize":
+        return False, normalize_sidebar_width(requested_width)
     raise ValueError("Unbekannte Navigationsaktion.")
 
 

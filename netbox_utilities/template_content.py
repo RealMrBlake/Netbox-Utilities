@@ -4,12 +4,12 @@ from django.urls import reverse
 from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
+from . import __version__
 from .models import NavigationPreference
 from .navigation_helpers import (
     SIDEBAR_WIDTH_DEFAULT,
     SIDEBAR_WIDTH_MAX,
     SIDEBAR_WIDTH_MIN,
-    SIDEBAR_WIDTH_STEP,
     get_visible_menus,
     normalize_preferences,
     normalize_sidebar_width,
@@ -43,7 +43,6 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
                 "width": normalize_sidebar_width(preference.sidebar_width if preference else SIDEBAR_WIDTH_DEFAULT),
                 "width_min": SIDEBAR_WIDTH_MIN,
                 "width_max": SIDEBAR_WIDTH_MAX,
-                "width_step": SIDEBAR_WIDTH_STEP,
                 "layout_update_url": reverse("plugins:netbox_utilities:navigation_layout"),
                 "csrf_token": get_token(request),
             }
@@ -52,6 +51,7 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
             {
                 "navigation_enabled": request.user.is_authenticated and navigation_customization_enabled(),
                 "navigation_preferences": preference_data,
+                "asset_version": __version__,
             },
         )
 

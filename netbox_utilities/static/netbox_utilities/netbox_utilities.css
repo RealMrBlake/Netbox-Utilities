@@ -10,7 +10,7 @@
   white-space: nowrap;
 }
 
-.netbox-utilities-sidebar-controls {
+.netbox-utilities-sidebar-resizer {
   display: none;
 }
 
@@ -38,24 +38,77 @@
     width: var(--netbox-utilities-sidebar-effective-width);
   }
 
-  .netbox-utilities-sidebar-controls {
-    position: sticky;
-    bottom: 0.5rem;
-    z-index: 2;
-    display: flex;
-    justify-content: center;
-    gap: 0.25rem;
-    margin: 0.75rem;
-    padding: 0.35rem;
-    border: 1px solid var(--tblr-border-color-translucent);
-    border-radius: var(--tblr-border-radius);
-    background: var(--tblr-bg-surface);
-    box-shadow: var(--tblr-box-shadow-sm);
+  .netbox-utilities-sidebar-resizer {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--netbox-utilities-sidebar-effective-width) - 5px);
+    z-index: 1045;
+    display: block;
+    width: 10px;
+    cursor: col-resize;
+    touch-action: none;
+    outline: 0;
+    transition: left 160ms ease;
   }
 
-  .netbox-utilities-sidebar-control {
-    flex: 0 1 3rem;
-    padding-inline: 0.5rem;
+  .netbox-utilities-sidebar-resizer::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 2px;
+    content: '';
+    background: transparent;
+    transition: background-color 120ms ease;
+  }
+
+  .netbox-utilities-sidebar-resizer:hover::before,
+  .netbox-utilities-sidebar-resizer:focus-visible::before,
+  html.netbox-utilities-navigation-resizing .netbox-utilities-sidebar-resizer::before {
+    background: var(--tblr-primary);
+  }
+
+  .netbox-utilities-sidebar-toggle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    width: 24px;
+    height: 44px;
+    padding: 0;
+    color: var(--tblr-secondary-color);
+    cursor: pointer;
+    background: var(--tblr-bg-surface);
+    border: 1px solid var(--tblr-border-color);
+    border-radius: 0 var(--tblr-border-radius) var(--tblr-border-radius) 0;
+    box-shadow: var(--tblr-box-shadow-sm);
+    transform: translate(0, -50%);
+    place-items: center;
+  }
+
+  .netbox-utilities-sidebar-toggle:hover,
+  .netbox-utilities-sidebar-toggle:focus-visible {
+    color: var(--tblr-primary);
+    border-color: var(--tblr-primary);
+    outline: 0;
+  }
+
+  .netbox-utilities-sidebar-save-error::before {
+    background: var(--tblr-danger) !important;
+  }
+
+  html.netbox-utilities-navigation-resizing,
+  html.netbox-utilities-navigation-resizing body {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+
+  html.netbox-utilities-navigation-resizing .page > aside.navbar-vertical.navbar-expand-lg,
+  html.netbox-utilities-navigation-resizing .page > aside.navbar-vertical.navbar-expand-lg ~ .navbar,
+  html.netbox-utilities-navigation-resizing .page > aside.navbar-vertical.navbar-expand-lg ~ .page-wrapper,
+  html.netbox-utilities-navigation-resizing .netbox-utilities-sidebar-resizer {
+    transition: none;
   }
 
   html.netbox-utilities-navigation-collapsed .navbar-vertical.navbar-expand-lg > .container-fluid {
@@ -105,19 +158,17 @@
     box-shadow: var(--tblr-box-shadow-lg);
   }
 
-  html.netbox-utilities-navigation-collapsed .netbox-utilities-sidebar-controls {
-    margin-inline: 0;
-  }
-
-  html.netbox-utilities-navigation-collapsed .netbox-utilities-sidebar-control:not([data-action="toggle"]) {
-    display: none;
+  html.netbox-utilities-navigation-collapsed .netbox-utilities-sidebar-resizer {
+    cursor: e-resize;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg,
   html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .navbar,
-  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .page-wrapper {
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .page-wrapper,
+  .netbox-utilities-sidebar-resizer,
+  .netbox-utilities-sidebar-resizer::before {
     transition: none;
   }
 }

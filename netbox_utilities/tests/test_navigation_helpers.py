@@ -29,11 +29,11 @@ class NormalizePreferencesTest(SimpleTestCase):
 
 
 class SidebarLayoutTest(SimpleTestCase):
-    def test_normalizes_width_to_supported_steps(self):
+    def test_clamps_width_without_discrete_steps(self):
         self.assertEqual(normalize_sidebar_width(None), SIDEBAR_WIDTH_DEFAULT)
         self.assertEqual(normalize_sidebar_width(100), SIDEBAR_WIDTH_MIN)
         self.assertEqual(normalize_sidebar_width(500), SIDEBAR_WIDTH_MAX)
-        self.assertEqual(normalize_sidebar_width(300), 312)
+        self.assertEqual(normalize_sidebar_width(300), 300)
 
     def test_toggles_icon_only_mode(self):
         collapsed, width = update_sidebar_layout(False, SIDEBAR_WIDTH_DEFAULT, "toggle")
@@ -41,12 +41,15 @@ class SidebarLayoutTest(SimpleTestCase):
         self.assertTrue(collapsed)
         self.assertEqual(width, SIDEBAR_WIDTH_DEFAULT)
 
-    def test_resizes_within_limits(self):
-        self.assertEqual(update_sidebar_layout(False, SIDEBAR_WIDTH_MIN, "smaller")[1], SIDEBAR_WIDTH_MIN)
-        self.assertEqual(update_sidebar_layout(False, SIDEBAR_WIDTH_MAX, "larger")[1], SIDEBAR_WIDTH_MAX)
-        self.assertLess(
-            update_sidebar_layout(False, SIDEBAR_WIDTH_DEFAULT, "smaller")[1],
-            SIDEBAR_WIDTH_DEFAULT,
+    def test_resizes_continuously_within_limits_and_expands(self):
+        self.assertEqual(update_sidebar_layout(True, SIDEBAR_WIDTH_DEFAULT, "resize", 301), (False, 301))
+        self.assertEqual(
+            update_sidebar_layout(False, SIDEBAR_WIDTH_DEFAULT, "resize", 100),
+            (False, SIDEBAR_WIDTH_MIN),
+        )
+        self.assertEqual(
+            update_sidebar_layout(False, SIDEBAR_WIDTH_DEFAULT, "resize", 500),
+            (False, SIDEBAR_WIDTH_MAX),
         )
 
     def test_rejects_unknown_action(self):

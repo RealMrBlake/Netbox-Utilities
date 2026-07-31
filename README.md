@@ -32,7 +32,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.1"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -202,14 +202,13 @@ Unter **Plugins > NetBox Utilities > Navigation personalisieren** sieht der
 Benutzer alle Menüs, für die er aktuell Berechtigungen besitzt. Die Pfeiltasten
 ändern die Reihenfolge; der Schalter blendet ein Menü aus.
 
-Zusätzlich kann jeder Benutzer die Desktop-Navigation auf einen reinen
-**Icon-Modus** einklappen und die Breite der ausgeklappten Navigation zwischen
-216 und 408 Pixeln einstellen. Am unteren Rand der Navigation stehen dafür
-direkte Schaltflächen für **schmaler**, **einklappen/ausklappen** und **breiter**
-zur Verfügung. Änderungen über diese Schaltflächen werden sofort im
-Benutzerprofil gespeichert. Im Icon-Modus öffnen sich die Menüinhalte als
-seitliches Flyout; auf kleinen beziehungsweise mobilen Ansichten bleibt das
-normale NetBox-Menü erhalten.
+Zusätzlich kann jeder Benutzer die Desktop-Navigation direkt an der rechten
+Kante zwischen 216 und 408 Pixeln breiter oder schmaler ziehen. Ein kleiner
+Pfeilgriff in der Mitte dieser Kante klappt sie auf einen reinen **Icon-Modus**
+ein und wieder aus. Dafür gibt es kein zusätzliches Bedienmenü. Beim Ziehen
+wird die neue Breite nach dem Loslassen im Benutzerprofil gespeichert. Im
+Icon-Modus öffnen sich die Menüinhalte als seitliches Flyout; auf kleinen
+beziehungsweise mobilen Ansichten bleibt das normale NetBox-Menü erhalten.
 
 **Zurücksetzen** stellt neben Reihenfolge und Sichtbarkeit auch die normale
 ausgeklappte Breite von 288 Pixeln wieder her.

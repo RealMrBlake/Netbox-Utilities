@@ -20,12 +20,8 @@ from .models import NavigationPreference, UtilitiesSettings
 from .module_installation import BulkModuleInstallError, install_modules
 from .navigation_helpers import (
     SIDEBAR_WIDTH_DEFAULT,
-    SIDEBAR_WIDTH_MAX,
-    SIDEBAR_WIDTH_MIN,
-    SIDEBAR_WIDTH_STEP,
     get_visible_menus,
     normalize_preferences,
-    normalize_sidebar_width,
     update_sidebar_layout,
 )
 from .runtime import (
@@ -137,8 +133,6 @@ class NavigationPreferencesView(LoginRequiredMixin, View):
             )
             preference.menu_order = order
             preference.hidden_menus = hidden
-            preference.sidebar_collapsed = request.POST.get("sidebar_collapsed") == "on"
-            preference.sidebar_width = normalize_sidebar_width(request.POST.get("sidebar_width"))
         preference.save()
         messages.success(request, "Die persönliche Navigation wurde gespeichert.")
         return redirect("plugins:netbox_utilities:navigation_preferences")
@@ -159,13 +153,6 @@ class NavigationPreferencesView(LoginRequiredMixin, View):
             {
                 "menus": menus,
                 "feature_enabled": navigation_customization_enabled(),
-                "sidebar_collapsed": preference.sidebar_collapsed if preference else False,
-                "sidebar_width": normalize_sidebar_width(
-                    preference.sidebar_width if preference else SIDEBAR_WIDTH_DEFAULT
-                ),
-                "sidebar_width_min": SIDEBAR_WIDTH_MIN,
-                "sidebar_width_max": SIDEBAR_WIDTH_MAX,
-                "sidebar_width_step": SIDEBAR_WIDTH_STEP,
             },
         )
 
@@ -183,6 +170,7 @@ class NavigationLayoutView(LoginRequiredMixin, View):
                 preference.sidebar_collapsed,
                 preference.sidebar_width,
                 request.POST.get("action"),
+                request.POST.get("width"),
             )
         except ValueError as error:
             return HttpResponseBadRequest(str(error))

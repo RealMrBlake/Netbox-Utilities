@@ -16,10 +16,9 @@
   function normalizeWidth(value) {
     const minimum = Number(preferences.width_min) || 216;
     const maximum = Number(preferences.width_max) || 408;
-    const step = Number(preferences.width_step) || 24;
-    const requested = Number(value) || 288;
-    const snapped = minimum + Math.round((requested - minimum) / step) * step;
-    return Math.min(maximum, Math.max(minimum, snapped));
+    const requested = Number(value);
+    const width = Number.isFinite(requested) ? Math.round(requested) : 288;
+    return Math.min(maximum, Math.max(minimum, width));
   }
 
   function applyRootLayout() {
@@ -58,7 +57,8 @@
     sidebar.querySelectorAll(':scope > li.nav-item.dropdown > button.nav-link').forEach((button) => {
       if (preferences.collapsed) {
         button.dataset.netboxUtilitiesTitle = 'true';
-        button.title = button.getAttribute('aria-label') || '';
+        button.title =
+          button.getAttribute('aria-label') || button.querySelector('.nav-link-title')?.textContent.trim() || '';
         const menu = button.closest('.nav-item.dropdown')?.querySelector(':scope > .dropdown-menu.show');
         if (menu) {
           const top = Math.max(8, button.getBoundingClientRect().top);
@@ -94,111 +94,149 @@
     });
   }
 
-  function createControl(action, icon, label) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn btn-sm btn-ghost-secondary netbox-utilities-sidebar-control';
-    button.dataset.action = action;
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    const iconElement = document.createElement('i');
-    iconElement.className = `mdi ${icon}`;
-    iconElement.setAttribute('aria-hidden', 'true');
-    button.appendChild(iconElement);
-    return button;
+  async function saveLayout(action, width) {
+    const body = new URLSearchParams({action});
+    if (width !== undefined) body.set('width', String(width));
+    const response = await fetch(preferences.layout_update_url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'X-CSRFToken': preferences.csrf_token,
+      },
+      body,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
   }
 
-  function updateControls(controls, sidebar, pending = false) {
-    const minimum = Number(preferences.width_min) || 216;
-    const maximum = Number(preferences.width_max) || 408;
-    const smaller = controls.querySelector('[data-action="smaller"]');
-    const larger = controls.querySelector('[data-action="larger"]');
-    const toggle = controls.querySelector('[data-action="toggle"]');
-    const toggleIcon = toggle.querySelector('i');
-
-    smaller.disabled = pending || preferences.collapsed || preferences.width <= minimum;
-    larger.disabled = pending || preferences.collapsed || preferences.width >= maximum;
-    toggle.disabled = pending;
-    toggleIcon.className = preferences.collapsed
-      ? 'mdi mdi-arrow-expand-right'
-      : 'mdi mdi-arrow-collapse-left';
-    const toggleLabel = preferences.collapsed ? 'Navigation ausklappen' : 'Navigation auf Icons einklappen';
-    toggle.title = toggleLabel;
-    toggle.setAttribute('aria-label', toggleLabel);
-    updateMenuTitles(sidebar);
-  }
-
-  function applyAction(action) {
-    const step = Number(preferences.width_step) || 24;
-    if (action === 'toggle') preferences.collapsed = !preferences.collapsed;
-    if (action === 'smaller') preferences.width = normalizeWidth(preferences.width - step);
-    if (action === 'larger') preferences.width = normalizeWidth(preferences.width + step);
-    applyRootLayout();
-  }
-
-  function addLayoutControls(sidebarMenu, sidebar) {
+  function addResizeHandle(sidebarElement, sidebar) {
     if (!preferences.layout_update_url || !preferences.csrf_token) return;
 
-    const controls = document.createElement('div');
-    controls.className = 'netbox-utilities-sidebar-controls';
-    controls.setAttribute('role', 'group');
-    controls.setAttribute('aria-label', 'Navigationsgröße');
-    controls.append(
-      createControl('smaller', 'mdi-minus', 'Navigation schmaler'),
-      createControl('toggle', 'mdi-arrow-collapse-left', 'Navigation auf Icons einklappen'),
-      createControl('larger', 'mdi-plus', 'Navigation breiter')
-    );
+    const handle = document.createElement('div');
+    handle.className = 'netbox-utilities-sidebar-resizer';
+    handle.tabIndex = 0;
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'vertical');
+    handle.setAttribute('aria-label', 'Breite der Navigation ändern');
 
-    const releaseInfo = sidebarMenu.querySelector(':scope > .text-muted');
-    sidebarMenu.insertBefore(controls, releaseInfo || null);
-    updateControls(controls, sidebar);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'netbox-utilities-sidebar-toggle';
+    const toggleIcon = document.createElement('i');
+    toggleIcon.className = 'mdi';
+    toggleIcon.setAttribute('aria-hidden', 'true');
+    toggle.appendChild(toggleIcon);
+    handle.appendChild(toggle);
+    sidebarElement.appendChild(handle);
 
-    controls.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-action]');
-      if (!button || button.disabled) return;
+    let resizing = false;
+    let previousLayout = null;
 
-      const previous = {collapsed: preferences.collapsed, width: preferences.width};
-      applyAction(button.dataset.action);
-      updateControls(controls, sidebar, true);
+    function updateHandle() {
+      const minimum = Number(preferences.width_min) || 216;
+      const maximum = Number(preferences.width_max) || 408;
+      handle.setAttribute('aria-valuemin', String(minimum));
+      handle.setAttribute('aria-valuemax', String(maximum));
+      handle.setAttribute('aria-valuenow', String(preferences.collapsed ? minimum : preferences.width));
+      const label = preferences.collapsed ? 'Navigation ausklappen' : 'Navigation auf Icons einklappen';
+      toggle.title = label;
+      toggle.setAttribute('aria-label', label);
+      toggleIcon.className = preferences.collapsed ? 'mdi mdi-chevron-right' : 'mdi mdi-chevron-left';
+      updateMenuTitles(sidebar);
+    }
 
+    function applyWidth(clientX) {
+      preferences.collapsed = false;
+      preferences.width = normalizeWidth(clientX);
+      applyRootLayout();
+      updateHandle();
+    }
+
+    async function persist(action, width, fallback) {
       try {
-        const response = await fetch(preferences.layout_update_url, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'X-CSRFToken': preferences.csrf_token,
-          },
-          body: new URLSearchParams({action: button.dataset.action}),
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const saved = await response.json();
+        const saved = await saveLayout(action, width);
         preferences.collapsed = Boolean(saved.collapsed);
         preferences.width = normalizeWidth(saved.width);
-        controls.classList.remove('text-danger');
-        controls.removeAttribute('title');
+        handle.classList.remove('netbox-utilities-sidebar-save-error');
+        handle.removeAttribute('data-save-error');
       } catch (error) {
-        preferences.collapsed = previous.collapsed;
-        preferences.width = previous.width;
-        controls.classList.add('text-danger');
-        controls.title = 'Die Navigationseinstellung konnte nicht gespeichert werden.';
+        preferences.collapsed = fallback.collapsed;
+        preferences.width = fallback.width;
+        handle.classList.add('netbox-utilities-sidebar-save-error');
+        handle.dataset.saveError = 'Die Navigationseinstellung konnte nicht gespeichert werden.';
         console.error('Could not save NetBox navigation layout', error);
       }
-
       applyRootLayout();
-      updateControls(controls, sidebar);
+      updateHandle();
+    }
+
+    toggle.addEventListener('click', async () => {
+      if (toggle.disabled) return;
+      const previous = {collapsed: preferences.collapsed, width: preferences.width};
+      preferences.collapsed = !preferences.collapsed;
+      applyRootLayout();
+      updateHandle();
+      toggle.disabled = true;
+      await persist('toggle', undefined, previous);
+      toggle.disabled = false;
     });
+
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('button')) return;
+      event.preventDefault();
+      resizing = true;
+      previousLayout = {collapsed: preferences.collapsed, width: preferences.width};
+      handle.setPointerCapture(event.pointerId);
+      root.classList.add('netbox-utilities-navigation-resizing');
+      applyWidth(event.clientX);
+    });
+
+    handle.addEventListener('pointermove', (event) => {
+      if (resizing) applyWidth(event.clientX);
+    });
+
+    async function finishResize(event) {
+      if (!resizing) return;
+      resizing = false;
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      root.classList.remove('netbox-utilities-navigation-resizing');
+      const fallback = previousLayout;
+      previousLayout = null;
+      await persist('resize', preferences.width, fallback);
+    }
+
+    handle.addEventListener('pointerup', finishResize);
+    handle.addEventListener('pointercancel', finishResize);
+
+    handle.addEventListener('keydown', async (event) => {
+      const minimum = Number(preferences.width_min) || 216;
+      const maximum = Number(preferences.width_max) || 408;
+      const directions = {ArrowLeft: -16, ArrowRight: 16};
+      let width;
+      if (event.key in directions) width = preferences.width + directions[event.key];
+      if (event.key === 'Home') width = minimum;
+      if (event.key === 'End') width = maximum;
+      if (width === undefined) return;
+      event.preventDefault();
+      const previous = {collapsed: preferences.collapsed, width: preferences.width};
+      applyWidth(width);
+      await persist('resize', preferences.width, previous);
+    });
+
+    updateHandle();
   }
 
   function initializeNavigation() {
     const sidebarMenu = document.getElementById('sidebar-menu');
     const sidebar = document.querySelector('#sidebar-menu > ul.navbar-nav');
-    if (!sidebarMenu || !sidebar) return;
+    const sidebarElement = document.querySelector('.page > aside.navbar-vertical.navbar-expand-lg');
+    if (!sidebarMenu || !sidebar || !sidebarElement) return;
 
     applyMenuPreferences(sidebar);
     updateMenuTitles(sidebar);
     configureCollapsedDropdowns(sidebar);
-    addLayoutControls(sidebarMenu, sidebar);
+    addResizeHandle(sidebarElement, sidebar);
   }
 
   applyRootLayout();

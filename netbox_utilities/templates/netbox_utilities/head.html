@@ -1,6 +1,6 @@
 {% load static %}
-<link rel="stylesheet" href="{% static 'netbox_utilities/netbox_utilities.css' %}">
+<link rel="stylesheet" href="{% static 'netbox_utilities/netbox_utilities.css' %}?v={{ asset_version }}">
 {% if navigation_enabled %}
   {{ navigation_preferences|json_script:"netbox-utilities-navigation-data" }}
-  <script src="{% static 'netbox_utilities/navigation.js' %}" defer></script>
+  <script src="{% static 'netbox_utilities/navigation.js' %}?v={{ asset_version }}" defer></script>
 {% endif %}
