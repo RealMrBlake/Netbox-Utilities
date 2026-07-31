@@ -1,11 +1,12 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit vier Funktionen:
+Plugin für **NetBox 4.6.5** mit fünf Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
 - Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
+- Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
@@ -13,6 +14,7 @@ Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gr
 
 - NetBox `>=4.6.5,<4.7`
 - Python `>=3.12`
+- optional: NetBox Reorder Rack `1.1.4`
 
 Andere NetBox-Versionen werden vom Plugin absichtlich abgelehnt, da die Anpassung der Core-Navigation von deren HTML-Struktur abhängt.
 
@@ -30,7 +32,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.3.1"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.4.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -62,6 +64,7 @@ PLUGINS = [
 PLUGINS_CONFIG = {
     "netbox_utilities": {
         "navigation_customization_enabled": True,
+        "reorder_rack_bulk_save_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
     },
@@ -125,6 +128,47 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### Mehrere Geräte mit NetBox Reorder Rack verschieben
+
+Wenn `netbox-reorder-rack` in Version `1.1.4` installiert und aktiviert ist,
+erweitert NetBox Utilities dessen vorhandenen Speichervorgang automatisch.
+In der Drag-and-drop-Ansicht können mehrere Geräte verschoben oder miteinander
+getauscht und anschließend gemeinsam über **Save** gespeichert werden.
+
+Die optionale Abhängigkeit wird separat installiert und für spätere NetBox-
+Updates in `/opt/netbox/local_requirements.txt` aufgenommen:
+
+```bash
+/opt/netbox/venv/bin/pip install "netbox-reorder-rack==1.1.4"
+echo "netbox-reorder-rack==1.1.4" | sudo tee -a /opt/netbox/local_requirements.txt
+```
+
+Beide Plugins müssen in NetBox aktiviert sein; ihre Reihenfolge ist beliebig:
+
+```python
+PLUGINS = [
+    "netbox_reorder_rack",
+    "netbox_utilities",
+]
+```
+
+NetBox Utilities verändert keine Dateien des Reorder-Plugins. Stattdessen wird
+dessen API beim Start kompatibel erweitert. Beim Speichern werden alle
+betroffenen Geräte und das Rack gesperrt, die alten Positionen gemeinsam
+freigegeben und danach sämtliche Zielpositionen mit der normalen
+NetBox-Modellvalidierung geprüft. Der Vorgang läuft in einer Transaktion: Bei
+einem Platz-, Validierungs- oder Berechtigungsfehler bleibt das gesamte Rack
+unverändert. Für jedes tatsächlich verschobene Gerät entsteht weiterhin ein
+normaler NetBox-Änderungseintrag.
+
+Die Integration kann mit
+`reorder_rack_bulk_save_enabled = False` in `PLUGINS_CONFIG` deaktiviert werden.
+Andere Versionen als `1.1.4` werden aus Sicherheitsgründen nicht automatisch
+verändert und erzeugen lediglich einen Hinweis im NetBox-Log. Das
+Reorder-Projekt selbst weist derzeit offiziell nur Kompatibilität bis NetBox
+4.5 aus; die Erweiterung in diesem Plugin ist gezielt für die hier unterstützte
+NetBox-Version 4.6.5 umgesetzt.
 
 ### Module mehrfach einbauen
 

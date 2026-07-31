@@ -1,17 +1,18 @@
-from netbox.plugins import PluginConfig
+from netbox.plugins import PluginConfig, get_plugin_config
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Personal navigation, global tenant filtering, and bulk module installation"
-    version = "0.3.1"
+    description = "Navigation, tenant filtering, bulk module installation, and atomic rack reordering"
+    version = "0.4.0"
     author = "LKE"
     base_url = "utilities"
     min_version = "4.6.5"
     max_version = "4.6.99"
     default_settings = {
         "navigation_customization_enabled": True,
+        "reorder_rack_bulk_save_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
     }
@@ -26,6 +27,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
 
         install_search_filter()
         install_tenant_validation()
+        if get_plugin_config("netbox_utilities", "reorder_rack_bulk_save_enabled"):
+            from .reorder_rack import install_reorder_rack_bulk_save
+
+            install_reorder_rack_bulk_save()
 
 
 config = NetBoxUtilitiesConfig
