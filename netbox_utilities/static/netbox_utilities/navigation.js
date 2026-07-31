@@ -71,26 +71,72 @@
     });
   }
 
+  function closeDropdown(item) {
+    if (!item) return false;
+    const button = item.querySelector(':scope > button.nav-link');
+    const menu = item.querySelector(':scope > .dropdown-menu');
+    if (!button || !menu?.classList.contains('show')) return false;
+
+    // Let NetBox/Bootstrap tear down its Popper instance when available.
+    button.click();
+    if (!menu.classList.contains('show')) {
+      menu.style.removeProperty('--netbox-utilities-dropdown-top');
+      return true;
+    }
+
+    // Fallback for pages on which Bootstrap's data API is unavailable.
+    button.classList.remove('show');
+    button.setAttribute('aria-expanded', 'false');
+    menu.classList.remove('show');
+    menu.style.removeProperty('--netbox-utilities-dropdown-top');
+    return true;
+  }
+
+  function closeDropdowns(sidebar, exceptItem = null) {
+    sidebar.querySelectorAll(':scope > li.nav-item.dropdown').forEach((item) => {
+      if (item !== exceptItem) closeDropdown(item);
+    });
+  }
+
   function configureCollapsedDropdowns(sidebar) {
     sidebar.addEventListener('show.bs.dropdown', (event) => {
       if (!preferences.collapsed) return;
       const item = event.target.closest('.nav-item.dropdown');
       if (!item) return;
 
-      sidebar.querySelectorAll(':scope > li.nav-item.dropdown').forEach((otherItem) => {
-        if (otherItem === item) return;
-        const otherButton = otherItem.querySelector(':scope > button.nav-link');
-        const otherMenu = otherItem.querySelector(':scope > .dropdown-menu');
-        otherButton?.classList.remove('show');
-        otherButton?.setAttribute('aria-expanded', 'false');
-        otherMenu?.classList.remove('show');
-      });
+      closeDropdowns(sidebar, item);
 
       const button = item.querySelector(':scope > button.nav-link');
       const menu = item.querySelector(':scope > .dropdown-menu');
       if (!button || !menu) return;
       const top = Math.max(8, button.getBoundingClientRect().top);
       menu.style.setProperty('--netbox-utilities-dropdown-top', `${top}px`);
+    });
+
+    sidebar.addEventListener('click', (event) => {
+      if (!preferences.collapsed || !(event.target instanceof Element)) return;
+      const selectedOption = event.target.closest('.dropdown-menu a[href], .dropdown-menu button');
+      if (selectedOption) closeDropdown(selectedOption.closest('.nav-item.dropdown'));
+    });
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!preferences.collapsed || !(event.target instanceof Element)) return;
+        sidebar.querySelectorAll(':scope > li.nav-item.dropdown').forEach((item) => {
+          if (!item.contains(event.target)) closeDropdown(item);
+        });
+      },
+      true
+    );
+
+    document.addEventListener('keydown', (event) => {
+      if (!preferences.collapsed || event.key !== 'Escape') return;
+      const openItem = sidebar.querySelector(':scope > li.nav-item.dropdown > .dropdown-menu.show')?.closest('.nav-item');
+      if (openItem && closeDropdown(openItem)) {
+        openItem.querySelector(':scope > button.nav-link')?.focus();
+        event.preventDefault();
+      }
     });
   }
 
