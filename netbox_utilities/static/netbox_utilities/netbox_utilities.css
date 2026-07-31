@@ -9,3 +9,115 @@
   vertical-align: bottom;
   white-space: nowrap;
 }
+
+.netbox-utilities-sidebar-controls {
+  display: none;
+}
+
+@media (min-width: 992px) {
+  html.netbox-utilities-navigation-layout {
+    --netbox-utilities-sidebar-effective-width: var(--netbox-utilities-sidebar-width, 18rem);
+  }
+
+  html.netbox-utilities-navigation-collapsed {
+    --netbox-utilities-sidebar-effective-width: 4.5rem;
+  }
+
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg {
+    width: var(--netbox-utilities-sidebar-effective-width);
+    transition: width 160ms ease;
+  }
+
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .navbar,
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .page-wrapper {
+    margin-left: var(--netbox-utilities-sidebar-effective-width);
+    transition: margin-left 160ms ease;
+  }
+
+  html.netbox-utilities-navigation-layout .navbar-vertical.navbar-expand-lg img.motif {
+    width: var(--netbox-utilities-sidebar-effective-width);
+  }
+
+  .netbox-utilities-sidebar-controls {
+    position: sticky;
+    bottom: 0.5rem;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    gap: 0.25rem;
+    margin: 0.75rem;
+    padding: 0.35rem;
+    border: 1px solid var(--tblr-border-color-translucent);
+    border-radius: var(--tblr-border-radius);
+    background: var(--tblr-bg-surface);
+    box-shadow: var(--tblr-box-shadow-sm);
+  }
+
+  .netbox-utilities-sidebar-control {
+    flex: 0 1 3rem;
+    padding-inline: 0.5rem;
+  }
+
+  html.netbox-utilities-navigation-collapsed .navbar-vertical.navbar-expand-lg > .container-fluid {
+    padding-inline: 0.35rem;
+  }
+
+  html.netbox-utilities-navigation-collapsed .navbar-vertical.navbar-expand-lg .navbar-brand,
+  html.netbox-utilities-navigation-collapsed .navbar-vertical.navbar-expand-lg img.motif,
+  html.netbox-utilities-navigation-collapsed #sidebar-menu > .text-muted,
+  html.netbox-utilities-navigation-collapsed #sidebar-menu .nav-link-title,
+  html.netbox-utilities-navigation-collapsed #sidebar-menu .dropdown-toggle::after {
+    display: none !important;
+  }
+
+  html.netbox-utilities-navigation-collapsed #sidebar-menu,
+  html.netbox-utilities-navigation-collapsed #sidebar-menu > .navbar-nav {
+    width: 100%;
+  }
+
+  html.netbox-utilities-navigation-collapsed #sidebar-menu .nav-item.dropdown > button.nav-link {
+    justify-content: center;
+    min-height: 2.75rem;
+    padding-inline: 0;
+    text-align: center;
+  }
+
+  html.netbox-utilities-navigation-collapsed #sidebar-menu .nav-link-icon {
+    width: auto;
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  html.netbox-utilities-navigation-collapsed #sidebar-menu .nav-item.dropdown > .dropdown-menu {
+    position: fixed !important;
+    top: var(--netbox-utilities-dropdown-top, 0.5rem) !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: var(--netbox-utilities-sidebar-effective-width) !important;
+    z-index: 1040;
+    width: min(22rem, calc(100vw - var(--netbox-utilities-sidebar-effective-width) - 1rem));
+    max-height: calc(100vh - var(--netbox-utilities-dropdown-top, 0.5rem) - 0.5rem);
+    overflow-y: auto;
+    transform: none !important;
+    border: 1px solid var(--tblr-border-color);
+    border-radius: var(--tblr-border-radius);
+    background: var(--tblr-bg-surface);
+    box-shadow: var(--tblr-box-shadow-lg);
+  }
+
+  html.netbox-utilities-navigation-collapsed .netbox-utilities-sidebar-controls {
+    margin-inline: 0;
+  }
+
+  html.netbox-utilities-navigation-collapsed .netbox-utilities-sidebar-control:not([data-action="toggle"]) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg,
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .navbar,
+  html.netbox-utilities-navigation-layout .page > aside.navbar-vertical.navbar-expand-lg ~ .page-wrapper {
+    transition: none;
+  }
+}

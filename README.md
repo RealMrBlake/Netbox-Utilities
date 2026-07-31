@@ -32,7 +32,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.4.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -198,7 +198,21 @@ NetBox-Objektberechtigungen des Benutzers eingeschränkt.
 
 ### Navigation personalisieren
 
-Unter **Plugins > NetBox Utilities > Navigation personalisieren** sieht der Benutzer alle Menüs, für die er aktuell Berechtigungen besitzt. Die Pfeiltasten ändern die Reihenfolge; der Schalter blendet ein Menü aus. **Zurücksetzen** stellt die NetBox-Reihenfolge wieder her.
+Unter **Plugins > NetBox Utilities > Navigation personalisieren** sieht der
+Benutzer alle Menüs, für die er aktuell Berechtigungen besitzt. Die Pfeiltasten
+ändern die Reihenfolge; der Schalter blendet ein Menü aus.
+
+Zusätzlich kann jeder Benutzer die Desktop-Navigation auf einen reinen
+**Icon-Modus** einklappen und die Breite der ausgeklappten Navigation zwischen
+216 und 408 Pixeln einstellen. Am unteren Rand der Navigation stehen dafür
+direkte Schaltflächen für **schmaler**, **einklappen/ausklappen** und **breiter**
+zur Verfügung. Änderungen über diese Schaltflächen werden sofort im
+Benutzerprofil gespeichert. Im Icon-Modus öffnen sich die Menüinhalte als
+seitliches Flyout; auf kleinen beziehungsweise mobilen Ansichten bleibt das
+normale NetBox-Menü erhalten.
+
+**Zurücksetzen** stellt neben Reihenfolge und Sichtbarkeit auch die normale
+ausgeklappte Breite von 288 Pixeln wieder her.
 
 Die Funktion kann installationsweit über `navigation_customization_enabled = False` in `PLUGINS_CONFIG` abgeschaltet werden.
 

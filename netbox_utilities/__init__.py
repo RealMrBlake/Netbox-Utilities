@@ -5,7 +5,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
     description = "Navigation, tenant filtering, bulk module installation, and atomic rack reordering"
-    version = "0.4.0"
+    version = "0.5.0"
     author = "LKE"
     base_url = "utilities"
     min_version = "4.6.5"

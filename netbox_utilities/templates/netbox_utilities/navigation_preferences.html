@@ -22,11 +22,46 @@
             </div>
           {% else %}
             <p class="text-secondary">
-              Verschiebe Menüs mit den Pfeilen und blende nicht benötigte Bereiche aus.
+              Passe Breite und Darstellung an, verschiebe Menüs mit den Pfeilen und blende nicht benötigte Bereiche aus.
               Berechtigungen von NetBox werden dadurch nicht verändert.
             </p>
             <form method="post" id="navigation-preferences-form">
               {% csrf_token %}
+              <fieldset class="border rounded p-3 mb-4">
+                <legend class="float-none w-auto px-2 fs-4 mb-2">Darstellung</legend>
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="sidebar-collapsed"
+                    name="sidebar_collapsed"
+                    {% if sidebar_collapsed %}checked{% endif %}
+                  >
+                  <label class="form-check-label fw-medium" for="sidebar-collapsed">
+                    Eingeklappt – nur Hauptmenü-Icons anzeigen
+                  </label>
+                </div>
+                <label class="form-label fw-medium" for="sidebar-width">
+                  Breite im ausgeklappten Zustand:
+                  <output id="sidebar-width-output" for="sidebar-width">{{ sidebar_width }} px</output>
+                </label>
+                <input
+                  class="form-range"
+                  type="range"
+                  id="sidebar-width"
+                  name="sidebar_width"
+                  min="{{ sidebar_width_min }}"
+                  max="{{ sidebar_width_max }}"
+                  step="{{ sidebar_width_step }}"
+                  value="{{ sidebar_width }}"
+                >
+                <div class="d-flex justify-content-between text-secondary small">
+                  <span>Kleiner</span>
+                  <span>Standard: 288 px</span>
+                  <span>Größer</span>
+                </div>
+              </fieldset>
               <div class="list-group mb-3" id="navigation-menu-editor">
                 {% for menu in menus %}
                   <div class="list-group-item d-flex align-items-center gap-3 navigation-menu-row">
@@ -71,18 +106,27 @@
   <script>
     (() => {
       const editor = document.getElementById('navigation-menu-editor');
-      if (!editor) return;
-      editor.addEventListener('click', (event) => {
-        const button = event.target.closest('.move-up, .move-down');
-        if (!button) return;
-        const row = button.closest('.navigation-menu-row');
-        if (button.classList.contains('move-up') && row.previousElementSibling) {
-          editor.insertBefore(row, row.previousElementSibling);
-        }
-        if (button.classList.contains('move-down') && row.nextElementSibling) {
-          editor.insertBefore(row.nextElementSibling, row);
-        }
-      });
+      if (editor) {
+        editor.addEventListener('click', (event) => {
+          const button = event.target.closest('.move-up, .move-down');
+          if (!button) return;
+          const row = button.closest('.navigation-menu-row');
+          if (button.classList.contains('move-up') && row.previousElementSibling) {
+            editor.insertBefore(row, row.previousElementSibling);
+          }
+          if (button.classList.contains('move-down') && row.nextElementSibling) {
+            editor.insertBefore(row.nextElementSibling, row);
+          }
+        });
+      }
+
+      const width = document.getElementById('sidebar-width');
+      const output = document.getElementById('sidebar-width-output');
+      if (width && output) {
+        width.addEventListener('input', () => {
+          output.value = `${width.value} px`;
+        });
+      }
     })();
   </script>
 {% endblock content %}

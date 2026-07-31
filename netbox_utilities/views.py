@@ -1,7 +1,7 @@
 from dcim.models import Device, Module
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -18,7 +18,16 @@ from .middleware import (
 )
 from .models import NavigationPreference, UtilitiesSettings
 from .module_installation import BulkModuleInstallError, install_modules
-from .navigation_helpers import get_visible_menus, normalize_preferences
+from .navigation_helpers import (
+    SIDEBAR_WIDTH_DEFAULT,
+    SIDEBAR_WIDTH_MAX,
+    SIDEBAR_WIDTH_MIN,
+    SIDEBAR_WIDTH_STEP,
+    get_visible_menus,
+    normalize_preferences,
+    normalize_sidebar_width,
+    update_sidebar_layout,
+)
 from .runtime import (
     clear_runtime_settings_cache,
     navigation_customization_enabled,
@@ -116,6 +125,8 @@ class NavigationPreferencesView(LoginRequiredMixin, View):
         if "reset" in request.POST:
             preference.menu_order = []
             preference.hidden_menus = []
+            preference.sidebar_collapsed = False
+            preference.sidebar_width = SIDEBAR_WIDTH_DEFAULT
         else:
             descriptors = get_visible_menus(request.user)
             available_keys = [item["key"] for item in descriptors]
@@ -126,6 +137,8 @@ class NavigationPreferencesView(LoginRequiredMixin, View):
             )
             preference.menu_order = order
             preference.hidden_menus = hidden
+            preference.sidebar_collapsed = request.POST.get("sidebar_collapsed") == "on"
+            preference.sidebar_width = normalize_sidebar_width(request.POST.get("sidebar_width"))
         preference.save()
         messages.success(request, "Die persönliche Navigation wurde gespeichert.")
         return redirect("plugins:netbox_utilities:navigation_preferences")
@@ -146,8 +159,38 @@ class NavigationPreferencesView(LoginRequiredMixin, View):
             {
                 "menus": menus,
                 "feature_enabled": navigation_customization_enabled(),
+                "sidebar_collapsed": preference.sidebar_collapsed if preference else False,
+                "sidebar_width": normalize_sidebar_width(
+                    preference.sidebar_width if preference else SIDEBAR_WIDTH_DEFAULT
+                ),
+                "sidebar_width_min": SIDEBAR_WIDTH_MIN,
+                "sidebar_width_max": SIDEBAR_WIDTH_MAX,
+                "sidebar_width_step": SIDEBAR_WIDTH_STEP,
             },
         )
+
+
+class NavigationLayoutView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
+    def post(self, request):
+        if not navigation_customization_enabled():
+            return HttpResponseBadRequest("Die Navigationspersonalisierung ist deaktiviert.")
+
+        preference, _ = NavigationPreference.objects.get_or_create(user=request.user)
+        try:
+            collapsed, width = update_sidebar_layout(
+                preference.sidebar_collapsed,
+                preference.sidebar_width,
+                request.POST.get("action"),
+            )
+        except ValueError as error:
+            return HttpResponseBadRequest(str(error))
+
+        preference.sidebar_collapsed = collapsed
+        preference.sidebar_width = width
+        preference.save(update_fields=("sidebar_collapsed", "sidebar_width", "updated"))
+        return JsonResponse({"collapsed": collapsed, "width": width})
 
 
 class UtilitiesSettingsView(LoginRequiredMixin, UserPassesTestMixin, View):

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -11,6 +11,11 @@ class NavigationPreference(models.Model):
     )
     menu_order = models.JSONField(default=list, blank=True)
     hidden_menus = models.JSONField(default=list, blank=True)
+    sidebar_collapsed = models.BooleanField(default=False)
+    sidebar_width = models.PositiveSmallIntegerField(
+        default=288,
+        validators=[MinValueValidator(216), MaxValueValidator(408)],
+    )
     updated = models.DateTimeField(auto_now=True)
 
     class Meta:

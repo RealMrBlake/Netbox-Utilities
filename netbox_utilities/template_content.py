@@ -1,16 +1,32 @@
 from dcim.models import ModuleBay
+from django.middleware.csrf import get_token
+from django.urls import reverse
 from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
 from .models import NavigationPreference
-from .navigation_helpers import get_visible_menus, normalize_preferences
+from .navigation_helpers import (
+    SIDEBAR_WIDTH_DEFAULT,
+    SIDEBAR_WIDTH_MAX,
+    SIDEBAR_WIDTH_MIN,
+    SIDEBAR_WIDTH_STEP,
+    get_visible_menus,
+    normalize_preferences,
+    normalize_sidebar_width,
+)
 from .runtime import navigation_customization_enabled, tenant_filter_enabled
 
 
 class UtilitiesGlobalContent(PluginTemplateExtension):
     def head(self):
         request = self.context["request"]
-        preference_data = {"order": [], "hidden": [], "menus": []}
+        preference_data = {
+            "order": [],
+            "hidden": [],
+            "menus": [],
+            "collapsed": False,
+            "width": SIDEBAR_WIDTH_DEFAULT,
+        }
         if request.user.is_authenticated and navigation_customization_enabled():
             descriptors = get_visible_menus(request.user)
             preference = NavigationPreference.objects.filter(user=request.user).first()
@@ -23,6 +39,13 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
                 "order": order,
                 "hidden": hidden,
                 "menus": descriptors,
+                "collapsed": preference.sidebar_collapsed if preference else False,
+                "width": normalize_sidebar_width(preference.sidebar_width if preference else SIDEBAR_WIDTH_DEFAULT),
+                "width_min": SIDEBAR_WIDTH_MIN,
+                "width_max": SIDEBAR_WIDTH_MAX,
+                "width_step": SIDEBAR_WIDTH_STEP,
+                "layout_update_url": reverse("plugins:netbox_utilities:navigation_layout"),
+                "csrf_token": get_token(request),
             }
         return self.render(
             "netbox_utilities/head.html",
