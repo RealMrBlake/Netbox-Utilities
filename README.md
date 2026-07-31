@@ -32,7 +32,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.2"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.3"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -210,7 +210,8 @@ wird die neue Breite nach dem Loslassen im Benutzerprofil gespeichert. Im
 Icon-Modus öffnen sich die Menüinhalte als seitliches Flyout; auf kleinen
 beziehungsweise mobilen Ansichten bleibt das normale NetBox-Menü erhalten.
 Das Flyout schließt sich bei Auswahl eines Eintrags, bei erneutem Klick auf
-das aktive Icon, bei einem Klick außerhalb und mit der Escape-Taste.
+das aktive Icon, bei einem Klick außerhalb und mit der Escape-Taste. Nach
+einem Seitenwechsel oder Neuladen startet es immer geschlossen.
 
 **Zurücksetzen** stellt neben Reihenfolge und Sichtbarkeit auch die normale
 ausgeklappte Breite von 288 Pixeln wieder her.

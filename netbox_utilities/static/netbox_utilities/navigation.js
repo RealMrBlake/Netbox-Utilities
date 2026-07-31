@@ -138,6 +138,10 @@
         event.preventDefault();
       }
     });
+
+    window.addEventListener('pageshow', () => {
+      if (preferences.collapsed) closeDropdowns(sidebar);
+    });
   }
 
   async function saveLayout(action, width) {
@@ -280,8 +284,12 @@
     if (!sidebarMenu || !sidebar || !sidebarElement) return;
 
     applyMenuPreferences(sidebar);
-    updateMenuTitles(sidebar);
     configureCollapsedDropdowns(sidebar);
+    if (preferences.collapsed) {
+      closeDropdowns(sidebar);
+      requestAnimationFrame(() => closeDropdowns(sidebar));
+    }
+    updateMenuTitles(sidebar);
     addResizeHandle(sidebarElement, sidebar);
   }
 
