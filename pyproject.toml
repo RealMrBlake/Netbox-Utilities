@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "netbox-utilities"
-version = "0.5.3"
-description = "Navigation, tenant filtering, bulk module installation, and atomic rack reordering for NetBox 4.6"
+version = "0.6.0"
+description = "Navigation, tenant utilities, bulk image/module upload, and atomic rack reordering for NetBox 4.6"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }

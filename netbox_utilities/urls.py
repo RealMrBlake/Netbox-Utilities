@@ -5,6 +5,7 @@ from . import views
 app_name = "netbox_utilities"
 
 urlpatterns = [
+    path("images/bulk-upload/", views.BulkImageUploadView.as_view(), name="bulk_image_upload"),
     path("modules/bulk-install/", views.BulkModuleInstallView.as_view(), name="bulk_module_install"),
     path("navigation/", views.NavigationPreferencesView.as_view(), name="navigation_preferences"),
     path("navigation/layout/", views.NavigationLayoutView.as_view(), name="navigation_layout"),

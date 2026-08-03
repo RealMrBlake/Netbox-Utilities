@@ -1,16 +1,22 @@
 from dcim.models import Device, Module
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import HttpResponseBadRequest, JsonResponse
-from django.shortcuts import redirect, render
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import SuspiciousFileOperation, ValidationError
+from django.db import DatabaseError, transaction
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
+from extras.forms import ImageAttachmentForm
+from extras.models import ImageAttachment
+from netbox.models.features import has_feature
 from netbox.plugins import get_plugin_config
 from tenancy.models import Tenant, TenantGroup
 from utilities.views import ContentTypePermissionRequiredMixin
 
-from .forms import BulkModuleInstallForm, UtilitiesSettingsForm
+from .forms import BulkImageUploadForm, BulkModuleInstallForm, UtilitiesSettingsForm
 from .middleware import (
     SESSION_TENANT_GROUP_KEY,
     SESSION_TENANT_KEY,
@@ -40,6 +46,100 @@ def _safe_return_url(request, default_name="home"):
     ):
         return candidate
     return reverse(default_name)
+
+
+class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
+    template_name = "netbox_utilities/bulk_image_upload.html"
+
+    def get_required_permission(self):
+        return "extras.add_imageattachment"
+
+    def get(self, request):
+        parent = self._get_parent(request, request.GET)
+        form = BulkImageUploadForm()
+        return self._render(request, form, parent)
+
+    def post(self, request):
+        parent = self._get_parent(request, request.POST)
+        form = BulkImageUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            image_forms = self._build_image_forms(parent, form.cleaned_data)
+            invalid = [image_form for image_form in image_forms if not image_form.is_valid()]
+            if invalid:
+                for image_form in invalid:
+                    filename = getattr(image_form.files.get("image"), "name", "Bild")
+                    for errors in image_form.errors.values():
+                        for error in errors:
+                            form.add_error("images", f"{filename}: {error}")
+            else:
+                created = []
+                try:
+                    with transaction.atomic():
+                        for image_form in image_forms:
+                            created.append(image_form.save())
+                except (DatabaseError, OSError, SuspiciousFileOperation, ValidationError, ValueError) as error:
+                    for image_form in image_forms:
+                        image_file = image_form.instance.image
+                        if image_file.name and image_file._committed:
+                            image_file.delete(save=False)
+                    form.add_error("images", f"Die Bilder konnten nicht gespeichert werden: {error}")
+                else:
+                    count = len(created)
+                    noun = "Bild wurde" if count == 1 else "Bilder wurden"
+                    messages.success(request, f"{count} {noun} gleichzeitig hochgeladen.")
+                    return redirect(self._return_url(request, parent))
+        return self._render(request, form, parent)
+
+    @staticmethod
+    def _get_parent(request, data):
+        try:
+            object_type_id = int(data.get("object_type", ""))
+            object_id = int(data.get("object_id", ""))
+        except (TypeError, ValueError):
+            raise Http404("Ungültiges Zielobjekt.") from None
+
+        object_type = get_object_or_404(ContentType, pk=object_type_id)
+        model = object_type.model_class()
+        if model is None or not has_feature(model, "image_attachments"):
+            raise Http404("Dieses Objekt unterstützt keine Bilder.")
+        queryset = model.objects
+        if hasattr(queryset, "restrict"):
+            queryset = queryset.restrict(request.user, "view")
+        return get_object_or_404(queryset, pk=object_id)
+
+    @staticmethod
+    def _build_image_forms(parent, cleaned_data):
+        return [
+            ImageAttachmentForm(
+                data={"name": "", "description": cleaned_data["description"]},
+                files={"image": image},
+                instance=ImageAttachment(parent=parent),
+            )
+            for image in cleaned_data["images"]
+        ]
+
+    def _return_url(self, request, parent):
+        candidate = request.POST.get("return_url") or request.GET.get("return_url")
+        if candidate and url_has_allowed_host_and_scheme(
+            candidate,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return candidate
+        return parent.get_absolute_url()
+
+    def _render(self, request, form, parent):
+        object_type = ContentType.objects.get_for_model(parent)
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "parent": parent,
+                "object_type": object_type.pk,
+                "return_url": self._return_url(request, parent),
+            },
+        )
 
 
 class BulkModuleInstallView(ContentTypePermissionRequiredMixin, View):

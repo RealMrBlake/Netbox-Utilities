@@ -1,10 +1,12 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit fünf Funktionen:
+Plugin für **NetBox 4.6.5** mit sieben Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
 - Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
+- Automatische Vorbelegung von Mandant und Mandantengruppe aus dem Objekt- oder Filterkontext.
+- Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
 
@@ -32,7 +34,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.5.3"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.6.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -170,6 +172,20 @@ Reorder-Projekt selbst weist derzeit offiziell nur Kompatibilität bis NetBox
 4.5 aus; die Erweiterung in diesem Plugin ist gezielt für die hier unterstützte
 NetBox-Version 4.6.5 umgesetzt.
 
+### Mehrere Bilder hochladen
+
+Im **Bilder**-Tab eines unterstützten NetBox-Objekts wird der bisherige
+Einzel-Upload durch **Mehrere Bilder hochladen** ersetzt. Im Dateidialog können
+bis zu 50 Bilder gemeinsam ausgewählt werden. Vor dem Speichern zeigt das
+Plugin Vorschaubilder und die jeweiligen Dateinamen an.
+
+Alle Dateien werden zunächst mit NetBox' eigener Bildvalidierung geprüft. Ist
+eine Datei ungültig, wird kein Bild aus dieser Auswahl gespeichert. Eine
+optionale gemeinsame Beschreibung kann auf alle Bilder angewendet werden; als
+Anzeigename bleibt der jeweilige ursprüngliche Dateiname erhalten. Benötigt
+werden weiterhin die NetBox-Berechtigung zum Hinzufügen von Bildanhängen und
+eine Leseberechtigung für das Zielobjekt.
+
 ### Module mehrfach einbauen
 
 Unter **Plugins > NetBox Utilities > Module mehrfach einbauen** kann ein
@@ -246,6 +262,18 @@ Aufrufen von `Model.save()` aus Skripten.
 Bestehende Objekte ohne Mandant bleiben nach Aktivierung zunächst bestehen.
 Beim nächsten Speichern eines solchen Objekts muss ein Mandant ergänzt werden.
 Globale Referenzmodelle ohne `tenant`-Feld sind nicht betroffen.
+
+Beim Öffnen eines NetBox-Formulars versucht das Plugin, fehlende Zuordnungen
+vorsichtig vorzubelegen. Vorrang hat ein bereits erkennbares Elternobjekt, zum
+Beispiel Rack, Standort, Gerät oder Cluster. Ist dort keine Zuordnung
+erkennbar, wird der global ausgewählte Mandant verwendet. Felder für eine
+Mandantengruppe werden aus dem erkannten Mandanten oder der global ausgewählten
+Mandantengruppe vorbelegt. Bereits vorhandene Werte werden nicht überschrieben.
+
+Bleibt ein automatisch gesetzter Mandant bis zum Speichern unverändert, fragt
+der Browser unmittelbar nach dem Klick auf **Speichern** noch einmal nach einer
+ausdrücklichen Bestätigung. Wird der Mandant manuell geändert, entfällt diese
+zusätzliche Rückfrage.
 
 Die Einstellung kann durch einen Superuser deaktiviert werden. Mit
 `tenant_required = False` in `PLUGINS_CONFIG` wird sie installationsweit fest

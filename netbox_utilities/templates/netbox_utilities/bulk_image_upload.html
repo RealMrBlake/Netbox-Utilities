@@ -1,0 +1,43 @@
+{% extends 'base/layout.html' %}
+{% load form_helpers %}
+
+{% block title %}Mehrere Bilder hochladen{% endblock %}
+
+{% render_errors form %}
+
+{% block content %}
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="object_type" value="{{ object_type }}">
+    <input type="hidden" name="object_id" value="{{ parent.pk }}">
+    <input type="hidden" name="return_url" value="{{ return_url }}">
+    <div class="row mb-3">
+      <div class="col col-lg-10 col-xl-8 offset-lg-1 offset-xl-2">
+        <div class="card">
+          <h2 class="card-header">
+            <i class="mdi mdi-image-multiple me-1" aria-hidden="true"></i>
+            Mehrere Bilder für {{ parent }} hochladen
+          </h2>
+          <div class="card-body">
+            <div class="alert alert-info">
+              Wählen Sie mehrere Bilder im Dateidialog aus. Alle Bilder werden gemeinsam geprüft;
+              bei einem Validierungsfehler wird keines gespeichert. Der ursprüngliche Dateiname
+              bleibt als Bildname sichtbar.
+            </div>
+            {% render_form form %}
+            <div id="netbox-utilities-image-preview" class="d-flex flex-wrap gap-3 mt-3" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col col-lg-10 col-xl-8 offset-lg-1 offset-xl-2 text-end">
+        <a href="{{ return_url }}" class="btn btn-outline-secondary">Abbrechen</a>
+        <button type="submit" class="btn btn-primary">
+          <i class="mdi mdi-cloud-upload" aria-hidden="true"></i>
+          Bilder hochladen
+        </button>
+      </div>
+    </div>
+  </form>
+{% endblock content %}

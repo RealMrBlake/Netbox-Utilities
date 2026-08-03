@@ -10,6 +10,25 @@
   white-space: nowrap;
 }
 
+.netbox-utilities-image-preview-item {
+  width: 9rem;
+}
+
+.netbox-utilities-image-preview-item img {
+  width: 9rem;
+  height: 7rem;
+  object-fit: cover;
+  border: 1px solid var(--tblr-border-color);
+  border-radius: var(--tblr-border-radius);
+}
+
+.netbox-utilities-image-preview-name {
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .netbox-utilities-sidebar-resizer {
   display: none;
 }

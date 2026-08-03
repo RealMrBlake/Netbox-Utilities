@@ -1,9 +1,50 @@
 from dcim.choices import ModuleStatusChoices
 from dcim.models import Device, ModuleBay, ModuleType
 from django import forms
+from extras.constants import IMAGE_ATTACHMENT_IMAGE_FORMATS
 from utilities.forms.fields import DynamicModelChoiceField, DynamicModelMultipleChoiceField
 
 from .models import UtilitiesSettings
+
+
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleImageField(forms.ImageField):
+    widget = MultipleImageInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return super().clean(data, initial)
+        files = data if isinstance(data, (list, tuple)) else [data]
+        return [super().clean(file, initial) for file in files]
+
+
+class BulkImageUploadForm(forms.Form):
+    images = MultipleImageField(
+        label="Bilder",
+        widget=MultipleImageInput(
+            attrs={
+                "accept": ",".join(sorted(set(IMAGE_ATTACHMENT_IMAGE_FORMATS.values()))),
+                "class": "netbox-utilities-multi-image-input",
+            }
+        ),
+        help_text="Bis zu 50 Bilder auswählen. Alle Dateien werden demselben NetBox-Objekt zugeordnet.",
+    )
+    description = forms.CharField(
+        label="Gemeinsame Beschreibung",
+        required=False,
+        max_length=200,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Optional: Diese Beschreibung wird für jedes ausgewählte Bild übernommen.",
+    )
+
+    def clean_images(self):
+        images = self.cleaned_data["images"]
+        if len(images) > 50:
+            raise forms.ValidationError("Pro Upload können höchstens 50 Bilder verarbeitet werden.")
+        return images
 
 
 class BulkModuleInstallForm(forms.Form):

@@ -49,6 +49,11 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
         return self.render(
             "netbox_utilities/head.html",
             {
+                "frontend_enabled": request.user.is_authenticated,
+                "frontend_data": {
+                    "image_attachment_add_url": reverse("extras:imageattachment_add"),
+                    "bulk_image_upload_url": reverse("plugins:netbox_utilities:bulk_image_upload"),
+                },
                 "navigation_enabled": request.user.is_authenticated and navigation_customization_enabled(),
                 "navigation_preferences": preference_data,
                 "asset_version": __version__,

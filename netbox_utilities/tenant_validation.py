@@ -7,6 +7,7 @@ from django.forms.models import BaseModelForm
 from tenancy.models import Tenant
 
 from .runtime import tenant_required
+from .tenant_autofill import apply_tenant_autofill
 
 VALIDATION_MESSAGE = "Für dieses Objekt muss ein Mandant angegeben werden."
 
@@ -55,6 +56,7 @@ def _install_form_validation():
         model = getattr(form._meta, "model", None)
         if tenant_required() and model and model_supports_tenant(model) and "tenant" in form.fields:
             form.fields["tenant"].required = True
+        apply_tenant_autofill(form)
 
     BaseModelForm.__init__ = tenant_aware_init
     BaseModelForm._netbox_utilities_tenant_validation = True

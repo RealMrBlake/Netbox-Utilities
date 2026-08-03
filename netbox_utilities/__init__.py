@@ -1,12 +1,12 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.5.3"
+__version__ = "0.6.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Navigation, tenant filtering, bulk module installation, and atomic rack reordering"
+    description = "Navigation, tenant utilities, bulk image/module upload, and atomic rack reordering"
     version = __version__
     author = "LKE"
     base_url = "utilities"
