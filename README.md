@@ -34,7 +34,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.6.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.6.1"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -179,7 +179,7 @@ Einzel-Upload durch **Mehrere Bilder hochladen** ersetzt. Im Dateidialog können
 bis zu 50 Bilder gemeinsam ausgewählt werden. Vor dem Speichern zeigt das
 Plugin Vorschaubilder und die jeweiligen Dateinamen an.
 
-Alle Dateien werden zunächst mit NetBox' eigener Bildvalidierung geprüft. Ist
+Jede Datei wird genau einmal mit NetBox' eigener Bildvalidierung geprüft. Ist
 eine Datei ungültig, wird kein Bild aus dieser Auswahl gespeichert. Eine
 optionale gemeinsame Beschreibung kann auf alle Bilder angewendet werden; als
 Anzeigename bleibt der jeweilige ursprüngliche Dateiname erhalten. Benötigt

@@ -11,7 +11,7 @@ class MultipleImageInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
-class MultipleImageField(forms.ImageField):
+class MultipleFileField(forms.FileField):
     widget = MultipleImageInput
 
     def clean(self, data, initial=None):
@@ -22,7 +22,7 @@ class MultipleImageField(forms.ImageField):
 
 
 class BulkImageUploadForm(forms.Form):
-    images = MultipleImageField(
+    images = MultipleFileField(
         label="Bilder",
         widget=MultipleImageInput(
             attrs={

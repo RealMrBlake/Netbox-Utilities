@@ -109,14 +109,18 @@ class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
 
     @staticmethod
     def _build_image_forms(parent, cleaned_data):
-        return [
-            ImageAttachmentForm(
-                data={"name": "", "description": cleaned_data["description"]},
-                files={"image": image},
-                instance=ImageAttachment(parent=parent),
+        image_forms = []
+        for image in cleaned_data["images"]:
+            if hasattr(image, "seek"):
+                image.seek(0)
+            image_forms.append(
+                ImageAttachmentForm(
+                    data={"name": "", "description": cleaned_data["description"]},
+                    files={"image": image},
+                    instance=ImageAttachment(parent=parent),
+                )
             )
-            for image in cleaned_data["images"]
-        ]
+        return image_forms
 
     def _return_url(self, request, parent):
         candidate = request.POST.get("return_url") or request.GET.get("return_url")
