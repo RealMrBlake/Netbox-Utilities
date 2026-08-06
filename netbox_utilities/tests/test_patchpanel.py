@@ -4,7 +4,14 @@ from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
-from netbox_utilities.patchpanel import is_patchpanel, pair_ports, port_identifier, retrace_patchpanel_paths
+from netbox_utilities.patchpanel import (
+    _component_saved,
+    _wrap_component_container_save,
+    is_patchpanel,
+    pair_ports,
+    port_identifier,
+    retrace_patchpanel_paths,
+)
 
 
 def port(pk, name):
@@ -12,6 +19,41 @@ def port(pk, name):
 
 
 class PatchpanelPairingTest(SimpleTestCase):
+    @patch("netbox_utilities.patchpanel.synchronize_patchpanel")
+    def test_component_edits_do_not_trigger_automation(self, synchronize):
+        component = SimpleNamespace(device_id=42)
+
+        _component_saved(None, component, created=False)
+
+        synchronize.assert_not_called()
+
+    @patch("netbox_utilities.patchpanel.synchronize_patchpanel")
+    def test_new_components_trigger_automation(self, synchronize):
+        component = SimpleNamespace(device_id=42)
+
+        _component_saved(None, component, created=True)
+
+        synchronize.assert_called_once_with(42)
+
+    @patch("netbox_utilities.patchpanel.synchronize_patchpanel")
+    def test_existing_device_save_does_not_trigger_automation(self, synchronize):
+        class Container:
+            def __init__(self, adding):
+                self._state = SimpleNamespace(adding=adding)
+                self.pk = 42
+
+            def save(self):
+                self._state.adding = False
+                return "saved"
+
+        _wrap_component_container_save(Container, lambda instance: instance.pk)
+
+        self.assertEqual(Container(adding=False).save(), "saved")
+        synchronize.assert_not_called()
+
+        self.assertEqual(Container(adding=True).save(), "saved")
+        synchronize.assert_called_once_with(42)
+
     def test_existing_device_migrations_are_noops(self):
         migration_names = (
             "0004_patchpanel_port_mappings",

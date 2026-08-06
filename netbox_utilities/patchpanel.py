@@ -117,8 +117,8 @@ def synchronize_patchpanel(device_id):
         return len(pairs)
 
 
-def _component_saved(sender, instance, raw=False, **kwargs):
-    if not raw and not _component_instantiation_active.get():
+def _component_saved(sender, instance, created=False, raw=False, **kwargs):
+    if created and not raw and not _component_instantiation_active.get():
         synchronize_patchpanel(getattr(instance, "device_id", None))
 
 
@@ -131,6 +131,10 @@ def _wrap_component_container_save(model, device_id_getter):
 
     @wraps(original_save)
     def patchpanel_aware_save(instance, *args, **kwargs):
+        created = instance._state.adding
+        if not created:
+            return original_save(instance, *args, **kwargs)
+
         token = _component_instantiation_active.set(True)
         try:
             result = original_save(instance, *args, **kwargs)

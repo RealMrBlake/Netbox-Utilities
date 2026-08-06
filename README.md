@@ -35,7 +35,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.3"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.4"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -142,15 +142,15 @@ weiter. Auch Kurzformen wie `F01` und `R1` werden als dieselbe Kennung erkannt.
 Fehlt die passende Gegenseite, bleibt der Port unverknüpft; die nachfolgenden
 Nummern rutschen nicht auf.
 
-Die Zuordnung wird nach Änderungen am Gerät, nach dem Einbau eines Moduls und
-nach dem Anlegen oder Umbenennen einzelner Front- beziehungsweise Rearports
-erneut hergestellt. Dabei ersetzt die Patchpanel-Automatik abweichende
-vorhandene Port-Mappings auf diesen Geräten durch die feste 1:1-Zuordnung.
+Die Zuordnung wird ausschließlich beim erstmaligen Anlegen eines Patchpanels,
+beim Einbau eines neuen Moduls sowie beim Anlegen eines neuen Front- oder
+Rearports hergestellt. Das Bearbeiten eines vorhandenen Patchpanels, Moduls
+oder Ports löst die Automatik nicht aus.
 
 Bei Installation oder Update findet kein automatischer Bestandslauf statt.
 Vorhandene Patchpanel-Geräte und deren Kabelpfade bleiben unverändert. Die
 Automatik greift erst, wenn ein betreffendes Gerät, Modul oder ein Front-/Rearport
-anschließend neu angelegt beziehungsweise gespeichert wird.
+neu angelegt wird.
 
 ### Mehrere Geräte mit NetBox Reorder Rack verschieben
 
