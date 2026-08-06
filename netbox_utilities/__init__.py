@@ -1,12 +1,12 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Navigation, tenant utilities, bulk image/module upload, and atomic rack reordering"
+    description = "Navigation, tenant utilities, patchpanel mapping, bulk uploads, and atomic rack reordering"
     version = __version__
     author = "LKE"
     base_url = "utilities"
@@ -24,11 +24,13 @@ class NetBoxUtilitiesConfig(PluginConfig):
 
     def ready(self):
         super().ready()
+        from .patchpanel import install_patchpanel_automation
         from .tenant_scope import install_search_filter
         from .tenant_validation import install_tenant_validation
 
         install_search_filter()
         install_tenant_validation()
+        install_patchpanel_automation()
         if get_plugin_config("netbox_utilities", "reorder_rack_bulk_save_enabled"):
             from .reorder_rack import install_reorder_rack_bulk_save
 

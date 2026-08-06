@@ -42,25 +42,105 @@ def tenant_id_from_object(obj, depth=0):
 
 
 def _related_object(form, field_name):
+    objects = _related_objects(form, field_name)
+    return objects[0] if objects else None
+
+
+def _related_objects(form, field_name):
     field = form.fields.get(field_name)
     if field is None or not hasattr(field, "queryset"):
-        return None
+        return []
 
-    value = None
+    values = []
     if form.is_bound:
-        value = form.data.get(form.add_prefix(field_name))
-    if not value:
-        value = form.initial.get(field_name)
-    if hasattr(value, "_meta"):
-        return value
-    if isinstance(value, (list, tuple)):
-        value = value[0] if value else None
-    if not value:
-        return None
+        field_name = form.add_prefix(field_name)
+        if hasattr(form.data, "getlist"):
+            values = form.data.getlist(field_name)
+        else:
+            values = form.data.get(field_name)
+    if not values:
+        values = form.initial.get(field_name)
+    if not isinstance(values, (list, tuple, set)):
+        values = [values]
+
+    objects = [value for value in values if hasattr(value, "_meta")]
+    object_ids = [value for value in values if value and not hasattr(value, "_meta")]
+    if not object_ids:
+        return objects
     try:
-        return field.queryset.filter(pk=value).first()
+        objects.extend(field.queryset.filter(pk__in=object_ids))
     except (TypeError, ValueError):
+        pass
+    return objects
+
+
+def _is_cable(instance):
+    meta = getattr(instance, "_meta", None)
+    return bool(
+        meta
+        and getattr(meta, "app_label", None) == "dcim"
+        and getattr(meta, "model_name", None) == "cable"
+    )
+
+
+def _instance_cable_terminations(instance):
+    if not _is_cable(instance):
+        return []
+    terminations = []
+    for name in ("a_terminations", "b_terminations"):
+        try:
+            values = getattr(instance, name, None) or []
+        except (ObjectDoesNotExist, ValueError):
+            continue
+        terminations.extend(values)
+    return terminations
+
+
+def tenant_id_from_cable_terminations(terminations):
+    """Return the common derivable tenant, or None for no/conflicting tenants."""
+    tenant_ids = {tenant_id for obj in terminations if (tenant_id := tenant_id_from_object(obj))}
+    if len(tenant_ids) == 1:
+        return tenant_ids.pop()
+    return None
+
+
+def _cable_form_tenant_result(form):
+    instance = getattr(form, "instance", None)
+    is_cable_form = _is_cable(instance) or any(name in form.fields for name in ("a_terminations", "b_terminations"))
+    if not is_cable_form:
+        return None, False
+
+    terminations = []
+    for field_name in (
+        "a_terminations",
+        "b_terminations",
+        "termination_a_device",
+        "termination_b_device",
+        "termination_a_powerpanel",
+        "termination_b_powerpanel",
+        "termination_a_circuit",
+        "termination_b_circuit",
+    ):
+        terminations.extend(_related_objects(form, field_name))
+    if not terminations:
+        terminations = _instance_cable_terminations(instance)
+
+    tenant_ids = {tenant_id for obj in terminations if (tenant_id := tenant_id_from_object(obj))}
+    if len(tenant_ids) == 1:
+        return tenant_ids.pop(), True
+    if len(tenant_ids) > 1:
+        return None, True
+    return None, False
+
+
+def apply_cable_instance_tenant(instance):
+    """Assign a cable's tenant when all derivable terminations agree."""
+    if not _is_cable(instance) or getattr(instance, "tenant_id", None):
         return None
+    tenant_id = tenant_id_from_cable_terminations(_instance_cable_terminations(instance))
+    if tenant_id:
+        instance.tenant_id = tenant_id
+    return tenant_id
 
 
 def infer_tenant_id(form):
@@ -76,6 +156,10 @@ def infer_tenant_id(form):
             return int(initial_tenant)
         except (TypeError, ValueError):
             pass
+
+    cable_tenant_id, cable_context_found = _cable_form_tenant_result(form)
+    if cable_context_found:
+        return cable_tenant_id
 
     for relation in PARENT_RELATIONS:
         if tenant_id := tenant_id_from_object(_related_object(form, relation)):

@@ -1,11 +1,12 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit sieben Funktionen:
+Plugin für **NetBox 4.6.5** mit acht Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
 - Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
 - Automatische Vorbelegung von Mandant und Mandantengruppe aus dem Objekt- oder Filterkontext.
+- Automatische 1:1-Verknüpfung von Front- und Rearports auf Geräten mit der Rolle `Patchpanel`.
 - Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
@@ -34,7 +35,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.6.1"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -130,6 +131,27 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### Front- und Rearports von Patchpaneln automatisch verknüpfen
+
+Geräte, deren NetBox-Geräterolle `Patchpanel` heißt, werden automatisch als
+Patchfeld erkannt. Groß- und Kleinschreibung spielen bei der Rollenbezeichnung
+keine Rolle. Das Plugin sortiert Front- und Rearports natürlich, sodass zum
+Beispiel `1, 2, 10` in dieser Reihenfolge verarbeitet wird, und verknüpft sie
+anschließend 1:1 auf Portposition 1. Der erste Frontport wird mit dem ersten
+Rearport verbunden, der zweite mit dem zweiten und so weiter. Überzählige Ports
+bleiben unverknüpft.
+
+Die Zuordnung wird nach Änderungen am Gerät, nach dem Einbau eines Moduls und
+nach dem Anlegen oder Umbenennen einzelner Front- beziehungsweise Rearports
+erneut hergestellt. Dabei ersetzt die Patchpanel-Automatik abweichende
+vorhandene Port-Mappings auf diesen Geräten durch die feste 1:1-Zuordnung.
+
+Beim Update auf Version `0.7.0` führt die Plugin-Migration dieselbe Zuordnung
+einmalig für alle bereits vorhandenen Geräte mit dieser Rolle aus. Vor dem
+Produktivupdate sollte daher geprüft werden, ob Geräte mit bewusst
+abweichenden oder mehrpoligen Mappings nicht die Rolle `Patchpanel` tragen
+sollen.
 
 ### Mehrere Geräte mit NetBox Reorder Rack verschieben
 
@@ -269,6 +291,13 @@ Beispiel Rack, Standort, Gerät oder Cluster. Ist dort keine Zuordnung
 erkennbar, wird der global ausgewählte Mandant verwendet. Felder für eine
 Mandantengruppe werden aus dem erkannten Mandanten oder der global ausgewählten
 Mandantengruppe vorbelegt. Bereits vorhandene Werte werden nicht überschrieben.
+
+Bei Kabeln werden die ausgewählten Anschlüsse beider Kabelenden ausgewertet.
+Gehören die Anschlüsse beziehungsweise ihre Geräte, Stromverteiler oder
+Schaltkreise eindeutig zu demselben Mandanten, übernimmt das Kabel diesen
+Mandanten automatisch. Ist nur an einem Ende eine Zuordnung herleitbar, wird
+diese verwendet. Bei widersprüchlichen Mandanten an den beiden Enden nimmt das
+Plugin keine automatische Zuordnung vor.
 
 Bleibt ein automatisch gesetzter Mandant bis zum Speichern unverändert, fragt
 der Browser unmittelbar nach dem Klick auf **Speichern** noch einmal nach einer

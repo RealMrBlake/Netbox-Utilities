@@ -5,7 +5,13 @@ from django import forms
 from django.test import SimpleTestCase
 from tenancy.models import TenantGroup
 
-from netbox_utilities.tenant_autofill import apply_tenant_autofill, infer_tenant_id, tenant_id_from_object
+from netbox_utilities.tenant_autofill import (
+    apply_cable_instance_tenant,
+    apply_tenant_autofill,
+    infer_tenant_id,
+    tenant_id_from_cable_terminations,
+    tenant_id_from_object,
+)
 from netbox_utilities.tenant_scope import ActiveTenantScope, active_tenant_scope
 
 
@@ -17,12 +23,25 @@ class FakeMeta:
         return [SimpleNamespace(name=name) for name in self.field_names]
 
 
+class FakeCableMeta(FakeMeta):
+    app_label = "dcim"
+    model_name = "cable"
+
+
 class FakeObject:
     def __init__(self, *, tenant_id=None, **relations):
         self.tenant_id = tenant_id
         self._meta = FakeMeta("tenant", *relations)
         for name, value in relations.items():
             setattr(self, name, value)
+
+
+class FakeCable(FakeObject):
+    def __init__(self, *, tenant_id=None, a_terminations=None, b_terminations=None):
+        super().__init__(tenant_id=tenant_id)
+        self._meta = FakeCableMeta("tenant")
+        self.a_terminations = a_terminations or []
+        self.b_terminations = b_terminations or []
 
 
 class FakeQuerySet:
@@ -47,6 +66,54 @@ class TenantAutofillTest(SimpleTestCase):
         token = active_tenant_scope.set(ActiveTenantScope("tenant", 17, frozenset({17})))
         try:
             self.assertEqual(infer_tenant_id(form), 17)
+        finally:
+            active_tenant_scope.reset(token)
+
+    def test_finds_common_cable_tenant_from_both_ends(self):
+        terminations = [FakeObject(device=FakeObject(tenant_id=42)), FakeObject(device=FakeObject(tenant_id=42))]
+
+        self.assertEqual(tenant_id_from_cable_terminations(terminations), 42)
+
+    def test_does_not_guess_when_cable_ends_have_different_tenants(self):
+        terminations = [FakeObject(device=FakeObject(tenant_id=42)), FakeObject(device=FakeObject(tenant_id=43))]
+
+        self.assertIsNone(tenant_id_from_cable_terminations(terminations))
+
+    def test_assigns_common_tenant_to_cable_instance(self):
+        cable = FakeCable(
+            a_terminations=[FakeObject(device=FakeObject(tenant_id=42))],
+            b_terminations=[FakeObject(device=FakeObject(tenant_id=42))],
+        )
+
+        self.assertEqual(apply_cable_instance_tenant(cable), 42)
+        self.assertEqual(cable.tenant_id, 42)
+
+    def test_prefers_cable_terminations_over_global_scope(self):
+        form = SimpleNamespace(
+            fields={"tenant": forms.IntegerField()},
+            initial={},
+            instance=FakeCable(a_terminations=[FakeObject(device=FakeObject(tenant_id=42))]),
+            is_bound=False,
+        )
+        token = active_tenant_scope.set(ActiveTenantScope("tenant", 17, frozenset({17})))
+        try:
+            self.assertEqual(infer_tenant_id(form), 42)
+        finally:
+            active_tenant_scope.reset(token)
+
+    def test_conflicting_cable_ends_do_not_fall_back_to_global_scope(self):
+        form = SimpleNamespace(
+            fields={"tenant": forms.IntegerField()},
+            initial={},
+            instance=FakeCable(
+                a_terminations=[FakeObject(device=FakeObject(tenant_id=42))],
+                b_terminations=[FakeObject(device=FakeObject(tenant_id=43))],
+            ),
+            is_bound=False,
+        )
+        token = active_tenant_scope.set(ActiveTenantScope("tenant", 17, frozenset({17})))
+        try:
+            self.assertIsNone(infer_tenant_id(form))
         finally:
             active_tenant_scope.reset(token)
 
