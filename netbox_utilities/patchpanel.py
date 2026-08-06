@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 from contextvars import ContextVar
 from functools import wraps
 
@@ -20,14 +21,42 @@ def natural_port_key(port):
     return parts, getattr(port, "pk", 0) or 0
 
 
+def port_identifier(port):
+    """Normalize a front/rear port name to its side-independent identifier."""
+    name = str(getattr(port, "name", "")).casefold()
+    name = re.sub(r"\b(?:front|rear)(?:[\s_-]*port)?(?=\b|\d)", " ", name)
+    name = re.sub(r"^(?:fp|rp|f|r)(?=\s*[-_.:/]?\s*\d)", "", name)
+    tokens = re.findall(r"\d+|[^\W\d_]+", name)
+    identifier = tuple(int(token) if token.isdigit() else token for token in tokens)
+    return identifier or None
+
+
 def is_patchpanel(device):
     role = getattr(device, "role", None)
     return bool(role and str(getattr(role, "name", "")).casefold() == PATCHPANEL_ROLE_NAME.casefold())
 
 
 def pair_ports(front_ports, rear_ports):
-    """Pair naturally sorted front and rear ports one-to-one."""
-    return list(zip(sorted(front_ports, key=natural_port_key), sorted(rear_ports, key=natural_port_key)))
+    """Pair only front and rear ports with the same normalized identifier."""
+    front_by_identifier = defaultdict(list)
+    rear_by_identifier = defaultdict(list)
+    for port in front_ports:
+        if identifier := port_identifier(port):
+            front_by_identifier[identifier].append(port)
+    for port in rear_ports:
+        if identifier := port_identifier(port):
+            rear_by_identifier[identifier].append(port)
+
+    pairs = []
+    for identifier, matching_front_ports in front_by_identifier.items():
+        matching_rear_ports = rear_by_identifier.get(identifier, [])
+        pairs.extend(
+            zip(
+                sorted(matching_front_ports, key=natural_port_key),
+                sorted(matching_rear_ports, key=natural_port_key),
+            )
+        )
+    return sorted(pairs, key=lambda pair: natural_port_key(pair[0]))
 
 
 def synchronize_patchpanel(device_id):

@@ -35,7 +35,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.1"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -136,19 +136,19 @@ empfohlen.
 
 Geräte, deren NetBox-Geräterolle `Patchpanel` heißt, werden automatisch als
 Patchfeld erkannt. Groß- und Kleinschreibung spielen bei der Rollenbezeichnung
-keine Rolle. Das Plugin sortiert Front- und Rearports natürlich, sodass zum
-Beispiel `1, 2, 10` in dieser Reihenfolge verarbeitet wird, und verknüpft sie
-anschließend 1:1 auf Portposition 1. Der erste Frontport wird mit dem ersten
-Rearport verbunden, der zweite mit dem zweiten und so weiter. Überzählige Ports
-bleiben unverknüpft.
+keine Rolle. Das Plugin verknüpft ausschließlich Ports mit derselben Kennung
+auf Portposition 1: `Front 1` mit `Rear 1`, `Front 2` mit `Rear 2` und so
+weiter. Auch Kurzformen wie `F01` und `R1` werden als dieselbe Kennung erkannt.
+Fehlt die passende Gegenseite, bleibt der Port unverknüpft; die nachfolgenden
+Nummern rutschen nicht auf.
 
 Die Zuordnung wird nach Änderungen am Gerät, nach dem Einbau eines Moduls und
 nach dem Anlegen oder Umbenennen einzelner Front- beziehungsweise Rearports
 erneut hergestellt. Dabei ersetzt die Patchpanel-Automatik abweichende
 vorhandene Port-Mappings auf diesen Geräten durch die feste 1:1-Zuordnung.
 
-Beim Update auf Version `0.7.0` führt die Plugin-Migration dieselbe Zuordnung
-einmalig für alle bereits vorhandenen Geräte mit dieser Rolle aus. Vor dem
+Beim Update auf Version `0.7.1` korrigiert eine Plugin-Migration die Zuordnung
+automatisch für alle bereits vorhandenen Geräte mit dieser Rolle. Vor dem
 Produktivupdate sollte daher geprüft werden, ob Geräte mit bewusst
 abweichenden oder mehrpoligen Mappings nicht die Rolle `Patchpanel` tragen
 sollen.
