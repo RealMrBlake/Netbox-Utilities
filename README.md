@@ -35,7 +35,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.1"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.2"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -147,11 +147,20 @@ nach dem Anlegen oder Umbenennen einzelner Front- beziehungsweise Rearports
 erneut hergestellt. Dabei ersetzt die Patchpanel-Automatik abweichende
 vorhandene Port-Mappings auf diesen Geräten durch die feste 1:1-Zuordnung.
 
-Beim Update auf Version `0.7.1` korrigiert eine Plugin-Migration die Zuordnung
-automatisch für alle bereits vorhandenen Geräte mit dieser Rolle. Vor dem
+Beim Update auf Version `0.7.2` korrigiert eine Plugin-Migration die Zuordnung
+automatisch für alle bereits vorhandenen Geräte mit dieser Rolle und berechnet
+die betroffenen Kabelpfade beziehungsweise Verbindungsenden neu. Vor dem
 Produktivupdate sollte daher geprüft werden, ob Geräte mit bewusst
 abweichenden oder mehrpoligen Mappings nicht die Rolle `Patchpanel` tragen
 sollen.
+
+Der Reparaturlauf kann bei Bedarf jederzeit erneut und ohne erneute Migration
+gestartet werden:
+
+```bash
+cd /opt/netbox/netbox
+/opt/netbox/venv/bin/python manage.py repair_patchpanel_mappings
+```
 
 ### Mehrere Geräte mit NetBox Reorder Rack verschieben
 

@@ -1,8 +1,9 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
-from netbox_utilities.patchpanel import is_patchpanel, pair_ports, port_identifier
+from netbox_utilities.patchpanel import is_patchpanel, pair_ports, port_identifier, retrace_patchpanel_paths
 
 
 def port(pk, name):
@@ -37,3 +38,25 @@ class PatchpanelPairingTest(SimpleTestCase):
         pairs = pair_ports([port(1, "Front 1")], [port(102, "Rear 2")])
 
         self.assertEqual(pairs, [])
+
+    @patch("dcim.models.CablePath")
+    def test_retraces_each_affected_cable_path_once(self, cable_path_model):
+        first_path = MagicMock()
+        second_path = MagicMock()
+
+        def filter_paths(**kwargs):
+            queryset = MagicMock()
+            if "_nodes__contains" in kwargs:
+                port_id = kwargs["_nodes__contains"].pk
+                queryset.values_list.return_value = [1] if port_id == 1 else [1, 2]
+            else:
+                queryset.first.return_value = {1: first_path, 2: second_path}.get(kwargs["pk"])
+            return queryset
+
+        cable_path_model.objects.filter.side_effect = filter_paths
+
+        retraced = retrace_patchpanel_paths([port(1, "Front 1"), port(2, "Front 2")])
+
+        self.assertEqual(retraced, 2)
+        first_path.retrace.assert_called_once_with()
+        second_path.retrace.assert_called_once_with()

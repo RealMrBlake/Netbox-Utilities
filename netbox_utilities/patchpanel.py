@@ -59,7 +59,23 @@ def pair_ports(front_ports, rear_ports):
     return sorted(pairs, key=lambda pair: natural_port_key(pair[0]))
 
 
-def synchronize_patchpanel(device_id):
+def retrace_patchpanel_paths(ports):
+    """Retrace cable paths touching any of the supplied pass-through ports."""
+    from dcim.models import CablePath
+
+    path_ids = set()
+    for port in ports:
+        path_ids.update(CablePath.objects.filter(_nodes__contains=port).values_list("pk", flat=True))
+
+    retraced = 0
+    for path_id in path_ids:
+        if cable_path := CablePath.objects.filter(pk=path_id).first():
+            cable_path.retrace()
+            retraced += 1
+    return retraced
+
+
+def synchronize_patchpanel(device_id, *, force_retrace=False):
     """Enforce front position 1 -> rear position 1 for a Patchpanel device."""
     if not device_id:
         return 0
@@ -83,23 +99,38 @@ def synchronize_patchpanel(device_id):
                 "rear_port_position",
             )
         )
-        if current == expected:
-            return len(pairs)
+        if current != expected:
+            PortMapping.objects.filter(device_id=device_id).delete()
+            PortMapping.objects.bulk_create(
+                [
+                    PortMapping(
+                        device_id=device_id,
+                        front_port_id=front.pk,
+                        rear_port_id=rear.pk,
+                        front_port_position=1,
+                        rear_port_position=1,
+                    )
+                    for front, rear in pairs
+                ]
+            )
+            force_retrace = True
 
-        PortMapping.objects.filter(device_id=device_id).delete()
-        PortMapping.objects.bulk_create(
-            [
-                PortMapping(
-                    device_id=device_id,
-                    front_port_id=front.pk,
-                    rear_port_id=rear.pk,
-                    front_port_position=1,
-                    rear_port_position=1,
-                )
-                for front, rear in pairs
-            ]
-        )
+        if force_retrace:
+            retrace_patchpanel_paths([*front_ports, *rear_ports])
         return len(pairs)
+
+
+def repair_existing_patchpanels():
+    """Repair mappings and cable paths for all existing Patchpanel devices."""
+    from dcim.models import Device
+
+    device_ids = Device.objects.filter(role__name__iexact=PATCHPANEL_ROLE_NAME).values_list("pk", flat=True)
+    device_count = 0
+    mapping_count = 0
+    for device_id in device_ids:
+        mapping_count += synchronize_patchpanel(device_id, force_retrace=True)
+        device_count += 1
+    return device_count, mapping_count
 
 
 def _component_saved(sender, instance, raw=False, **kwargs):
