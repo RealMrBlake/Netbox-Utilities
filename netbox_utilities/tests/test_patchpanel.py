@@ -1,3 +1,4 @@
+from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,18 @@ def port(pk, name):
 
 
 class PatchpanelPairingTest(SimpleTestCase):
+    def test_existing_device_migrations_are_noops(self):
+        migration_names = (
+            "0004_patchpanel_port_mappings",
+            "0005_fix_patchpanel_port_number_mappings",
+            "0006_retrace_existing_patchpanel_paths",
+        )
+
+        for migration_name in migration_names:
+            with self.subTest(migration=migration_name):
+                module = import_module(f"netbox_utilities.migrations.{migration_name}")
+                self.assertEqual(module.Migration.operations, [])
+
     def test_detects_patchpanel_role_case_insensitively(self):
         self.assertTrue(is_patchpanel(SimpleNamespace(role=SimpleNamespace(name="Patchpanel"))))
         self.assertTrue(is_patchpanel(SimpleNamespace(role=SimpleNamespace(name="PATCHPANEL"))))
