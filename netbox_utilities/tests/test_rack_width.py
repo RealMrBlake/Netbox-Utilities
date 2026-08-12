@@ -11,6 +11,7 @@ from netbox_utilities.rack_width import (
     _cleanup_unracked_placement,
     available_units_for_device,
     horizontal_interval,
+    include_rack_width_in_fieldsets,
     intervals_cover_full_width,
     intervals_overlap,
     normalize_width_position,
@@ -20,6 +21,34 @@ from netbox_utilities.rack_width import (
 
 
 class RackWidthTest(SimpleTestCase):
+    def test_adds_rack_width_fields_to_existing_location_fieldset(self):
+        from utilities.forms.rendering import FieldSet
+
+        original = (FieldSet("site", "rack", "position", "latitude", name="Location"),)
+
+        extended = include_rack_width_in_fieldsets(original)
+
+        self.assertEqual(
+            extended[0].items,
+            (
+                "site",
+                "rack",
+                "position",
+                "utilities_rack_width",
+                "utilities_horizontal_position",
+                "latitude",
+            ),
+        )
+        self.assertEqual(original[0].items, ("site", "rack", "position", "latitude"))
+
+    def test_appends_visible_fallback_fieldset_when_position_is_missing(self):
+        from utilities.forms.rendering import FieldSet
+
+        extended = include_rack_width_in_fieldsets((FieldSet("name", name="Device"),))
+
+        self.assertEqual(extended[-1].name, "Rackbreite im Rack")
+        self.assertEqual(extended[-1].items, ("utilities_rack_width", "utilities_horizontal_position"))
+
     def test_device_edit_view_uses_explicit_rack_width_form(self):
         from netbox.registry import registry
 
@@ -32,6 +61,7 @@ class RackWidthTest(SimpleTestCase):
 
     def test_resolved_device_edit_page_renders_rack_width_fields(self):
         from dcim.models import Device
+        from utilities.forms.rendering import FieldSet
 
         object_type = SimpleNamespace(pk=1, model_class=lambda: Device)
         with (
@@ -48,17 +78,31 @@ class RackWidthTest(SimpleTestCase):
         ):
             url = reverse("dcim:device_edit", kwargs={"pk": 1})
             view_class = resolve(url).func.view_class
-            form = view_class.form()
-            html = render_to_string("htmx/form.html", {"form": form})
+            base_form = view_class.form.__mro__[1]
+            with patch.object(
+                base_form,
+                "fieldsets",
+                (FieldSet("site", "rack", "position", "face", "latitude", name="Location"),),
+            ):
+                form = view_class.form()
+                rendered_fieldsets = form.fieldsets
+                html = render_to_string("htmx/form.html", {"form": form})
 
         width = 'name="utilities_rack_width"'
         horizontal_position = 'name="utilities_horizontal_position"'
         self.assertIn(width, html)
         self.assertIn(horizontal_position, html)
-        field_names = list(form.fields)
         self.assertEqual(
-            field_names[field_names.index("position") : field_names.index("position") + 4],
-            ["position", "utilities_rack_width", "utilities_horizontal_position", "face"],
+            rendered_fieldsets[0].items,
+            (
+                "site",
+                "rack",
+                "position",
+                "utilities_rack_width",
+                "utilities_horizontal_position",
+                "face",
+                "latitude",
+            ),
         )
 
     def test_normalizes_full_width_to_first_position(self):

@@ -1,5 +1,6 @@
 import decimal
 from contextvars import ContextVar
+from copy import deepcopy
 from fractions import Fraction
 from functools import wraps
 
@@ -25,6 +26,8 @@ POSITION_CHOICES = (
 CORE_RACK_POSITION_CONSTRAINT = "dcim_device_unique_rack_position_face"
 
 _validated_device = ContextVar("netbox_utilities_width_validated_device", default=None)
+
+RACK_WIDTH_FORM_FIELDS = ("utilities_rack_width", "utilities_horizontal_position")
 
 
 def normalize_width_position(width, horizontal_position):
@@ -112,6 +115,40 @@ def stage_width_position(device, width, horizontal_position):
     device._netbox_utilities_rack_width = width
     device._netbox_utilities_horizontal_position = horizontal_position
     return width, horizontal_position
+
+
+def include_rack_width_in_fieldsets(fieldsets):
+    """Return an isolated fieldset layout which renders both rack width fields."""
+    if not fieldsets:
+        return fieldsets
+
+    copied_fieldsets = deepcopy(fieldsets)
+
+    def insert_after_position(group):
+        items = list(getattr(group, "items", ()))
+        if "position" in items:
+            index = items.index("position") + 1
+            for field_name in reversed(RACK_WIDTH_FORM_FIELDS):
+                if field_name not in items:
+                    items.insert(index, field_name)
+            group.items = tuple(items)
+            return True
+
+        for item in items:
+            nested_groups = getattr(item, "groups", ())
+            if any(insert_after_position(nested_group) for nested_group in nested_groups):
+                return True
+        return False
+
+    if any(insert_after_position(fieldset) for fieldset in copied_fieldsets):
+        return tuple(copied_fieldsets)
+
+    from utilities.forms.rendering import FieldSet
+
+    return (
+        *copied_fieldsets,
+        FieldSet(*RACK_WIDTH_FORM_FIELDS, name="Rackbreite im Rack"),
+    )
 
 
 def _vertical_interval(device, position=None):
@@ -329,6 +366,10 @@ def _install_device_form():
             initial=1,
             help_text="Position von links; bei halber Breite sind Position 1 und 2 möglich.",
         )
+
+        @property
+        def fieldsets(self):
+            return include_rack_width_in_fieldsets(super().fieldsets)
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
