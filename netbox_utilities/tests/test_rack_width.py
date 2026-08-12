@@ -1,4 +1,5 @@
 from importlib import import_module
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from django.urls import resolve, reverse
 
 from netbox_utilities.rack_width import (
     _cleanup_unracked_placement,
+    _fit_latest_elevation_image,
     _partial_width_elevation_devices,
     available_units_for_device,
     horizontal_interval,
@@ -25,6 +27,28 @@ from netbox_utilities.rack_width import (
 
 
 class RackWidthTest(SimpleTestCase):
+    def test_rack_width_javascript_synchronizes_netbox_tom_select(self):
+        script = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "forms.js").read_text(encoding="utf-8")
+
+        self.assertIn("positionField.disabled = width === 1", script)
+        self.assertIn("positionField.tomselect.sync()", script)
+
+    def test_partial_width_device_image_is_fitted_without_cropping(self):
+        from svgwrite import Drawing
+        from svgwrite.container import Hyperlink
+        from svgwrite.image import Image
+
+        drawing = Drawing()
+        link = Hyperlink("/dcim/devices/1/")
+        device_image = Image("/media/device.png", size=(100, 20))
+        device_image.fit(scale="slice")
+        link.add(device_image)
+        drawing.add(link)
+
+        _fit_latest_elevation_image(drawing)
+
+        self.assertEqual(device_image.attribs["preserveAspectRatio"], "xMidYMid meet")
+
     def test_partial_width_svg_devices_include_core_device_bay_annotation(self):
         from dcim.choices import DeviceFaceChoices
         from dcim.models import Rack

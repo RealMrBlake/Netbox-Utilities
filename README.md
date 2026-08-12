@@ -36,7 +36,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.6"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.7"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -149,6 +149,12 @@ dürfen anschließend identisch sein. Die Kollisionsprüfung berücksichtigt
 sowohl die Gerätehöhe als auch die Breite und verhindert horizontale oder
 vertikale Überschneidungen. Mehrere HE hohe Geräte werden ebenfalls
 unterstützt.
+
+Nach einer Änderung der Rackbreite wird die **Breitenposition** unmittelbar
+aktualisiert; ein Zwischenspeichern oder Neuladen ist nicht erforderlich.
+Hinterlegte Vorder- und Rückseitenbilder des Gerätetyps werden bei
+Teilbreitengeräten proportional in die verfügbare Breite eingepasst, ohne das
+Bild seitlich abzuschneiden.
 
 Ohne Breitenangabe belegt ein Gerät wie bisher die volle Rackbreite. Das gilt
 automatisch für sämtliche vorhandenen Geräte; es findet keine Änderung oder

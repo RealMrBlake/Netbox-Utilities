@@ -103,11 +103,18 @@
         const position = Number.parseInt(option.value || '1', 10);
         option.disabled = position > width;
       });
-      if (width === 1 || Number.parseInt(positionField.value || '1', 10) > width) {
+
+      const resetPosition = width === 1 || Number.parseInt(positionField.value || '1', 10) > width;
+      if (resetPosition) {
         positionField.value = '1';
+      }
+
+      positionField.disabled = width === 1;
+      if (positionField.tomselect) positionField.tomselect.sync();
+
+      if (resetPosition) {
         positionField.dispatchEvent(new Event('change', {bubbles: true}));
       }
-      positionField.disabled = width === 1;
     };
 
     widthField.addEventListener('change', updatePositions);
