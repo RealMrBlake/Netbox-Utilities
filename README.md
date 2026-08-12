@@ -36,7 +36,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.1"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.2"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -136,7 +136,7 @@ empfohlen.
 ### Mehrere Geräte nebeneinander in derselben HE
 
 Auf der normalen **Bearbeitungsseite eines Geräts** stehen direkt nach
-**Rackseite** zwei neue optionale Felder zur Verfügung. Dafür wird kein
+**Position** zwei neue optionale Felder zur Verfügung. Dafür wird kein
 separates Plugin-Menü benötigt:
 
 - **Rackbreite**: volle, halbe, Drittel- oder Viertelbreite;

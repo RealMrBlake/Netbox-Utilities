@@ -3,7 +3,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import ValidationError
+from django.template.loader import render_to_string
 from django.test import SimpleTestCase
+from django.urls import resolve, reverse
 
 from netbox_utilities.rack_width import (
     _cleanup_unracked_placement,
@@ -19,11 +21,45 @@ from netbox_utilities.rack_width import (
 
 class RackWidthTest(SimpleTestCase):
     def test_device_edit_view_uses_explicit_rack_width_form(self):
-        from dcim.views import DeviceEditView
+        from netbox.registry import registry
 
-        self.assertEqual(DeviceEditView.form.__name__, "RackWidthDeviceForm")
-        self.assertIn("utilities_rack_width", DeviceEditView.form.base_fields)
-        self.assertIn("utilities_horizontal_position", DeviceEditView.form.base_fields)
+        edit_view = next(view["view"] for view in registry["views"]["dcim"]["device"] if view["name"] == "edit")
+
+        self.assertEqual(edit_view.__name__, "RackWidthDeviceEditView")
+        self.assertEqual(edit_view.form.__name__, "RackWidthDeviceForm")
+        self.assertIn("utilities_rack_width", edit_view.form.base_fields)
+        self.assertIn("utilities_horizontal_position", edit_view.form.base_fields)
+
+    def test_resolved_device_edit_page_renders_rack_width_fields(self):
+        from dcim.models import Device
+
+        object_type = SimpleNamespace(pk=1, model_class=lambda: Device)
+        with (
+            patch("core.models.ObjectType.objects.get_for_model", return_value=object_type),
+            patch(
+                "django.contrib.contenttypes.models.ContentType.objects.get_for_model",
+                return_value=object_type,
+            ),
+            patch("extras.models.CustomField.objects.get_for_model", return_value=[]),
+            patch(
+                "netbox_utilities.runtime._get_database_settings",
+                return_value={"tenant_required": True},
+            ),
+        ):
+            url = reverse("dcim:device_edit", kwargs={"pk": 1})
+            view_class = resolve(url).func.view_class
+            form = view_class.form()
+            html = render_to_string("htmx/form.html", {"form": form})
+
+        width = 'name="utilities_rack_width"'
+        horizontal_position = 'name="utilities_horizontal_position"'
+        self.assertIn(width, html)
+        self.assertIn(horizontal_position, html)
+        field_names = list(form.fields)
+        self.assertEqual(
+            field_names[field_names.index("position") : field_names.index("position") + 4],
+            ["position", "utilities_rack_width", "utilities_horizontal_position", "face"],
+        )
 
     def test_normalizes_full_width_to_first_position(self):
         self.assertEqual(normalize_width_position(1, 4), (1, 1))

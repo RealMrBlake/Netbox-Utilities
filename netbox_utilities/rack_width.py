@@ -307,6 +307,7 @@ def _install_device_validation():
 
 def _install_device_form():
     from dcim.views import DeviceEditView
+    from netbox.registry import registry
 
     if getattr(DeviceEditView, "_netbox_utilities_rack_width_installed", False):
         return
@@ -341,7 +342,7 @@ def _install_device_form():
                 if name in {"utilities_rack_width", "utilities_horizontal_position"}:
                     continue
                 reordered[name] = field
-                if name == "face":
+                if name == "position":
                     reordered["utilities_rack_width"] = self.fields["utilities_rack_width"]
                     reordered["utilities_horizontal_position"] = self.fields["utilities_horizontal_position"]
             self.fields = reordered
@@ -379,6 +380,20 @@ def _install_device_form():
 
     RackWidthDeviceForm.__module__ = __name__
     RackWidthDeviceForm.__qualname__ = "RackWidthDeviceForm"
+
+    class RackWidthDeviceEditView(DeviceEditView):
+        form = RackWidthDeviceForm
+
+    RackWidthDeviceEditView.__module__ = __name__
+    RackWidthDeviceEditView.__qualname__ = "RackWidthDeviceEditView"
+
+    for view_config in registry["views"]["dcim"]["device"]:
+        if view_config["name"] == "edit":
+            view_config["view"] = RackWidthDeviceEditView
+            break
+    else:
+        raise RuntimeError("Die NetBox-Gerätebearbeitung ist nicht in der View-Registry registriert.")
+
     DeviceEditView.form = RackWidthDeviceForm
     DeviceEditView._netbox_utilities_rack_width_installed = True
 
