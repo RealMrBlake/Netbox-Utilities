@@ -5,19 +5,25 @@ from importlib import import_module
 
 from dcim.models import Device, Rack
 from django.apps import apps
-from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import OperationalError, ProgrammingError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from netbox.plugins import get_plugin_config
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from utilities.permissions import get_permission_for_model
 
+from .models import DeviceRackPlacement
+from .rack_width import FULL_WIDTH, normalize_width_position, stage_width_position
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_REORDER_RACK_VERSIONS = {"1.1.4"}
 PATCH_MARKER = "_netbox_utilities_bulk_save"
+GRID_COLUMNS = 12
+REORDER_RACK_VIEW = "dcim:rack_reorder"
 
 
 class RackLayoutError(Exception):
@@ -29,9 +35,31 @@ class DevicePlacement:
     device_id: int
     position: Decimal | None
     face: str
+    grid_x: int | None
 
 
-def parse_device_placements(layout):
+def grid_dimensions(width, horizontal_position):
+    try:
+        width, horizontal_position = normalize_width_position(width, horizontal_position)
+    except ValidationError as error:
+        raise RackLayoutError(str(error)) from error
+    grid_width = GRID_COLUMNS // width
+    return grid_width, (horizontal_position - 1) * grid_width
+
+
+def horizontal_position_from_grid_x(width, grid_x):
+    if isinstance(grid_x, bool) or not isinstance(grid_x, int):
+        raise RackLayoutError("Die horizontale Rasterposition muss eine ganze Zahl sein.")
+    grid_width, _ = grid_dimensions(width, 1)
+    if grid_x < 0 or grid_x > GRID_COLUMNS - grid_width or grid_x % grid_width:
+        raise RackLayoutError(f"Rasterposition {grid_x} ist für 1/{width} Rackbreite nicht zulässig.")
+    return grid_x // grid_width + 1
+
+
+def parse_device_placements(layout, *, grid_columns=None):
+    if grid_columns not in {None, GRID_COLUMNS}:
+        raise RackLayoutError(f"Das Rackraster muss {GRID_COLUMNS} Spalten verwenden.")
+
     placements = []
     seen_device_ids = set()
 
@@ -53,6 +81,7 @@ def parse_device_placements(layout):
 
             if section == "other":
                 position = None
+                grid_x = None
             else:
                 try:
                     position = Decimal(str(item["y"]))
@@ -61,7 +90,13 @@ def parse_device_placements(layout):
                 if not position.is_finite():
                     raise RackLayoutError(f"Gerät {device_id} besitzt keine gültige Rack-Position.")
 
-            placements.append(DevicePlacement(device_id=device_id, position=position, face=face))
+                grid_x = None
+                if grid_columns == GRID_COLUMNS:
+                    grid_x = item.get("x")
+                    if isinstance(grid_x, bool) or not isinstance(grid_x, int) or not 0 <= grid_x < GRID_COLUMNS:
+                        raise RackLayoutError(f"Gerät {device_id} besitzt keine gültige horizontale Rasterposition.")
+
+            placements.append(DevicePlacement(device_id=device_id, position=position, face=face, grid_x=grid_x))
 
     return placements
 
@@ -77,35 +112,81 @@ def apply_rack_layout(*, rack, placements, user):
         missing = ", ".join(str(device_id) for device_id in sorted(missing_ids))
         raise RackLayoutError(f"Diese Geräte gehören nicht zum gewählten Rack: {missing}.")
 
+    stored_placements = {
+        placement.device_id: placement
+        for placement in DeviceRackPlacement.objects.select_for_update().filter(device_id__in=placement_by_id)
+    }
+    target_placements = []
+    for placement in placements:
+        stored = stored_placements.get(placement.device_id)
+        current_width = stored.width if stored else FULL_WIDTH
+        current_horizontal_position = stored.horizontal_position if stored else 1
+        if placement.position is None:
+            target_width, target_horizontal_position = FULL_WIDTH, 1
+        elif placement.grid_x is None:
+            target_width = current_width
+            target_horizontal_position = current_horizontal_position
+        else:
+            target_width = current_width
+            target_horizontal_position = horizontal_position_from_grid_x(target_width, placement.grid_x)
+        target_placements.append(
+            (
+                devices[placement.device_id],
+                placement,
+                target_width,
+                target_horizontal_position,
+                current_width,
+                current_horizontal_position,
+            )
+        )
+
     changed = [
-        (devices[placement.device_id], placement)
-        for placement in placements
+        (device, placement, target_width, target_horizontal_position)
+        for (
+            device,
+            placement,
+            target_width,
+            target_horizontal_position,
+            current_width,
+            current_horizontal_position,
+        ) in target_placements
         if (
-            devices[placement.device_id].position != placement.position
-            or devices[placement.device_id].face != placement.face
+            device.position != placement.position
+            or device.face != placement.face
+            or current_width != target_width
+            or current_horizontal_position != target_horizontal_position
         )
     ]
     if not changed:
         return []
 
     permission = get_permission_for_model(Device, "change")
-    for device, _placement in changed:
+    for device, _placement, _width, _horizontal_position in changed:
         if not user.has_perm(permission, obj=device):
             raise PermissionDenied(f"Keine Berechtigung zum Verschieben von {device}.")
 
-    for device, _placement in changed:
+    for device, _placement, _width, _horizontal_position in changed:
         device.snapshot()
 
-    changed_ids = [device.pk for device, _placement in changed]
+    changed_ids = [device.pk for device, _placement, _width, _horizontal_position in changed]
     Device.objects.filter(pk__in=changed_ids).update(position=None, face="")
 
-    for device, placement in changed:
+    for device, placement, width, horizontal_position in changed:
         device.position = placement.position
         device.face = placement.face
+        stage_width_position(device, width, horizontal_position)
         device.full_clean()
         device.save()
 
-    return [device for device, _placement in changed]
+        if width == FULL_WIDTH or placement.position is None:
+            DeviceRackPlacement.objects.filter(device=device).delete()
+        else:
+            DeviceRackPlacement.objects.update_or_create(
+                device=device,
+                defaults={"width": width, "horizontal_position": horizontal_position},
+            )
+
+    return [device for device, _placement, _width, _horizontal_position in changed]
 
 
 def _validation_error_message(error):
@@ -115,6 +196,119 @@ def _validation_error_message(error):
             for field, messages in error.message_dict.items()
         )
     return "; ".join(str(message) for message in error.messages)
+
+
+def is_reorder_rack_request(request):
+    resolver_match = getattr(request, "resolver_match", None)
+    return getattr(resolver_match, "view_name", None) == REORDER_RACK_VIEW
+
+
+def reorder_rack_width_enabled(request):
+    if not (
+        is_reorder_rack_request(request)
+        and get_plugin_config("netbox_utilities", "reorder_rack_bulk_save_enabled")
+        and apps.is_installed("netbox_reorder_rack")
+    ):
+        return False
+    plugin_config = apps.get_app_config("netbox_reorder_rack")
+    return getattr(plugin_config, "version", None) in SUPPORTED_REORDER_RACK_VERSIONS
+
+
+def reorder_grid_y(rack, position, height):
+    rack_height = int(Decimal(str(rack.u_height)) * 2)
+    grid_height = int(Decimal(str(height)) * 2)
+    unit_id = int(Decimal(str(position)) * 2)
+    if rack.desc_units:
+        return unit_id - 2
+    if grid_height > 1:
+        return rack_height - unit_id - grid_height + 2
+    return rack_height - unit_id
+
+
+def _image_url(image):
+    if not image:
+        return ""
+    try:
+        return image.url
+    except (AttributeError, ValueError):
+        return ""
+
+
+def get_reorder_rack_width_data(request):
+    """Describe partial-width widgets for netbox-reorder-rack's GridStack UI."""
+    if not reorder_rack_width_enabled(request):
+        return None
+
+    rack_id = getattr(request.resolver_match, "kwargs", {}).get("pk")
+    if not rack_id:
+        return None
+
+    from dcim.svg.racks import get_device_name
+    from netbox.config import get_config
+    from utilities.html import foreground_color
+
+    try:
+        rack = Rack.objects.restrict(request.user, "view").filter(pk=rack_id).first()
+        if rack is None:
+            return None
+        devices = (
+            Device.objects.restrict(request.user, "view")
+            .filter(
+                rack=rack,
+                position__isnull=False,
+                netbox_utilities_rack_placement__isnull=False,
+            )
+            .select_related("device_type", "role", "netbox_utilities_rack_placement")
+            .order_by("pk")
+        )
+        permission = get_permission_for_model(Device, "change")
+        descriptors = []
+        for device in devices:
+            placement = device.netbox_utilities_rack_placement
+            grid_width, grid_x = grid_dimensions(placement.width, placement.horizontal_position)
+            role_color = device.role.color or "1685fc"
+            grid_height = int(Decimal(str(device.device_type.u_height)) * 2)
+            descriptors.append(
+                {
+                    "id": device.pk,
+                    "label": get_device_name(device),
+                    "face": device.face,
+                    "full_depth": device.device_type.is_full_depth,
+                    "grid_x": grid_x,
+                    "grid_y": reorder_grid_y(rack, device.position, device.device_type.u_height),
+                    "grid_width": grid_width,
+                    "grid_height": grid_height,
+                    "width": placement.width,
+                    "horizontal_position": placement.horizontal_position,
+                    "color": role_color,
+                    "text_color": foreground_color(role_color),
+                    "front_image": _image_url(device.device_type.front_image),
+                    "rear_image": _image_url(device.device_type.rear_image),
+                    "locked": not request.user.has_perm(permission, obj=device),
+                }
+            )
+        if not descriptors:
+            return None
+
+        selected_view = request.GET.get("view", "images-and-labels")
+        return {
+            "columns": GRID_COLUMNS,
+            "unit_width": get_config().RACK_ELEVATION_DEFAULT_UNIT_WIDTH,
+            "images": selected_view != "labels-only",
+            "labels": selected_view != "images-only",
+            "devices": descriptors,
+        }
+    except (
+        AttributeError,
+        ObjectDoesNotExist,
+        OperationalError,
+        ProgrammingError,
+        RackLayoutError,
+        TypeError,
+        ValueError,
+    ):
+        logger.warning("Could not load partial rack widths for netbox-reorder-rack", exc_info=True)
+        return None
 
 
 def bulk_reorder_update(self, request, pk=None):
@@ -128,7 +322,12 @@ def bulk_reorder_update(self, request, pk=None):
             if layout["rack_id"] != rack.pk:
                 raise RackLayoutError("Die Rack-ID der Anfrage stimmt nicht mit dem Ziel-Rack überein.")
 
-            placements = parse_device_placements(layout)
+            grid_columns_header = request.headers.get("X-NetBox-Utilities-Rack-Grid-Columns")
+            try:
+                grid_columns = int(grid_columns_header) if grid_columns_header is not None else None
+            except (TypeError, ValueError):
+                raise RackLayoutError("Das angegebene Rackraster ist ungültig.") from None
+            placements = parse_device_placements(layout, grid_columns=grid_columns)
             changed_devices = apply_rack_layout(rack=rack, placements=placements, user=request.user)
             if not changed_devices:
                 return Response(

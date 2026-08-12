@@ -8,3 +8,11 @@
   {{ navigation_preferences|json_script:"netbox-utilities-navigation-data" }}
   <script src="{% static 'netbox_utilities/navigation.js' %}?v={{ asset_version }}" defer></script>
 {% endif %}
+{% if topology_rack_width_data %}
+  {{ topology_rack_width_data|json_script:"netbox-utilities-topology-rack-width-data" }}
+  <script src="{% static 'netbox_utilities/topology-rack-width.js' %}?v={{ asset_version }}" defer></script>
+{% endif %}
+{% if reorder_rack_width_data %}
+  {{ reorder_rack_width_data|json_script:"netbox-utilities-reorder-rack-width-data" }}
+  <script src="{% static 'netbox_utilities/reorder-rack-width.js' %}?v={{ asset_version }}" defer></script>
+{% endif %}

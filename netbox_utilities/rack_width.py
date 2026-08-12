@@ -1,4 +1,5 @@
 import decimal
+import logging
 from contextvars import ContextVar
 from copy import deepcopy
 from fractions import Fraction
@@ -10,6 +11,8 @@ from django.db.models import Count, Q
 from django.db.models.signals import post_save, pre_save
 
 from .models import DeviceRackPlacement
+
+logger = logging.getLogger(__name__)
 
 FULL_WIDTH = 1
 WIDTH_CHOICES = (
@@ -432,14 +435,22 @@ def _install_device_form():
     RackWidthDeviceEditView.__module__ = __name__
     RackWidthDeviceEditView.__qualname__ = "RackWidthDeviceEditView"
 
+    replaced_views = set()
     for view_config in registry["views"]["dcim"]["device"]:
-        if view_config["name"] == "edit":
+        if view_config["name"] in {"add", "edit"}:
             view_config["view"] = RackWidthDeviceEditView
-            break
-    else:
-        raise RuntimeError("Die NetBox-Gerätebearbeitung ist nicht in der View-Registry registriert.")
+            replaced_views.add(view_config["name"])
+    if replaced_views != {"add", "edit"}:
+        missing_views = ", ".join(sorted({"add", "edit"} - replaced_views))
+        logger.warning(
+            "NetBox Utilities could not replace these device registry views: %s; "
+            "the core DeviceEditView fallback remains active",
+            missing_views,
+        )
 
     DeviceEditView.form = RackWidthDeviceForm
+    DeviceEditView.template_name = RackWidthDeviceEditView.template_name
+    DeviceEditView.htmx_template_name = RackWidthDeviceEditView.htmx_template_name
     DeviceEditView._netbox_utilities_rack_width_installed = True
 
 

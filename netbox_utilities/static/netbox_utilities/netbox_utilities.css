@@ -29,6 +29,13 @@
   white-space: nowrap;
 }
 
+.rack-device.netbox-utilities-partial-width {
+  box-sizing: border-box;
+  right: auto !important;
+  left: calc(var(--netbox-utilities-rack-device-left) + 3px) !important;
+  width: calc(var(--netbox-utilities-rack-device-width) - 6px) !important;
+}
+
 .netbox-utilities-sidebar-resizer {
   display: none;
 }

@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.7** mit neun Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.7** mit zehn Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -8,6 +8,7 @@ Plugin für **NetBox 4.6.5 bis 4.6.7** mit neun Funktionen:
 - Automatische Vorbelegung von Mandant und Mandantengruppe aus dem Objekt- oder Filterkontext.
 - Automatische 1:1-Verknüpfung von Front- und Rearports auf Geräten mit der Rolle `Patchpanel`.
 - Geräte mit optionaler Teilbreite können sich dieselbe Höheneinheit teilen.
+- Die Rack-Ansicht von MrBlakes optionalem Topology-Views-Plugin stellt Teilbreitengeräte korrekt dar.
 - Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
@@ -19,6 +20,7 @@ Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gr
 - NetBox `>=4.6.5,<4.7`
 - Python `>=3.12`
 - optional: NetBox Reorder Rack `1.1.4`
+- optional: [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views) mit Rack-Ansicht
 
 Andere NetBox-Versionen werden vom Plugin absichtlich abgelehnt, da die Anpassung der Core-Navigation von deren HTML-Struktur abhängt.
 
@@ -32,11 +34,12 @@ Das Plugin kann direkt aus dem `main`-Branch installiert werden:
 ```
 
 Für eine reproduzierbare Produktivinstallation sollte statt `main` ein
-Release-Tag oder ein bestimmter Commit verwendet werden:
+bereits veröffentlichter Release-Tag oder eine bestimmte Commit-ID verwendet
+werden. `COMMIT-ID` wird dabei durch den gewünschten Stand ersetzt:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.8"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@COMMIT-ID"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -69,6 +72,7 @@ PLUGINS_CONFIG = {
     "netbox_utilities": {
         "navigation_customization_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
+        "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
     },
@@ -135,9 +139,9 @@ empfohlen.
 
 ### Mehrere Geräte nebeneinander in derselben HE
 
-Auf der normalen **Bearbeitungsseite eines Geräts** stehen direkt nach
-**Position** zwei neue optionale Felder zur Verfügung. Dafür wird kein
-separates Plugin-Menü benötigt:
+Auf der normalen Seite zum **Anlegen oder Bearbeiten eines Geräts** stehen
+direkt nach **Position** zwei neue optionale Felder zur Verfügung. Dafür wird
+kein separates Plugin-Menü benötigt:
 
 - **Rackbreite**: volle, halbe, Drittel- oder Viertelbreite;
 - **Breitenposition**: Position 1 bis 4, von links gezählt.
@@ -169,6 +173,44 @@ wiederhergestellt.
 Die Zusatzfelder werden derzeit im NetBox-Webformular gepflegt. REST- oder
 CSV-Vorgänge ohne diese Felder behandeln neue Geräte als volle Rackbreite.
 
+### Teilbreiten in MrBlake NetBox Topology Views
+
+Ist
+[MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views)
+mit seiner **Rack-Ansicht** installiert, erkennt NetBox Utilities das Plugin
+automatisch. Teilbreitengeräte werden dort anhand ihrer Rackbreite und
+Breitenposition nebeneinander dargestellt. Die aktuelle Rack-Ansicht wird auch
+bei ihren Exporten nach **SVG**, **PNG** und **draw.io** unterstützt. Die
+Kabeltopologie bleibt unverändert, da sie Geräte als frei verschiebbare Knoten
+und nicht als physische Rackflächen darstellt.
+
+Das Topology-Plugin bleibt eine optionale Abhängigkeit. Eine reproduzierbare
+Installation des derzeit getesteten MrBlake-Stands erfolgt über dessen
+Commit-ID:
+
+```bash
+/opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
+  "git+https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views.git@86a8daf45ef380d57ac73b461dbc47a16bb831ba"
+```
+
+Für automatische NetBox-Updates wird derselbe Git-Eintrag zusätzlich in
+`/opt/netbox/local_requirements.txt` aufgenommen. Anschließend müssen beide
+Plugins aktiviert sein; ihre Reihenfolge ist beliebig:
+
+```python
+PLUGINS = [
+    "netbox_topology_views",
+    "netbox_utilities",
+]
+```
+
+Die Integration ändert keine Dateien von Topology Views und erzeugt keine
+zusätzlichen Datenbankeinträge. Sie wird ausschließlich auf dessen Rack-Seite
+geladen und kann mit
+`topology_views_rack_width_enabled = False` in `PLUGINS_CONFIG` deaktiviert
+werden. Ist Topology Views nicht installiert oder enthält der installierte
+Stand keine Rack-Ansicht, bleibt NetBox Utilities unverändert nutzbar.
+
 ### Front- und Rearports von Patchpaneln automatisch verknüpfen
 
 Geräte, deren NetBox-Geräterolle `Patchpanel` heißt, werden automatisch als
@@ -195,6 +237,13 @@ Wenn `netbox-reorder-rack` in Version `1.1.4` installiert und aktiviert ist,
 erweitert NetBox Utilities dessen vorhandenen Speichervorgang automatisch.
 In der Drag-and-drop-Ansicht können mehrere Geräte verschoben oder miteinander
 getauscht und anschließend gemeinsam über **Save** gespeichert werden.
+Teilbreitengeräte werden dort ebenfalls nebeneinander angezeigt. Das
+12-spaltige Raster bildet volle, halbe, Drittel- und Viertelbreite exakt ab.
+Beim horizontalen Verschieben rastet ein Gerät auf einer für seine Breite
+gültigen Position ein; **Save** speichert Höhe, Rackseite und Breitenposition
+gemeinsam in derselben Transaktion. Die gewählte Rackbreite selbst wird in der
+Reorder-Ansicht nicht verändert und weiterhin auf der Geräte-Neu- oder
+Bearbeitungsseite gepflegt.
 
 Die optionale Abhängigkeit wird separat installiert und für spätere NetBox-
 Updates in `/opt/netbox/local_requirements.txt` aufgenommen:
@@ -214,8 +263,8 @@ PLUGINS = [
 ```
 
 NetBox Utilities verändert keine Dateien des Reorder-Plugins. Stattdessen wird
-dessen API beim Start kompatibel erweitert. Beim Speichern werden alle
-betroffenen Geräte und das Rack gesperrt, die alten Positionen gemeinsam
+dessen Oberfläche und API beim Start kompatibel erweitert. Beim Speichern
+werden alle betroffenen Geräte und das Rack gesperrt, die alten Positionen gemeinsam
 freigegeben und danach sämtliche Zielpositionen mit der normalen
 NetBox-Modellvalidierung geprüft. Der Vorgang läuft in einer Transaktion: Bei
 einem Platz-, Validierungs- oder Berechtigungsfehler bleibt das gesamte Rack
@@ -228,7 +277,7 @@ Andere Versionen als `1.1.4` werden aus Sicherheitsgründen nicht automatisch
 verändert und erzeugen lediglich einen Hinweis im NetBox-Log. Das
 Reorder-Projekt selbst weist derzeit offiziell nur Kompatibilität bis NetBox
 4.5 aus; die Erweiterung in diesem Plugin ist gezielt für die hier unterstützte
-NetBox-Version 4.6.5 umgesetzt.
+NetBox-Versionen 4.6.5 bis 4.6.7 umgesetzt und getestet.
 
 ### Mehrere Bilder hochladen
 

@@ -74,14 +74,15 @@ class RackWidthTest(SimpleTestCase):
     def test_device_edit_view_uses_explicit_rack_width_form(self):
         from netbox.registry import registry
 
-        edit_view = next(view["view"] for view in registry["views"]["dcim"]["device"] if view["name"] == "edit")
+        for action in ("add", "edit"):
+            device_view = next(view["view"] for view in registry["views"]["dcim"]["device"] if view["name"] == action)
 
-        self.assertEqual(edit_view.__name__, "RackWidthDeviceEditView")
-        self.assertEqual(edit_view.form.__name__, "RackWidthDeviceForm")
-        self.assertEqual(edit_view.template_name, "netbox_utilities/device_edit.html")
-        self.assertEqual(edit_view.htmx_template_name, "netbox_utilities/device_edit_form.html")
-        self.assertIn("utilities_rack_width", edit_view.form.base_fields)
-        self.assertIn("utilities_horizontal_position", edit_view.form.base_fields)
+            self.assertEqual(device_view.__name__, "RackWidthDeviceEditView")
+            self.assertEqual(device_view.form.__name__, "RackWidthDeviceForm")
+            self.assertEqual(device_view.template_name, "netbox_utilities/device_edit.html")
+            self.assertEqual(device_view.htmx_template_name, "netbox_utilities/device_edit_form.html")
+            self.assertIn("utilities_rack_width", device_view.form.base_fields)
+            self.assertIn("utilities_horizontal_position", device_view.form.base_fields)
 
     def test_resolved_device_edit_page_renders_rack_width_fields(self):
         from dcim.models import Device
@@ -132,6 +133,48 @@ class RackWidthTest(SimpleTestCase):
             self.assertLess(html.index(rack_position), html.index(width))
             self.assertLess(html.index(width), html.index(horizontal_position))
             self.assertLess(html.index(horizontal_position), html.index(latitude))
+
+    def test_resolved_device_add_page_renders_rack_width_fields(self):
+        from dcim.models import Device
+
+        object_type = SimpleNamespace(pk=1, model_class=lambda: Device)
+        with (
+            patch("core.models.ObjectType.objects.get_for_model", return_value=object_type),
+            patch(
+                "django.contrib.contenttypes.models.ContentType.objects.get_for_model",
+                return_value=object_type,
+            ),
+            patch("extras.models.CustomField.objects.get_for_model", return_value=[]),
+            patch(
+                "netbox_utilities.runtime._get_database_settings",
+                return_value={"tenant_required": True},
+            ),
+        ):
+            view_class = resolve(reverse("dcim:device_add")).func.view_class
+            form = view_class.form()
+            request = self._anonymous_request()
+            context = {
+                "form": form,
+                "object": SimpleNamespace(
+                    pk=None,
+                    _meta=Device._meta,
+                    device_type=SimpleNamespace(is_child_device=False),
+                    parent_bay=None,
+                ),
+                "return_url": "/dcim/devices/",
+                "request": request,
+                "settings": settings,
+                "csrf_token": "",
+                "perms": PermWrapper(request.user),
+            }
+            rendered_pages = (
+                render_to_string(view_class.htmx_template_name, context),
+                render_to_string(view_class.template_name, context),
+            )
+
+        for html in rendered_pages:
+            self.assertIn('name="utilities_rack_width"', html)
+            self.assertIn('name="utilities_horizontal_position"', html)
 
     def test_bound_device_form_clean_handles_netbox_clean_returning_none(self):
         from dcim.models import Device

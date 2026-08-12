@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.8.8"
+__version__ = "0.9.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -15,6 +15,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
     default_settings = {
         "navigation_customization_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
+        "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
     }
