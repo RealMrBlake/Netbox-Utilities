@@ -1,12 +1,13 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit acht Funktionen:
+Plugin für **NetBox 4.6.5** mit neun Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
 - Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
 - Automatische Vorbelegung von Mandant und Mandantengruppe aus dem Objekt- oder Filterkontext.
 - Automatische 1:1-Verknüpfung von Front- und Rearports auf Geräten mit der Rolle `Patchpanel`.
+- Geräte mit optionaler Teilbreite können sich dieselbe Höheneinheit teilen.
 - Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
@@ -35,7 +36,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.7.4"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.0"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -131,6 +132,38 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### Mehrere Geräte nebeneinander in derselben HE
+
+Im normalen NetBox-Geräteformular stehen direkt nach **Rackseite** zwei neue
+optionale Felder zur Verfügung:
+
+- **Rackbreite**: volle, halbe, Drittel- oder Viertelbreite;
+- **Breitenposition**: Position 1 bis 4, von links gezählt.
+
+Für eine Fritzbox und ein zweites Gerät in derselben HE wird bei beiden
+Geräten beispielsweise **1/2 Rackbreite** gewählt. Die Fritzbox erhält
+**Position 1 (links)**, das andere Gerät **Position 2**. Rack, HE und Rackseite
+dürfen anschließend identisch sein. Die Kollisionsprüfung berücksichtigt
+sowohl die Gerätehöhe als auch die Breite und verhindert horizontale oder
+vertikale Überschneidungen. Mehrere HE hohe Geräte werden ebenfalls
+unterstützt.
+
+Ohne Breitenangabe belegt ein Gerät wie bisher die volle Rackbreite. Das gilt
+automatisch für sämtliche vorhandenen Geräte; es findet keine Änderung oder
+Migration bestehender Platzierungen statt. Teilbreite und Position werden auf
+der Geräteseite angezeigt und in der Rackgrafik nebeneinander dargestellt.
+
+NetBox besitzt standardmäßig eine Datenbank-Eindeutigkeit für Rack, HE und
+Rackseite. Die Plugin-Migration `0007` entfernt ausschließlich diese
+Core-Eindeutigkeit, damit mehrere Geräte dieselbe HE verwenden können. Das
+Plugin übernimmt dafür die breitenabhängige Prüfung beim Speichern. Vor einem
+späteren Entfernen des Plugins müssen geteilte Höheneinheiten wieder aufgelöst
+werden; die Core-Eindeutigkeit wird bei einer Deinstallation nicht automatisch
+wiederhergestellt.
+
+Die Zusatzfelder werden derzeit im NetBox-Webformular gepflegt. REST- oder
+CSV-Vorgänge ohne diese Felder behandeln neue Geräte als volle Rackbreite.
 
 ### Front- und Rearports von Patchpaneln automatisch verknüpfen
 

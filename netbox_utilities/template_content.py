@@ -5,7 +5,7 @@ from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
 from . import __version__
-from .models import NavigationPreference
+from .models import DeviceRackPlacement, NavigationPreference
 from .navigation_helpers import (
     SIDEBAR_WIDTH_DEFAULT,
     SIDEBAR_WIDTH_MAX,
@@ -98,6 +98,18 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
         ):
             return ""
         return self.render("netbox_utilities/device_bulk_module_button.html")
+
+    def right_page(self):
+        placement = DeviceRackPlacement.objects.filter(device=self.context["object"]).first()
+        if placement is None:
+            return ""
+        return self.render(
+            "netbox_utilities/device_rack_width_panel.html",
+            {
+                "rack_width": f"1/{placement.width}",
+                "horizontal_position": placement.horizontal_position,
+            },
+        )
 
 
 template_extensions = [UtilitiesGlobalContent, DeviceUtilitiesContent]

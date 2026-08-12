@@ -91,10 +91,34 @@
     });
   }
 
+  function configureRackWidth(root = document) {
+    const widthField = root.querySelector('[name="utilities_rack_width"]');
+    const positionField = root.querySelector('[name="utilities_horizontal_position"]');
+    if (!widthField || !positionField || widthField.dataset.netboxUtilitiesWidth === 'true') return;
+    widthField.dataset.netboxUtilitiesWidth = 'true';
+
+    const updatePositions = () => {
+      const width = Number.parseInt(widthField.value || '1', 10);
+      Array.from(positionField.options).forEach((option) => {
+        const position = Number.parseInt(option.value || '1', 10);
+        option.disabled = position > width;
+      });
+      if (width === 1 || Number.parseInt(positionField.value || '1', 10) > width) {
+        positionField.value = '1';
+        positionField.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+      positionField.disabled = width === 1;
+    };
+
+    widthField.addEventListener('change', updatePositions);
+    updatePositions();
+  }
+
   function initialize(root = document) {
     rewriteImageUploadLinks(root);
     configureTenantConfirmation(root);
     configureImagePreview(root);
+    configureRackWidth(root);
   }
 
   if (document.readyState === 'loading') {
