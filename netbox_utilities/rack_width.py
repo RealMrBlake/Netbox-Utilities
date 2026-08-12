@@ -424,6 +424,8 @@ def _install_device_form():
 
     class RackWidthDeviceEditView(DeviceEditView):
         form = RackWidthDeviceForm
+        template_name = "netbox_utilities/device_edit.html"
+        htmx_template_name = "netbox_utilities/device_edit_form.html"
 
     RackWidthDeviceEditView.__module__ = __name__
     RackWidthDeviceEditView.__qualname__ = "RackWidthDeviceEditView"

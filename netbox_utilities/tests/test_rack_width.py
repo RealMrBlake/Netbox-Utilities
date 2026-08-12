@@ -2,9 +2,12 @@ from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
+from django.contrib.auth.context_processors import PermWrapper
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import resolve, reverse
 
 from netbox_utilities.rack_width import (
@@ -56,12 +59,13 @@ class RackWidthTest(SimpleTestCase):
 
         self.assertEqual(edit_view.__name__, "RackWidthDeviceEditView")
         self.assertEqual(edit_view.form.__name__, "RackWidthDeviceForm")
+        self.assertEqual(edit_view.template_name, "netbox_utilities/device_edit.html")
+        self.assertEqual(edit_view.htmx_template_name, "netbox_utilities/device_edit_form.html")
         self.assertIn("utilities_rack_width", edit_view.form.base_fields)
         self.assertIn("utilities_horizontal_position", edit_view.form.base_fields)
 
     def test_resolved_device_edit_page_renders_rack_width_fields(self):
         from dcim.models import Device
-        from utilities.forms.rendering import FieldSet
 
         object_type = SimpleNamespace(pk=1, model_class=lambda: Device)
         with (
@@ -78,32 +82,43 @@ class RackWidthTest(SimpleTestCase):
         ):
             url = reverse("dcim:device_edit", kwargs={"pk": 1})
             view_class = resolve(url).func.view_class
-            base_form = view_class.form.__mro__[1]
-            with patch.object(
-                base_form,
-                "fieldsets",
-                (FieldSet("site", "rack", "position", "face", "latitude", name="Location"),),
-            ):
-                form = view_class.form()
-                rendered_fieldsets = form.fieldsets
-                html = render_to_string("htmx/form.html", {"form": form})
+            form = view_class.form()
+            request = self._anonymous_request()
+            context = {
+                "form": form,
+                "object": SimpleNamespace(
+                    pk=None,
+                    _meta=Device._meta,
+                    device_type=SimpleNamespace(is_child_device=False),
+                    parent_bay=None,
+                ),
+                "return_url": "/dcim/devices/",
+                "request": request,
+                "settings": settings,
+                "csrf_token": "",
+                "perms": PermWrapper(request.user),
+            }
+            rendered_pages = (
+                render_to_string(view_class.htmx_template_name, context),
+                render_to_string(view_class.template_name, context),
+            )
 
+        rack_position = 'name="position"'
         width = 'name="utilities_rack_width"'
         horizontal_position = 'name="utilities_horizontal_position"'
-        self.assertIn(width, html)
-        self.assertIn(horizontal_position, html)
-        self.assertEqual(
-            rendered_fieldsets[0].items,
-            (
-                "site",
-                "rack",
-                "position",
-                "utilities_rack_width",
-                "utilities_horizontal_position",
-                "face",
-                "latitude",
-            ),
-        )
+        latitude = 'name="latitude"'
+        for html in rendered_pages:
+            self.assertIn(width, html)
+            self.assertIn(horizontal_position, html)
+            self.assertLess(html.index(rack_position), html.index(width))
+            self.assertLess(html.index(width), html.index(horizontal_position))
+            self.assertLess(html.index(horizontal_position), html.index(latitude))
+
+    @staticmethod
+    def _anonymous_request():
+        request = RequestFactory().get("/dcim/devices/1/edit/")
+        request.user = AnonymousUser()
+        return request
 
     def test_normalizes_full_width_to_first_position(self):
         self.assertEqual(normalize_width_position(1, 4), (1, 1))
