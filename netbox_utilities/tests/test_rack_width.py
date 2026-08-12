@@ -114,6 +114,31 @@ class RackWidthTest(SimpleTestCase):
             self.assertLess(html.index(width), html.index(horizontal_position))
             self.assertLess(html.index(horizontal_position), html.index(latitude))
 
+    def test_bound_device_form_clean_handles_netbox_clean_returning_none(self):
+        from dcim.models import Device
+        from netbox.registry import registry
+
+        edit_view = next(view["view"] for view in registry["views"]["dcim"]["device"] if view["name"] == "edit")
+        object_type = SimpleNamespace(pk=1, model_class=lambda: Device)
+        with (
+            patch("core.models.ObjectType.objects.get_for_model", return_value=object_type),
+            patch(
+                "django.contrib.contenttypes.models.ContentType.objects.get_for_model",
+                return_value=object_type,
+            ),
+            patch("extras.models.CustomField.objects.get_for_model", return_value=[]),
+            patch(
+                "netbox_utilities.runtime._get_database_settings",
+                return_value={"tenant_required": True},
+            ),
+        ):
+            form = edit_view.form(data={})
+            # NetBox 4.6.7's CheckLastUpdatedMixin.clean() updates
+            # self.cleaned_data but deliberately returns None.
+            with patch.object(form, "_post_clean"):
+                self.assertFalse(form.is_valid())
+            self.assertIsInstance(form.cleaned_data, dict)
+
     @staticmethod
     def _anonymous_request():
         request = RequestFactory().get("/dcim/devices/1/edit/")

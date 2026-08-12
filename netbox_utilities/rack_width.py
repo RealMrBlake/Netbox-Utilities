@@ -389,7 +389,8 @@ def _install_device_form():
             self.fields = reordered
 
         def clean(self):
-            cleaned_data = super().clean()
+            super().clean()
+            cleaned_data = self.cleaned_data
             try:
                 width, horizontal_position = normalize_width_position(
                     cleaned_data.get("utilities_rack_width"),
