@@ -6,6 +6,7 @@ from functools import wraps
 
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db.models import Count, Q
 from django.db.models.signals import post_save, pre_save
 
 from .models import DeviceRackPlacement
@@ -452,14 +453,8 @@ def _install_rack_svg():
     @wraps(original_draw_face)
     def width_aware_draw_face(elevation, face, opposite=False):
         original_draw_face(elevation, face, opposite)
-        placements = DeviceRackPlacement.objects.filter(
-            device__rack=elevation.rack,
-            device__position__isnull=False,
-        ).select_related("device", "device__device_type", "device__role")
-        for placement in placements:
-            device = placement.device
-            if not (device.face == face or device.device_type.is_full_depth):
-                continue
+        for device in _partial_width_elevation_devices(elevation.rack, face):
+            placement = device.netbox_utilities_rack_placement
             height = decimal.Decimal(str(device.device_type.u_height))
             coords = elevation._get_device_coords(device.position, height)
             width = elevation.unit_width / placement.width
@@ -477,6 +472,28 @@ def _install_rack_svg():
 
     RackElevationSVG.draw_face = width_aware_draw_face
     RackElevationSVG._netbox_utilities_rack_width_installed = True
+
+
+def _partial_width_elevation_devices(rack, face):
+    """Return the annotated Device instances expected by NetBox's SVG renderer."""
+    from dcim.models import Device
+
+    return (
+        Device.objects.filter(
+            rack=rack,
+            position__gt=0,
+            device_type__u_height__gt=0,
+            netbox_utilities_rack_placement__isnull=False,
+        )
+        .filter(Q(face=face) | Q(device_type__is_full_depth=True))
+        .select_related(
+            "device_type",
+            "device_type__manufacturer",
+            "role",
+            "netbox_utilities_rack_placement",
+        )
+        .annotate(devicebay_count=Count("devicebays"))
+    )
 
 
 def _validate_before_save(sender, instance, raw=False, **kwargs):

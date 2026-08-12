@@ -36,7 +36,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.5"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.6"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.

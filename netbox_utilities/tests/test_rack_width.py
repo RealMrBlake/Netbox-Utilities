@@ -12,6 +12,7 @@ from django.urls import resolve, reverse
 
 from netbox_utilities.rack_width import (
     _cleanup_unracked_placement,
+    _partial_width_elevation_devices,
     available_units_for_device,
     horizontal_interval,
     include_rack_width_in_fieldsets,
@@ -24,6 +25,17 @@ from netbox_utilities.rack_width import (
 
 
 class RackWidthTest(SimpleTestCase):
+    def test_partial_width_svg_devices_include_core_device_bay_annotation(self):
+        from dcim.choices import DeviceFaceChoices
+        from dcim.models import Rack
+
+        devices = _partial_width_elevation_devices(Rack(pk=3), DeviceFaceChoices.FACE_FRONT)
+
+        self.assertIn("devicebay_count", devices.query.annotations)
+        self.assertIn("netbox_utilities_rack_placement", devices.query.select_related)
+        self.assertIn("device_type", devices.query.select_related)
+        self.assertIn("manufacturer", devices.query.select_related["device_type"])
+
     def test_adds_rack_width_fields_to_existing_location_fieldset(self):
         from utilities.forms.rendering import FieldSet
 
