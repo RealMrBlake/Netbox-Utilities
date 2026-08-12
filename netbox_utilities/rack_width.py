@@ -306,84 +306,81 @@ def _install_device_validation():
 
 
 def _install_device_form():
-    from dcim.forms import DeviceForm
+    from dcim.views import DeviceEditView
 
-    if getattr(DeviceForm, "_netbox_utilities_rack_width_installed", False):
+    if getattr(DeviceEditView, "_netbox_utilities_rack_width_installed", False):
         return
 
-    original_init = DeviceForm.__init__
-    original_clean = DeviceForm.clean
-    original_save = DeviceForm.save
+    base_device_form = DeviceEditView.form
 
-    @wraps(original_init)
-    def width_aware_init(form, *args, **kwargs):
-        original_init(form, *args, **kwargs)
-        width, horizontal_position = _stored_width_position(form.instance)
-        form.fields["utilities_rack_width"] = forms.ChoiceField(
+    class RackWidthDeviceForm(base_device_form):
+        utilities_rack_width = forms.ChoiceField(
             label="Rackbreite",
             choices=WIDTH_CHOICES,
             required=False,
-            initial=width,
+            initial=FULL_WIDTH,
             help_text="Optional: Geräte können sich eine HE nebeneinander teilen.",
         )
-        form.fields["utilities_horizontal_position"] = forms.ChoiceField(
+        utilities_horizontal_position = forms.ChoiceField(
             label="Breitenposition",
             choices=POSITION_CHOICES,
             required=False,
-            initial=horizontal_position,
+            initial=1,
             help_text="Position von links; bei halber Breite sind Position 1 und 2 möglich.",
         )
-        if not form.is_bound:
-            form.initial["utilities_rack_width"] = width
-            form.initial["utilities_horizontal_position"] = horizontal_position
 
-        reordered = {}
-        for name, field in form.fields.items():
-            if name in {"utilities_rack_width", "utilities_horizontal_position"}:
-                continue
-            reordered[name] = field
-            if name == "face":
-                reordered["utilities_rack_width"] = form.fields["utilities_rack_width"]
-                reordered["utilities_horizontal_position"] = form.fields["utilities_horizontal_position"]
-        form.fields = reordered
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            width, horizontal_position = _stored_width_position(self.instance)
+            if not self.is_bound:
+                self.initial["utilities_rack_width"] = width
+                self.initial["utilities_horizontal_position"] = horizontal_position
 
-    @wraps(original_clean)
-    def width_aware_form_clean(form):
-        cleaned_data = original_clean(form)
-        try:
-            width, horizontal_position = normalize_width_position(
-                cleaned_data.get("utilities_rack_width"),
-                cleaned_data.get("utilities_horizontal_position"),
-            )
-        except ValidationError as error:
-            form.add_error("utilities_horizontal_position", error)
+            reordered = {}
+            for name, field in self.fields.items():
+                if name in {"utilities_rack_width", "utilities_horizontal_position"}:
+                    continue
+                reordered[name] = field
+                if name == "face":
+                    reordered["utilities_rack_width"] = self.fields["utilities_rack_width"]
+                    reordered["utilities_horizontal_position"] = self.fields["utilities_horizontal_position"]
+            self.fields = reordered
+
+        def clean(self):
+            cleaned_data = super().clean()
+            try:
+                width, horizontal_position = normalize_width_position(
+                    cleaned_data.get("utilities_rack_width"),
+                    cleaned_data.get("utilities_horizontal_position"),
+                )
+            except ValidationError as error:
+                self.add_error("utilities_horizontal_position", error)
+                return cleaned_data
+            if not cleaned_data.get("rack") or not cleaned_data.get("position"):
+                width, horizontal_position = FULL_WIDTH, 1
+            cleaned_data["utilities_rack_width"] = width
+            cleaned_data["utilities_horizontal_position"] = horizontal_position
+            stage_width_position(self.instance, width, horizontal_position)
             return cleaned_data
-        if not cleaned_data.get("rack") or not cleaned_data.get("position"):
-            width, horizontal_position = FULL_WIDTH, 1
-        cleaned_data["utilities_rack_width"] = width
-        cleaned_data["utilities_horizontal_position"] = horizontal_position
-        stage_width_position(form.instance, width, horizontal_position)
-        return cleaned_data
 
-    @wraps(original_save)
-    def width_aware_form_save(form, commit=True):
-        device = original_save(form, commit=commit)
-        if not commit:
+        def save(self, commit=True):
+            device = super().save(commit=commit)
+            if not commit:
+                return device
+            width, horizontal_position = get_width_position(device)
+            if width == FULL_WIDTH or not device.rack_id or not device.position:
+                DeviceRackPlacement.objects.filter(device=device).delete()
+            else:
+                DeviceRackPlacement.objects.update_or_create(
+                    device=device,
+                    defaults={"width": width, "horizontal_position": horizontal_position},
+                )
             return device
-        width, horizontal_position = get_width_position(device)
-        if width == FULL_WIDTH or not device.rack_id or not device.position:
-            DeviceRackPlacement.objects.filter(device=device).delete()
-        else:
-            DeviceRackPlacement.objects.update_or_create(
-                device=device,
-                defaults={"width": width, "horizontal_position": horizontal_position},
-            )
-        return device
 
-    DeviceForm.__init__ = width_aware_init
-    DeviceForm.clean = width_aware_form_clean
-    DeviceForm.save = width_aware_form_save
-    DeviceForm._netbox_utilities_rack_width_installed = True
+    RackWidthDeviceForm.__module__ = __name__
+    RackWidthDeviceForm.__qualname__ = "RackWidthDeviceForm"
+    DeviceEditView.form = RackWidthDeviceForm
+    DeviceEditView._netbox_utilities_rack_width_installed = True
 
 
 def _install_rack_svg():

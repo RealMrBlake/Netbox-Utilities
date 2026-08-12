@@ -18,6 +18,13 @@ from netbox_utilities.rack_width import (
 
 
 class RackWidthTest(SimpleTestCase):
+    def test_device_edit_view_uses_explicit_rack_width_form(self):
+        from dcim.views import DeviceEditView
+
+        self.assertEqual(DeviceEditView.form.__name__, "RackWidthDeviceForm")
+        self.assertIn("utilities_rack_width", DeviceEditView.form.base_fields)
+        self.assertIn("utilities_horizontal_position", DeviceEditView.form.base_fields)
+
     def test_normalizes_full_width_to_first_position(self):
         self.assertEqual(normalize_width_position(1, 4), (1, 1))
 

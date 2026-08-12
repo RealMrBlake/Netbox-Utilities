@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5** mit neun Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.7** mit neun Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -36,7 +36,7 @@ Release-Tag oder ein bestimmter Commit verwendet werden:
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.0"
+  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@v0.8.1"
 ```
 
 Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
@@ -135,8 +135,9 @@ empfohlen.
 
 ### Mehrere Geräte nebeneinander in derselben HE
 
-Im normalen NetBox-Geräteformular stehen direkt nach **Rackseite** zwei neue
-optionale Felder zur Verfügung:
+Auf der normalen **Bearbeitungsseite eines Geräts** stehen direkt nach
+**Rackseite** zwei neue optionale Felder zur Verfügung. Dafür wird kein
+separates Plugin-Menü benötigt:
 
 - **Rackbreite**: volle, halbe, Drittel- oder Viertelbreite;
 - **Breitenposition**: Position 1 bis 4, von links gezählt.
