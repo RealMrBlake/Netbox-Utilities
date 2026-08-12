@@ -465,7 +465,6 @@ def _install_rack_svg():
                     elevation.draw_device_front(device, coords, size)
                 else:
                     elevation.draw_device_rear(device, coords, size)
-                _fit_latest_elevation_image(elevation.drawing)
             else:
                 from svgwrite.shapes import Rect
 
@@ -495,19 +494,6 @@ def _partial_width_elevation_devices(rack, face):
         )
         .annotate(devicebay_count=Count("devicebays"))
     )
-
-
-def _fit_latest_elevation_image(drawing):
-    """Fit the latest device image into a partial-width slot without cropping it."""
-    from svgwrite.image import Image
-
-    if not getattr(drawing, "elements", None):
-        return
-    container = drawing.elements[-1]
-    for element in reversed(getattr(container, "elements", ())):
-        if isinstance(element, Image):
-            element.fit(scale="meet")
-            return
 
 
 def _validate_before_save(sender, instance, raw=False, **kwargs):
