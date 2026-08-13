@@ -34,7 +34,7 @@
       <div class="col-lg-4 col-md-6 col-sm-12 text-center">
         <h4>Non-Racked Devices</h4>
         <div class="d-flex justify-content-center">
-          <div class="grid-stack rack" id="grid-other" gs-column="12" gs-max-row="150"
+          <div class="grid-stack rack netbox-utilities-reorder-grid" id="grid-other" gs-column="12" gs-max-row="150"
                gs-min-row="{{ object.u_height|mul:2 }}" data-grid-id="2">
             {% for device in non_racked %}
               <div class="grid-stack-item" gs-w="12" gs-h="{{ device.device_type.u_height|mul:2 }}"

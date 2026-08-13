@@ -1,8 +1,6 @@
 import logging
 import re
-from functools import wraps
 from html import unescape
-from importlib import import_module
 
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
@@ -17,12 +15,12 @@ from .rack_width import effective_width_positions
 logger = logging.getLogger(__name__)
 
 TOPOLOGY_RACK_ELEVATION_VIEW = "plugins:netbox_topology_views:rack_elevation"
-TOPOLOGY_VIEW_PATCH_MARKER = "_netbox_utilities_rack_width_view"
 RACK_DEVICE_TAG_RE = re.compile(
     r"<a\b[^>]*\bclass=[\"'][^\"']*\brack-device\b[^\"']*[\"'][^>]*>",
     re.IGNORECASE,
 )
 HREF_RE = re.compile(r"\bhref=[\"'](?P<url>[^\"']+)[\"']", re.IGNORECASE)
+STYLE_RE = re.compile(r"\bstyle=(?P<quote>[\"'])(?P<style>.*?)(?P=quote)", re.IGNORECASE)
 DEVICE_ID_RE = re.compile(r"(?:^|/)dcim/devices/(?P<device_id>\d+)/?(?:$|[?#])")
 
 
@@ -179,6 +177,34 @@ def _topology_width_head(data):
     return f'{stylesheet}{payload}<script src="{script_url}" defer></script>'
 
 
+def _apply_topology_widths_to_device_tags(html, data):
+    descriptors = {device["url"]: device for device in data["devices"]}
+
+    def replace_tag(match):
+        tag = match.group(0)
+        href_match = HREF_RE.search(tag)
+        if href_match is None:
+            return tag
+        descriptor = descriptors.get(unescape(href_match.group("url")))
+        if descriptor is None:
+            return tag
+
+        geometry = (
+            "right:auto!important;"
+            f"left:calc({descriptor['left_percent']}% + 3px)!important;"
+            f"width:calc({descriptor['width_percent']}% - 6px)!important"
+        )
+        style_match = STYLE_RE.search(tag)
+        if style_match is not None:
+            quote = style_match.group("quote")
+            existing = style_match.group("style").rstrip().rstrip(";")
+            replacement = f"style={quote}{existing};{geometry}{quote}"
+            return f"{tag[: style_match.start()]}{replacement}{tag[style_match.end() :]}"
+        return f'{tag[:-1]} style="{geometry}">'
+
+    return RACK_DEVICE_TAG_RE.sub(replace_tag, html)
+
+
 def _inject_topology_widths(response):
     if (
         getattr(response, "streaming", False)
@@ -192,6 +218,7 @@ def _inject_topology_widths(response):
         return response
     visible_urls = _visible_topology_device_urls(html)
     data = _topology_data_for_visible_devices(visible_urls)
+    html = _apply_topology_widths_to_device_tags(html, data)
     insertion = _topology_width_head(data)
     head_end = html.lower().index("</head>")
     html = f"{html[:head_end]}{insertion}{html[head_end:]}"
@@ -202,41 +229,16 @@ def _inject_topology_widths(response):
     return response
 
 
-def install_topology_rack_width_support():
-    """Patch the optional view and derive widths from its authorized HTML."""
-    if not (
-        apps.is_installed("netbox_topology_views")
-        and get_plugin_config("netbox_utilities", "topology_views_rack_width_enabled")
-    ):
-        return False
-
+def apply_topology_rack_widths(request, response):
+    """Apply widths after the optional view has rendered its authorized devices."""
+    if not topology_rack_width_enabled(request):
+        return response
     try:
-        topology_views = import_module("netbox_topology_views.views")
-        view = topology_views.RackElevationView
-    except (AttributeError, ImportError):
-        logger.warning("NetBox Utilities could not find the optional Topology rack elevation view")
-        return False
-
-    if getattr(view, TOPOLOGY_VIEW_PATCH_MARKER, False):
-        return True
-
-    original_get = view.get
-
-    @wraps(original_get)
-    def width_aware_topology_get(self, request, *args, **kwargs):
-        response = original_get(self, request, *args, **kwargs)
-        try:
-            return _inject_topology_widths(response)
-        except (AttributeError, ObjectDoesNotExist, OperationalError, ProgrammingError, TypeError, ValueError):
-            logger.warning(
-                "Could not inject partial rack widths into NetBox Topology Views path %s",
-                request.get_full_path(),
-                exc_info=True,
-            )
-            return response
-
-    view._netbox_utilities_original_get = original_get
-    view.get = width_aware_topology_get
-    setattr(view, TOPOLOGY_VIEW_PATCH_MARKER, True)
-    logger.info("Enabled partial rack widths for the optional Topology rack elevation view")
-    return True
+        return _inject_topology_widths(response)
+    except Exception:
+        logger.warning(
+            "Could not inject partial rack widths into NetBox Topology Views path %s",
+            request.get_full_path(),
+            exc_info=True,
+        )
+        return response

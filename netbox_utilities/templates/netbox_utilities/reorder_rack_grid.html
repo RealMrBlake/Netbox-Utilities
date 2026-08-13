@@ -6,7 +6,7 @@
         {% if unit|rack_unit %}<li>{{ unit|rack_unit_to_int }}</li>{% else %}<li></li>{% endif %}
       {% endfor %}
     </ul>
-    <div class="grid-stack rack" id="grid-{{ face }}" gs-column="12"
+    <div class="grid-stack rack netbox-utilities-reorder-grid" id="grid-{{ face }}" gs-column="12"
          gs-max-row="{{ object.u_height|mul:2 }}" gs-min-row="{{ object.u_height|mul:2 }}"
          data-grid-id="{{ grid_id }}">
       {% for device in reorder_devices %}

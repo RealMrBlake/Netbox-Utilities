@@ -22,7 +22,10 @@ class GlobalTenantFilterMiddleware:
         try:
             if scope is not None and request.method in {"GET", "HEAD"}:
                 self._inject_filter_parameter(request, scope)
-            return self.get_response(request)
+            response = self.get_response(request)
+            from .topology_views import apply_topology_rack_widths
+
+            return apply_topology_rack_widths(request, response)
         finally:
             active_tenant_scope.reset(token)
 

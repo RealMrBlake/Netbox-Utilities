@@ -310,6 +310,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn("{% for device in reorder_devices %}", grid)
         self.assertIn('gs-w="{{ device.grid_width }}"', grid)
         self.assertIn('gs-x="{{ device.grid_x }}"', grid)
+        self.assertIn("netbox-utilities-reorder-grid", grid)
         self.assertIn('json_script:"netbox-utilities-reorder-rack-width-data"', page)
         self.assertIn("netbox_utilities/reorder-rack-width.js", page)
 
@@ -342,6 +343,14 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn('gs-column="12"', rendered_grid)
         self.assertIn('gs-id="10"', rendered_grid)
         self.assertIn("LEO-Fritzbox", rendered_grid)
+
+        stylesheet = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "netbox_utilities.css").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('.netbox-utilities-reorder-grid[gs-column="12"]', stylesheet)
+        self.assertIn('.grid-stack-item[gs-w="6"] { width: 50% !important; }', stylesheet)
+        self.assertIn('.grid-stack-item[gs-w="12"] { width: 100% !important; }', stylesheet)
+        self.assertIn('.grid-stack-item[gs-x="6"] { left: 50% !important; }', stylesheet)
 
     def test_resolved_reorder_page_uses_server_side_width_view(self):
         view_class = resolve(reverse("dcim:rack_reorder", kwargs={"pk": 3})).func.view_class
@@ -405,7 +414,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
         self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
         self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
-        self.assertEqual(context["asset_version"], "0.9.6")
+        self.assertEqual(context["asset_version"], "0.9.7")
         self.assertIs(context["reorder_rack_width_data"], get_width_data.return_value)
         get_width_data.assert_called_once()
         self.assertIs(get_width_data.call_args.kwargs["rack"], rack)

@@ -132,6 +132,12 @@ autorisierten Rack-Datensatz. Die Topology-Rack-Ansicht leitet ihre Breiten
 ausschließlich aus den Geräten ab, die der Topology-View tatsächlich in seine
 HTML-Antwort geschrieben hat. Zusätzliche Berechtigungsabfragen können die
 beiden Ansichten dadurch nicht mehr fälschlich leeren.
+Ab Version `0.9.7` enthält Reorder eigene 12-Spalten-CSS-Regeln. Diese beheben
+die Inkompatibilität zwischen GridStack 10 aus Reorder Rack `1.1.4` und dem
+GridStack-11-Stylesheet von NetBox 4.6.7, durch die Gerätekacheln mit einer
+berechneten Breite von `0px` unsichtbar waren. Topology-Breiten werden außerdem
+nach dem vollständigen Rendern zentral auf die HTTP-Antwort angewendet und
+zusätzlich direkt in die vorhandenen Geräte-Styles geschrieben.
 Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
 keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
 Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander

@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from netbox_utilities.middleware import GlobalTenantFilterMiddleware
@@ -27,6 +28,21 @@ def resolver_match(filterset=None, view_name="dcim:device_list"):
 class GlobalTenantFilterMiddlewareTest(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
+
+    @patch("netbox_utilities.topology_views.apply_topology_rack_widths")
+    @patch("netbox_utilities.middleware.GlobalTenantFilterMiddleware._get_selected_scope", return_value=None)
+    def test_processes_topology_widths_after_the_view_response(self, _scope, apply_widths):
+        native_response = HttpResponse("native topology")
+        final_response = HttpResponse("width-aware topology")
+        apply_widths.return_value = final_response
+        middleware = GlobalTenantFilterMiddleware(lambda _request: native_response)
+        request = self.factory.get("/plugins/netbox_topology_views/rack-elevation/?rack_id=3")
+        request.session = {}
+
+        result = middleware(request)
+
+        self.assertIs(result, final_response)
+        apply_widths.assert_called_once_with(request, native_response)
 
     @patch("netbox_utilities.middleware.resolve")
     def test_injects_and_overrides_tenant_id(self, mocked_resolve):

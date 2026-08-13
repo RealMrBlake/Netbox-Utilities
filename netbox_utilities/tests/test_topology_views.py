@@ -6,11 +6,12 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from netbox_utilities.topology_views import (
+    _apply_topology_widths_to_device_tags,
     _inject_topology_widths,
     _topology_data_for_visible_devices,
     _visible_topology_device_urls,
+    apply_topology_rack_widths,
     get_topology_rack_width_data,
-    install_topology_rack_width_support,
     is_topology_rack_elevation_request,
     serialize_topology_placement,
     topology_rack_width_enabled,
@@ -245,24 +246,40 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn('id="netbox-utilities-topology-rack-width-styles"', html)
         self.assertIn('.rack-device[href="/dcim/devices/334/"]', html)
         self.assertIn("left: calc(50% + 3px) !important", html)
-        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.9.6", html)
+        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.9.7", html)
+        self.assertIn("left:calc(0% + 3px)!important", html)
+        self.assertIn("left:calc(50% + 3px)!important", html)
+        self.assertIn("width:calc(50% - 6px)!important", html)
 
-    def test_patches_the_optional_topology_view_only_once(self):
-        def original_get(self, request):
-            return self, request
+    def test_preserves_existing_topology_style_while_applying_width(self):
+        data = {
+            "devices": [
+                {
+                    "url": "/dcim/devices/334/",
+                    "left_percent": 0,
+                    "width_percent": 50,
+                }
+            ]
+        }
+        html = (
+            '<a class="rack-device" href="/dcim/devices/334/" '
+            'style="bottom: 10%; height: 2%; border-color: #f00">Fritzbox</a>'
+        )
 
-        class RackElevationView:
-            get = original_get
+        result = _apply_topology_widths_to_device_tags(html, data)
 
-        module = SimpleNamespace(RackElevationView=RackElevationView)
-        with (
-            patch("netbox_utilities.topology_views.apps.is_installed", return_value=True),
-            patch("netbox_utilities.topology_views.get_plugin_config", return_value=True),
-            patch("netbox_utilities.topology_views.import_module", return_value=module),
-        ):
-            self.assertTrue(install_topology_rack_width_support())
-            patched_get = RackElevationView.get
-            self.assertTrue(install_topology_rack_width_support())
+        self.assertIn("bottom: 10%", result)
+        self.assertIn("height: 2%", result)
+        self.assertIn("left:calc(0% + 3px)!important", result)
+        self.assertIn("width:calc(50% - 6px)!important", result)
 
-        self.assertIs(RackElevationView.get, patched_get)
-        self.assertIs(RackElevationView._netbox_utilities_original_get, original_get)
+    @patch("netbox_utilities.topology_views._inject_topology_widths")
+    @patch("netbox_utilities.topology_views.topology_rack_width_enabled", return_value=True)
+    def test_response_processor_runs_after_the_topology_view(self, _enabled, inject):
+        response = HttpResponse("<html></html>")
+        inject.return_value = response
+
+        result = apply_topology_rack_widths(self.request, response)
+
+        self.assertIs(result, response)
+        inject.assert_called_once_with(response)
