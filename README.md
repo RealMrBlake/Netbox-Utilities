@@ -117,6 +117,10 @@ Reorder ersetzt seine nativen Gerätekacheln erst, nachdem ein vollständiger
 und zur JavaScript-Version passender Datensatz geprüft wurde. Bei einer
 gemischten Installation aus altem Python-Code und neuen statischen Dateien
 bleibt deshalb die native Ansicht erhalten, statt ein leeres Rack zu zeigen.
+Ab Version `0.9.4` werden vorhandene Reorder-Kacheln außerdem direkt auf das
+12-Spalten-Raster erweitert und nicht mehr vorsorglich neu erzeugt. Nur ein
+zweites, von NetBox' Ein-Gerät-pro-HE-Darstellung unterschlagenes Gerät wird
+aus den Plugin-Daten ergänzt. Das verhindert browserabhängige leere Racks.
 Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
 keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
 Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander

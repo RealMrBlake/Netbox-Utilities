@@ -48,6 +48,8 @@
     console.warn('NetBox Utilities received no replacement devices and kept the populated native layout.');
     return;
   }
+  const devicesById = new Map(data.devices.map(device => [String(device.id), device]));
+  const nativeItemsByFace = {};
 
   const setAttribute = (element, name, value) => element.setAttribute(name, String(value));
   const originalFetch = window.fetch.bind(window);
@@ -73,12 +75,26 @@
 
   Object.entries(gridElements).forEach(([face, grid]) => {
     setAttribute(grid, 'gs-column', columns);
+    const nativeItemsById = new Map(
+      Array.from(grid.querySelectorAll('.grid-stack-item')).map(item => [item.getAttribute('gs-id'), item]),
+    );
     grid.querySelectorAll('.grid-stack-item').forEach(item => {
-      // The native Reorder view is based on Rack.get_rack_units(), which can
-      // expose only one device per rack unit. Rebuild the mounted grids from
-      // the complete server payload; keep native non-racked devices intact.
+      // Keep every native widget whenever possible. Rack.get_rack_units() can
+      // expose only one device per unit, so missing shared widgets are added
+      // from the complete payload below.
       if (face !== 'other') {
-        item.remove();
+        const device = devicesById.get(item.getAttribute('gs-id'));
+        const belongsOnFace = device && (device.face === face || device.full_depth);
+        if (!belongsOnFace) {
+          item.remove();
+          return;
+        }
+        setAttribute(item, 'gs-w', device.grid_width);
+        setAttribute(item, 'gs-h', device.grid_height);
+        setAttribute(item, 'gs-x', device.grid_x);
+        setAttribute(item, 'gs-y', device.grid_y);
+        item.dataset.rackWidth = String(device.width);
+        item.dataset.horizontalPosition = String(device.horizontal_position);
         return;
       }
       setAttribute(item, 'gs-w', columns);
@@ -86,6 +102,7 @@
       item.dataset.rackWidth = '1';
       item.dataset.horizontalPosition = '1';
     });
+    nativeItemsByFace[face] = nativeItemsById;
   });
 
   const addWidget = (device, gridFace, itemFace, rearSide = false) => {
@@ -125,9 +142,14 @@
 
   data.devices.forEach(device => {
     const face = device.face === 'rear' ? 'rear' : 'front';
-    addWidget(device, face, face);
+    if (!nativeItemsByFace[face].has(String(device.id))) {
+      addWidget(device, face, face);
+    }
     if (device.full_depth) {
-      addWidget(device, face === 'front' ? 'rear' : 'front', 'back', true);
+      const oppositeFace = face === 'front' ? 'rear' : 'front';
+      if (!nativeItemsByFace[oppositeFace].has(String(device.id))) {
+        addWidget(device, oppositeFace, 'back', true);
+      }
     }
   });
 

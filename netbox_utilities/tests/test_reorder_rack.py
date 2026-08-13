@@ -291,6 +291,9 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn("data.schema_version !== 3", script)
         self.assertIn("data.complete !== true", script)
         self.assertIn("nativeMountedItems.length", script)
+        self.assertIn("const nativeItemsByFace = {}", script)
+        self.assertIn("const device = devicesById.get", script)
+        self.assertIn("if (!nativeItemsByFace[face].has", script)
         self.assertNotIn("partialDeviceIds", script)
         self.assertNotIn("JSON.stringify", script)
 
