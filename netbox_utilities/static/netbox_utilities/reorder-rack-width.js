@@ -11,6 +11,10 @@
     console.error('NetBox Utilities could not read the Reorder Rack width data.', error);
     return;
   }
+  if (data.status && data.status !== 'ready') {
+    console.warn('NetBox Utilities is leaving Reorder Rack in its native layout.', data.status);
+    return;
+  }
 
   const columns = Number.parseInt(data.columns, 10) || 12;
   const gridElements = {

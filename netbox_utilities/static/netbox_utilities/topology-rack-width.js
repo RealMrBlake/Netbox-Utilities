@@ -4,11 +4,20 @@
   const placementSource = document.getElementById('netbox-utilities-topology-rack-width-data');
   if (!placementSource) return;
 
-  let placementData;
+  let payload;
   try {
-    placementData = JSON.parse(placementSource.textContent);
+    payload = JSON.parse(placementSource.textContent);
   } catch (error) {
     console.error('NetBox Utilities could not read the Topology Views rack widths.', error);
+    return;
+  }
+  if (!Array.isArray(payload) && payload?.status && payload.status !== 'ready') {
+    console.warn('NetBox Utilities is leaving Topology Views in its native layout.', payload.status);
+    return;
+  }
+  const placementData = Array.isArray(payload) ? payload : payload?.devices;
+  if (!Array.isArray(placementData)) {
+    console.error('NetBox Utilities received invalid Topology Views rack width data.');
     return;
   }
 
@@ -59,6 +68,7 @@
       && typeof device.dataset.deviceColor === 'string'
     ));
   });
+  if (!rackCards.length && !placementData.length) return;
   if (!liveViewCompatible) {
     console.warn('NetBox Utilities left Topology Views unchanged because its rack DOM is not compatible.');
     return;

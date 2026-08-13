@@ -94,8 +94,9 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
             position__isnull=False,
         )
         placement_objects.filter.assert_called_once_with(device__in="permitted-device-query")
-        self.assertEqual(result[0]["width"], 2)
-        self.assertEqual(result[0]["horizontal_position"], 2)
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["devices"][0]["width"], 2)
+        self.assertEqual(result["devices"][0]["horizontal_position"], 2)
 
     def test_frontend_supports_live_view_and_all_rack_export_formats(self):
         script = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "topology-rack-width.js").read_text(
@@ -112,6 +113,8 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn("event.stopImmediatePropagation()", script)
         self.assertIn("rackExportCompatible", script)
         self.assertIn("liveViewCompatible", script)
+        self.assertIn("payload?.devices", script)
+        self.assertIn("payload.status !== 'ready'", script)
         self.assertLess(script.index("liveViewCompatible"), script.index("netbox-utilities-partial-width"))
         self.assertLess(script.index("exportGraphic(graphic"), script.index("event.preventDefault()"))
 
@@ -119,7 +122,10 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
     def test_malformed_partial_placement_fails_open(self, _enabled):
         self.request.resolver_match = SimpleNamespace(view_name="plugins:netbox_topology_views:rack_elevation")
         with patch("dcim.models.Rack.objects.restrict", side_effect=AttributeError("stale")):
-            self.assertIsNone(get_topology_rack_width_data(self.request))
+            result = get_topology_rack_width_data(self.request)
+
+        self.assertEqual(result["status"], "native-fallback")
+        self.assertEqual(result["devices"], [])
 
     def test_partial_width_css_uses_topology_device_slot_geometry(self):
         stylesheet = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "netbox_utilities.css").read_text(

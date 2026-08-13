@@ -41,8 +41,12 @@ def serialize_topology_placement(placement):
 
 def get_topology_rack_width_data(request):
     """Return permitted partial-width devices shown by Topology Views."""
-    if not topology_rack_width_enabled(request) or not request.GET:
+    if not topology_rack_width_enabled(request):
         return None
+
+    data = {"devices": [], "status": "ready"}
+    if not request.GET:
+        return data
 
     from dcim.models import Device, Rack
 
@@ -66,7 +70,8 @@ def get_topology_rack_width_data(request):
         placements = (
             DeviceRackPlacement.objects.filter(device__in=devices).select_related("device").order_by("device_id")
         )
-        return [serialize_topology_placement(placement) for placement in placements]
+        data["devices"] = [serialize_topology_placement(placement) for placement in placements]
+        return data
     except (
         AttributeError,
         ObjectDoesNotExist,
@@ -76,5 +81,10 @@ def get_topology_rack_width_data(request):
         ValueError,
     ):
         # Keep NetBox usable while plugin migrations are being installed.
-        logger.warning("Could not load partial rack widths for NetBox Topology Views", exc_info=True)
-        return None
+        logger.warning(
+            "Could not load partial rack widths for NetBox Topology Views path %s; using its native rack layout",
+            request.get_full_path(),
+            exc_info=True,
+        )
+        data["status"] = "native-fallback"
+        return data

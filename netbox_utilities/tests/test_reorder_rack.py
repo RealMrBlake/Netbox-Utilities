@@ -223,7 +223,10 @@ class ReorderRackFrontendTest(SimpleTestCase):
         rack_model.objects.restrict.return_value.filter.return_value.first.return_value = SimpleNamespace(pk=5)
 
         with patch("netbox_utilities.reorder_rack.Device.objects.restrict", side_effect=AttributeError("stale")):
-            self.assertIsNone(get_reorder_rack_width_data(request))
+            result = get_reorder_rack_width_data(request)
+
+        self.assertEqual(result["status"], "native-fallback")
+        self.assertEqual(result["devices"], [])
 
     @patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled", return_value=True)
     @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
@@ -246,6 +249,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         device = SimpleNamespace(
             pk=10,
             name="Fritzbox",
+            label="Fritzbox",
             virtual_chassis=None,
             device_type=SimpleNamespace(
                 u_height=1,
@@ -263,7 +267,6 @@ class ReorderRackFrontendTest(SimpleTestCase):
         device_model.objects.restrict.return_value = device_queryset
 
         with (
-            patch("dcim.svg.racks.get_device_name", return_value="Fritzbox"),
             patch(
                 "netbox.config.get_config",
                 return_value=SimpleNamespace(RACK_ELEVATION_DEFAULT_UNIT_WIDTH=220),
@@ -273,6 +276,8 @@ class ReorderRackFrontendTest(SimpleTestCase):
             result = get_reorder_rack_width_data(request)
 
         self.assertEqual(result["columns"], 12)
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["devices"][0]["label"], "Fritzbox")
         self.assertFalse(result["images"])
         self.assertTrue(result["labels"])
         self.assertEqual(

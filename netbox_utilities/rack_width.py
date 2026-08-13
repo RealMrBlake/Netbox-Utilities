@@ -248,25 +248,12 @@ def _decimal_range(start, stop):
         current += decimal.Decimal("0.5")
 
 
-def _partial_intervals_for_unit(unit, face, placements):
-    intervals = []
-    for placement in placements:
-        device = placement.device
-        if not (device.face == face or device.device_type.is_full_depth):
-            continue
-        start, end = _vertical_interval(device)
-        if start <= decimal.Decimal(unit) < end:
-            intervals.append(horizontal_interval(placement.width, placement.horizontal_position))
-    return intervals
-
-
 def _install_rack_methods():
     from dcim.models import Rack
 
     if getattr(Rack, "_netbox_utilities_rack_width_installed", False):
         return
     original_available_units = Rack.get_available_units
-    original_rack_units = Rack.get_rack_units
 
     @wraps(original_available_units)
     def width_aware_available_units(
@@ -286,33 +273,7 @@ def _install_rack_methods():
             )
         return original_available_units(rack, u_height, rack_face, exclude, ignore_excluded_devices)
 
-    @wraps(original_rack_units)
-    def width_aware_rack_units(rack, *args, **kwargs):
-        units = original_rack_units(rack, *args, **kwargs)
-        face = kwargs.get("face")
-        if face is None and len(args) > 1:
-            face = args[1]
-        if face is None:
-            from dcim.choices import DeviceFaceChoices
-
-            face = DeviceFaceChoices.FACE_FRONT
-        placements = list(
-            DeviceRackPlacement.objects.filter(
-                device__rack=rack,
-                device__position__isnull=False,
-            ).select_related("device", "device__device_type")
-        )
-        for unit in units:
-            intervals = _partial_intervals_for_unit(unit["id"], face, placements)
-            if not intervals:
-                continue
-            unit["device"] = None
-            unit.pop("height", None)
-            unit["occupied"] = intervals_cover_full_width(intervals)
-        return units
-
     Rack.get_available_units = width_aware_available_units
-    Rack.get_rack_units = width_aware_rack_units
     Rack._netbox_utilities_rack_width_installed = True
 
 
@@ -463,8 +424,31 @@ def _install_rack_svg():
 
     @wraps(original_draw_face)
     def width_aware_draw_face(elevation, face, opposite=False):
-        original_draw_face(elevation, face, opposite)
-        for device in _partial_width_elevation_devices(elevation.rack, face):
+        partial_devices = list(_partial_width_elevation_devices(elevation.rack, face))
+        partial_device_ids = {device.pk for device in partial_devices}
+
+        # Draw regular devices with NetBox's native geometry. Partial devices
+        # are skipped here and rendered once with their stored horizontal slot
+        # below. Rack.get_rack_units() deliberately remains untouched so that
+        # other consumers such as netbox-reorder-rack keep receiving devices.
+        for unit in elevation.rack.get_rack_units(face=face, expand_devices=False):
+            device = unit["device"]
+            if device and device.pk in partial_device_ids:
+                continue
+            height = unit.get("height", decimal.Decimal("1.0"))
+            coords = elevation._get_device_coords(unit["id"], height)
+            size = (elevation.unit_width, int(elevation.unit_height * height))
+            if device and device.pk in elevation.permitted_device_ids:
+                if device.face == face and not opposite:
+                    elevation.draw_device_front(device, coords, size)
+                else:
+                    elevation.draw_device_rear(device, coords, size)
+            elif device:
+                from svgwrite.shapes import Rect
+
+                elevation.drawing.add(Rect(coords, size, class_="blocked"))
+
+        for device in partial_devices:
             placement = device.netbox_utilities_rack_placement
             height = decimal.Decimal(str(device.device_type.u_height))
             coords = elevation._get_device_coords(device.position, height)

@@ -234,16 +234,33 @@ def _image_url(image):
         return ""
 
 
+def _device_label(device):
+    return device.label or str(device.device_type)
+
+
+def _empty_reorder_rack_width_data(request, *, status="ready"):
+    selected_view = request.GET.get("view", "images-and-labels")
+    return {
+        "columns": GRID_COLUMNS,
+        "unit_width": 220,
+        "images": selected_view != "labels-only",
+        "labels": selected_view != "images-only",
+        "devices": [],
+        "status": status,
+    }
+
+
 def get_reorder_rack_width_data(request):
     """Describe partial-width widgets for netbox-reorder-rack's GridStack UI."""
     if not reorder_rack_width_enabled(request):
         return None
 
+    data = _empty_reorder_rack_width_data(request)
     rack_id = getattr(request.resolver_match, "kwargs", {}).get("pk")
     if not rack_id:
-        return None
+        data["status"] = "missing-rack"
+        return data
 
-    from dcim.svg.racks import get_device_name
     from netbox.config import get_config
     from utilities.html import foreground_color
 
@@ -262,16 +279,15 @@ def get_reorder_rack_width_data(request):
             .order_by("pk")
         )
         permission = get_permission_for_model(Device, "change")
-        descriptors = []
         for device in devices:
             placement = device.netbox_utilities_rack_placement
             grid_width, grid_x = grid_dimensions(placement.width, placement.horizontal_position)
             role_color = device.role.color or "1685fc"
             grid_height = int(Decimal(str(device.device_type.u_height)) * 2)
-            descriptors.append(
+            data["devices"].append(
                 {
                     "id": device.pk,
-                    "label": get_device_name(device),
+                    "label": _device_label(device),
                     "face": device.face,
                     "full_depth": device.device_type.is_full_depth,
                     "grid_x": grid_x,
@@ -287,17 +303,8 @@ def get_reorder_rack_width_data(request):
                     "locked": not request.user.has_perm(permission, obj=device),
                 }
             )
-        if not descriptors:
-            return None
-
-        selected_view = request.GET.get("view", "images-and-labels")
-        return {
-            "columns": GRID_COLUMNS,
-            "unit_width": get_config().RACK_ELEVATION_DEFAULT_UNIT_WIDTH,
-            "images": selected_view != "labels-only",
-            "labels": selected_view != "images-only",
-            "devices": descriptors,
-        }
+        data["unit_width"] = get_config().RACK_ELEVATION_DEFAULT_UNIT_WIDTH
+        return data
     except (
         AttributeError,
         ObjectDoesNotExist,
@@ -307,8 +314,13 @@ def get_reorder_rack_width_data(request):
         TypeError,
         ValueError,
     ):
-        logger.warning("Could not load partial rack widths for netbox-reorder-rack", exc_info=True)
-        return None
+        logger.warning(
+            "Could not load partial rack widths for netbox-reorder-rack rack %s; using the native rack layout",
+            rack_id,
+            exc_info=True,
+        )
+        data["status"] = "native-fallback"
+        return data
 
 
 def bulk_reorder_update(self, request, pk=None):

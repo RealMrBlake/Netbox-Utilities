@@ -105,6 +105,30 @@ sudo systemctl restart netbox netbox-rq
 Nach Änderungen an JavaScript oder CSS kann ein Hard-Reload des Browsers mit
 `Strg+F5` erforderlich sein.
 
+Ab Version `0.9.1` werden die Teilbreiten-Adapter auf der Rack- und
+Reorder-Seite auch dann eingebunden, wenn keine Teilbreitengeräte gefunden
+wurden. Nach diesem Update ist `collectstatic` deshalb zwingend erforderlich;
+die Dateien `topology-rack-width.js` und `reorder-rack-width.js` müssen unter
+`/opt/netbox/netbox/static/netbox_utilities/` vorhanden sein.
+
+Die Installation lässt sich anschließend mit diesen Befehlen kontrollieren:
+
+```bash
+/opt/netbox/venv/bin/python -c \
+  "import netbox_utilities; print(netbox_utilities.__version__, netbox_utilities.__file__)"
+
+test -f /opt/netbox/netbox/static/netbox_utilities/reorder-rack-width.js
+test -f /opt/netbox/netbox/static/netbox_utilities/topology-rack-width.js
+
+cd /opt/netbox/netbox
+/opt/netbox/venv/bin/python manage.py shell -c \
+  "from django.urls import reverse; print(reverse('dcim:rack_reorder', kwargs={'pk': 1})); print(reverse('plugins:netbox_topology_views:rack_elevation'))"
+```
+
+Die letzten beiden Routen müssen auflösbar sein. Die Topology-Rack-Route ist
+im getesteten MrBlake-Develop-Stand `86a8daf45ef380d57ac73b461dbc47a16bb831ba`
+enthalten, aber nicht im gleich bezeichneten öffentlichen Tag `v4.5.1`.
+
 ## Aktualisierung
 
 Bei einer Installation aus dem `main`-Branch wird das Paket erneut aus Gitea
