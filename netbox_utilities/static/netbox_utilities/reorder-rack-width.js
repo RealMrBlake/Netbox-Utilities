@@ -15,6 +15,22 @@
     console.warn('NetBox Utilities is leaving Reorder Rack in its native layout.', data.status);
     return;
   }
+  if (data.schema_version !== 3 || data.complete !== true || !Array.isArray(data.devices)) {
+    console.warn('NetBox Utilities received an incomplete Reorder Rack payload and kept the native layout.');
+    return;
+  }
+  const validDeviceData = data.devices.every(device => (
+    Number.isInteger(Number(device.id))
+    && ['front', 'rear'].includes(device.face)
+    && Number.isInteger(Number(device.grid_x))
+    && Number.isInteger(Number(device.grid_y))
+    && Number.isInteger(Number(device.grid_width))
+    && Number.isInteger(Number(device.grid_height))
+  ));
+  if (!validDeviceData) {
+    console.warn('NetBox Utilities received invalid Reorder Rack device data and kept the native layout.');
+    return;
+  }
 
   const columns = Number.parseInt(data.columns, 10) || 12;
   const gridElements = {
@@ -23,6 +39,15 @@
     other: document.getElementById('grid-other'),
   };
   if (!gridElements.front || !gridElements.rear || !gridElements.other) return;
+
+  const nativeMountedItems = [
+    ...gridElements.front.querySelectorAll('.grid-stack-item'),
+    ...gridElements.rear.querySelectorAll('.grid-stack-item'),
+  ];
+  if (!data.devices.length && nativeMountedItems.length) {
+    console.warn('NetBox Utilities received no replacement devices and kept the populated native layout.');
+    return;
+  }
 
   const setAttribute = (element, name, value) => element.setAttribute(name, String(value));
   const originalFetch = window.fetch.bind(window);

@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from utilities.permissions import get_permission_for_model
 
 from .models import DeviceRackPlacement
-from .rack_width import FULL_WIDTH, normalize_width_position, stage_width_position
+from .rack_width import FULL_WIDTH, effective_width_positions, normalize_width_position, stage_width_position
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +116,14 @@ def apply_rack_layout(*, rack, placements, user):
         placement.device_id: placement
         for placement in DeviceRackPlacement.objects.select_for_update().filter(device_id__in=placement_by_id)
     }
+    mounted_devices = [device for device in devices.values() if device.position is not None and device.position > 0]
+    effective_placements = effective_width_positions(mounted_devices, stored_placements)
     target_placements = []
     for placement in placements:
-        stored = stored_placements.get(placement.device_id)
-        current_width = stored.width if stored else FULL_WIDTH
-        current_horizontal_position = stored.horizontal_position if stored else 1
+        current_width, current_horizontal_position, _source = effective_placements.get(
+            placement.device_id,
+            (FULL_WIDTH, 1, "default"),
+        )
         if placement.position is None:
             target_width, target_horizontal_position = FULL_WIDTH, 1
         elif placement.grid_x is None:
@@ -238,16 +241,6 @@ def _device_label(device):
     return device.label or str(device.device_type)
 
 
-def _device_width_position(device):
-    try:
-        placement = device.netbox_utilities_rack_placement
-    except ObjectDoesNotExist:
-        placement = None
-    if placement is None:
-        return FULL_WIDTH, 1
-    return normalize_width_position(placement.width, placement.horizontal_position)
-
-
 def _empty_reorder_rack_width_data(request, *, status="ready"):
     selected_view = request.GET.get("view", "images-and-labels")
     return {
@@ -257,6 +250,8 @@ def _empty_reorder_rack_width_data(request, *, status="ready"):
         "labels": selected_view != "images-only",
         "devices": [],
         "status": status,
+        "schema_version": 3,
+        "complete": False,
     }
 
 
@@ -294,9 +289,11 @@ def get_reorder_rack_width_data(request):
             )
             .order_by("position", "pk")
         )
+        devices = list(devices)
+        widths = effective_width_positions(devices)
         permission = get_permission_for_model(Device, "change")
         for device in devices:
-            width, horizontal_position = _device_width_position(device)
+            width, horizontal_position, width_source = widths[device.pk]
             grid_width, grid_x = grid_dimensions(width, horizontal_position)
             role_color = device.role.color or "1685fc"
             grid_height = int(Decimal(str(device.device_type.u_height)) * 2)
@@ -312,6 +309,7 @@ def get_reorder_rack_width_data(request):
                     "grid_height": grid_height,
                     "width": width,
                     "horizontal_position": horizontal_position,
+                    "width_source": width_source,
                     "color": role_color,
                     "text_color": foreground_color(role_color),
                     "front_image": _image_url(device.device_type.front_image),
@@ -320,6 +318,7 @@ def get_reorder_rack_width_data(request):
                 }
             )
         data["unit_width"] = get_config().RACK_ELEVATION_DEFAULT_UNIT_WIDTH
+        data["complete"] = True
         return data
     except (
         AttributeError,

@@ -17,6 +17,7 @@ from netbox_utilities.rack_width import (
     _install_rack_methods,
     _rack_elevation_devices,
     available_units_for_device,
+    effective_width_positions,
     horizontal_interval,
     include_rack_width_in_fieldsets,
     intervals_cover_full_width,
@@ -84,6 +85,7 @@ class RackWidthTest(SimpleTestCase):
 
         regular = SimpleNamespace(
             pk=1,
+            rack_id=3,
             face="front",
             position=12,
             device_type=SimpleNamespace(u_height=1),
@@ -91,6 +93,7 @@ class RackWidthTest(SimpleTestCase):
         )
         partial_right = SimpleNamespace(
             pk=2,
+            rack_id=3,
             face="front",
             position=11,
             device_type=SimpleNamespace(u_height=1),
@@ -98,6 +101,7 @@ class RackWidthTest(SimpleTestCase):
         )
         partial_left = SimpleNamespace(
             pk=3,
+            rack_id=3,
             face="front",
             position=11,
             device_type=SimpleNamespace(u_height=1),
@@ -129,6 +133,62 @@ class RackWidthTest(SimpleTestCase):
                 call(partial_left, (10.0, 20), (100.0, 20)),
                 call(partial_right, (110.0, 20), (100.0, 20)),
             ],
+        )
+
+    def test_infers_two_half_widths_when_legacy_devices_share_one_unit(self):
+        devices = [
+            SimpleNamespace(
+                pk=21,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+            ),
+            SimpleNamespace(
+                pk=22,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+            ),
+        ]
+
+        self.assertEqual(
+            effective_width_positions(devices),
+            {
+                21: (2, 1, "inferred"),
+                22: (2, 2, "inferred"),
+            },
+        )
+
+    def test_infers_missing_position_next_to_stored_half_width(self):
+        devices = [
+            SimpleNamespace(
+                pk=31,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=2),
+            ),
+            SimpleNamespace(
+                pk=32,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+            ),
+        ]
+
+        self.assertEqual(
+            effective_width_positions(devices),
+            {
+                31: (2, 2, "stored"),
+                32: (2, 1, "inferred"),
+            },
         )
 
     def test_adds_rack_width_fields_to_existing_location_fieldset(self):

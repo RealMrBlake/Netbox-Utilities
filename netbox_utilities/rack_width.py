@@ -1,5 +1,6 @@
 import decimal
 import logging
+from collections import defaultdict
 from contextvars import ContextVar
 from copy import deepcopy
 from fractions import Fraction
@@ -112,6 +113,65 @@ def get_width_position(device, placements=None):
         placement = placements[device.pk]
         return placement.width, placement.horizontal_position
     return _stored_width_position(device)
+
+
+def effective_width_positions(devices, placements=None):
+    """Return stored rack widths and infer missing rows for devices sharing one slot."""
+    devices = list(devices)
+    groups = defaultdict(list)
+    result = {}
+
+    for device in devices:
+        key = (
+            device.rack_id,
+            device.face,
+            decimal.Decimal(str(device.position)),
+            decimal.Decimal(str(device.device_type.u_height)),
+        )
+        groups[key].append(device)
+
+    for group in groups.values():
+        stored = {}
+        missing = []
+        for device in group:
+            if placements is not None:
+                placement = placements.get(device.pk)
+            else:
+                try:
+                    placement = device.netbox_utilities_rack_placement
+                except ObjectDoesNotExist:
+                    placement = None
+            if placement is None:
+                missing.append(device)
+            else:
+                stored[device.pk] = normalize_width_position(placement.width, placement.horizontal_position)
+
+        candidate_width = None
+        stored_widths = {width for width, _position in stored.values()}
+        if len(stored_widths) == 1:
+            stored_width = next(iter(stored_widths))
+            if len(group) <= stored_width:
+                candidate_width = stored_width
+        elif not stored and 2 <= len(group) <= 4:
+            candidate_width = len(group)
+
+        if candidate_width is not None:
+            used_positions = {position for width, position in stored.values() if width == candidate_width}
+            free_positions = iter(
+                position for position in range(1, candidate_width + 1) if position not in used_positions
+            )
+            for device in sorted(missing, key=lambda item: item.pk):
+                position = next(free_positions, None)
+                if position is None:
+                    break
+                result[device.pk] = (candidate_width, position, "inferred")
+
+        for device_id, (width, position) in stored.items():
+            result[device_id] = (width, position, "stored")
+        for device in missing:
+            result.setdefault(device.pk, (FULL_WIDTH, 1, "default"))
+
+    return result
 
 
 def stage_width_position(device, width, horizontal_position):
@@ -432,7 +492,7 @@ def _install_device_form():
 def _install_rack_svg():
     from dcim.svg.racks import RackElevationSVG
 
-    if getattr(RackElevationSVG, "_netbox_utilities_rack_width_version", None) == 3:
+    if getattr(RackElevationSVG, "_netbox_utilities_rack_width_version", None) == 4:
         return
     current_draw_face = RackElevationSVG.draw_face
     current_globals = getattr(current_draw_face, "__globals__", {})
@@ -448,16 +508,14 @@ def _install_rack_svg():
         # NetBox's get_rack_units() stores only one device per rack unit and
         # therefore cannot represent two devices mounted beside each other.
         # Query every mounted device directly and render each exactly once.
-        for device in _rack_elevation_devices(elevation.rack, face):
-            try:
-                placement = device.netbox_utilities_rack_placement
-            except ObjectDoesNotExist:
-                placement = None
+        devices = list(_rack_elevation_devices(elevation.rack, face))
+        widths = effective_width_positions(devices)
+        for device in devices:
+            width_divisor, horizontal_position, _source = widths[device.pk]
             height = decimal.Decimal(str(device.device_type.u_height))
             coords = elevation._get_device_coords(device.position, height)
-            width = elevation.unit_width if placement is None else elevation.unit_width / placement.width
-            if placement is not None:
-                coords = (coords[0] + width * (placement.horizontal_position - 1), coords[1])
+            width = elevation.unit_width / width_divisor
+            coords = (coords[0] + width * (horizontal_position - 1), coords[1])
             size = (width, int(elevation.unit_height * height))
             if device.pk in elevation.permitted_device_ids:
                 if device.face == face and not opposite:
@@ -469,7 +527,7 @@ def _install_rack_svg():
 
     RackElevationSVG.draw_face = width_aware_draw_face
     RackElevationSVG._netbox_utilities_rack_width_installed = True
-    RackElevationSVG._netbox_utilities_rack_width_version = 3
+    RackElevationSVG._netbox_utilities_rack_width_version = 4
 
 
 def _rack_elevation_devices(rack, face):

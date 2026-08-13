@@ -43,7 +43,7 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
     def test_serializes_fractional_width_geometry_and_device_url(self):
         placement = SimpleNamespace(
             device_id=17,
-            device=SimpleNamespace(get_absolute_url=lambda: "/dcim/devices/17/"),
+            device=SimpleNamespace(pk=17, get_absolute_url=lambda: "/dcim/devices/17/"),
             width=3,
             horizontal_position=2,
         )
@@ -57,12 +57,12 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
                 "horizontal_position": 2,
                 "left_percent": 33.33333333,
                 "width_percent": 33.33333333,
+                "width_source": "stored",
             },
         )
 
-    @patch("netbox_utilities.topology_views.DeviceRackPlacement.objects")
     @patch("netbox_utilities.topology_views.topology_rack_width_enabled", return_value=True)
-    def test_queries_only_permitted_devices_from_selected_racks(self, _enabled, placement_objects):
+    def test_queries_all_permitted_devices_and_infers_shared_unit_widths(self, _enabled):
         self.request.resolver_match = SimpleNamespace(view_name="plugins:netbox_topology_views:rack_elevation")
         rack_queryset = MagicMock()
         rack_queryset.filter.return_value = rack_queryset
@@ -71,19 +71,32 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         rack_model.objects.restrict.return_value = rack_queryset
 
         device_queryset = MagicMock()
-        device_queryset.filter.return_value = "permitted-device-query"
+        selected_devices = MagicMock()
+        device_queryset.filter.return_value = selected_devices
         device_model = MagicMock()
         device_model.objects.restrict.return_value = device_queryset
 
-        placement = SimpleNamespace(
-            device_id=17,
-            device=SimpleNamespace(get_absolute_url=lambda: "/dcim/devices/17/"),
-            width=2,
-            horizontal_position=2,
-        )
-        placement_queryset = MagicMock()
-        placement_queryset.select_related.return_value.order_by.return_value = [placement]
-        placement_objects.filter.return_value = placement_queryset
+        devices = [
+            SimpleNamespace(
+                pk=17,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+                get_absolute_url=lambda: "/dcim/devices/17/",
+            ),
+            SimpleNamespace(
+                pk=18,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+                get_absolute_url=lambda: "/dcim/devices/18/",
+            ),
+        ]
+        selected_devices.select_related.return_value.order_by.return_value = devices
 
         with patch.dict("sys.modules", {"dcim.models": SimpleNamespace(Device=device_model, Rack=rack_model)}):
             result = get_topology_rack_width_data(self.request)
@@ -91,12 +104,17 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         rack_queryset.filter.assert_called_once_with(pk__in=["3"])
         device_queryset.filter.assert_called_once_with(
             rack_id__in="selected-rack-query",
-            position__isnull=False,
+            position__gt=0,
+            device_type__u_height__gt=0,
         )
-        placement_objects.filter.assert_called_once_with(device__in="permitted-device-query")
         self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["schema_version"], 3)
+        self.assertTrue(result["complete"])
+        self.assertEqual(len(result["devices"]), 2)
         self.assertEqual(result["devices"][0]["width"], 2)
-        self.assertEqual(result["devices"][0]["horizontal_position"], 2)
+        self.assertEqual(result["devices"][0]["horizontal_position"], 1)
+        self.assertEqual(result["devices"][1]["horizontal_position"], 2)
+        self.assertEqual(result["devices"][0]["width_source"], "inferred")
 
     def test_frontend_supports_live_view_and_all_rack_export_formats(self):
         script = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "topology-rack-width.js").read_text(
@@ -115,6 +133,8 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn("liveViewCompatible", script)
         self.assertIn("payload?.devices", script)
         self.assertIn("payload.status !== 'ready'", script)
+        self.assertIn("payload?.schema_version !== 3", script)
+        self.assertIn("placement.source", script)
         self.assertLess(script.index("liveViewCompatible"), script.index("netbox-utilities-partial-width"))
         self.assertLess(script.index("exportGraphic(graphic"), script.index("event.preventDefault()"))
 
@@ -126,6 +146,7 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
 
         self.assertEqual(result["status"], "native-fallback")
         self.assertEqual(result["devices"], [])
+        self.assertFalse(result["complete"])
 
     def test_partial_width_css_uses_topology_device_slot_geometry(self):
         stylesheet = (Path(__file__).parents[1] / "static" / "netbox_utilities" / "netbox_utilities.css").read_text(

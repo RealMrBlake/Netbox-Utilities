@@ -97,8 +97,20 @@ class ApplyRackLayoutTest(SimpleTestCase):
         placement_model,
     ):
         events = []
-        first = MagicMock(pk=10, position=Decimal(1), face="front")
-        second = MagicMock(pk=11, position=Decimal(2), face="front")
+        first = MagicMock(
+            pk=10,
+            rack_id=5,
+            position=Decimal(1),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
+        second = MagicMock(
+            pk=11,
+            rack_id=5,
+            position=Decimal(2),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
         first.snapshot.side_effect = lambda: events.append("snapshot-10")
         second.snapshot.side_effect = lambda: events.append("snapshot-11")
         first.full_clean.side_effect = lambda: events.append("validate-10")
@@ -126,7 +138,13 @@ class ApplyRackLayoutTest(SimpleTestCase):
     @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
     @patch("netbox_utilities.reorder_rack.Device")
     def test_rejects_changed_device_without_permission(self, device_model, _get_permission, placement_model):
-        device = MagicMock(pk=10, position=Decimal(1), face="front")
+        device = MagicMock(
+            pk=10,
+            rack_id=5,
+            position=Decimal(1),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
         device_model.objects.select_for_update.return_value.filter.return_value = [device]
         placement_model.objects.select_for_update.return_value.filter.return_value = []
         user = MagicMock()
@@ -148,7 +166,13 @@ class ApplyRackLayoutTest(SimpleTestCase):
         _get_permission,
         placement_model,
     ):
-        device = MagicMock(pk=10, position=Decimal(4), face="front")
+        device = MagicMock(
+            pk=10,
+            rack_id=5,
+            position=Decimal(4),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
         stored = SimpleNamespace(device_id=10, width=2, horizontal_position=1)
         device_model.objects.select_for_update.return_value.filter.return_value = [device]
         placement_model.objects.select_for_update.return_value.filter.return_value = [stored]
@@ -178,7 +202,13 @@ class ApplyRackLayoutTest(SimpleTestCase):
         _get_permission,
         placement_model,
     ):
-        device = MagicMock(pk=10, position=Decimal(4), face="front")
+        device = MagicMock(
+            pk=10,
+            rack_id=5,
+            position=Decimal(4),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
         stored = SimpleNamespace(device_id=10, width=2, horizontal_position=2)
         device_model.objects.select_for_update.return_value.filter.return_value = [device]
         placement_model.objects.select_for_update.return_value.filter.return_value = [stored]
@@ -191,6 +221,51 @@ class ApplyRackLayoutTest(SimpleTestCase):
         self.assertEqual(changed, [device])
         placement_model.objects.update_or_create.assert_called_once_with(
             device=device,
+            defaults={"width": 2, "horizontal_position": 2},
+        )
+
+    @patch("netbox_utilities.reorder_rack.DeviceRackPlacement")
+    @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
+    @patch("netbox_utilities.reorder_rack.Device")
+    def test_persists_inferred_half_width_when_shared_device_is_moved(
+        self,
+        device_model,
+        _get_permission,
+        placement_model,
+    ):
+        left = MagicMock(
+            pk=10,
+            rack_id=5,
+            position=Decimal(4),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
+        right = MagicMock(
+            pk=11,
+            rack_id=5,
+            position=Decimal(4),
+            face="front",
+            device_type=SimpleNamespace(u_height=1),
+        )
+        device_model.objects.select_for_update.return_value.filter.return_value = [left, right]
+        placement_model.objects.select_for_update.return_value.filter.return_value = []
+        user = MagicMock()
+        user.has_perm.return_value = True
+        placements = parse_device_placements(
+            rack_layout(
+                front=[
+                    {"id": 10, "x": 0, "y": 4},
+                    {"id": 11, "x": 6, "y": 5},
+                ]
+            ),
+            grid_columns=12,
+        )
+
+        changed = apply_rack_layout(rack=SimpleNamespace(pk=5), placements=placements, user=user)
+
+        self.assertEqual(changed, [right])
+        placement_model.objects.update_or_create.assert_called_once_with(
+            device=right,
             defaults={"width": 2, "horizontal_position": 2},
         )
 
@@ -213,6 +288,9 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn("closest('#saveButton')", script)
         self.assertIn("X-NetBox-Utilities-Rack-Grid-Columns", script)
         self.assertIn("if (face !== 'other')", script)
+        self.assertIn("data.schema_version !== 3", script)
+        self.assertIn("data.complete !== true", script)
+        self.assertIn("nativeMountedItems.length", script)
         self.assertNotIn("partialDeviceIds", script)
         self.assertNotIn("JSON.stringify", script)
 
@@ -229,6 +307,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
 
         self.assertEqual(result["status"], "native-fallback")
         self.assertEqual(result["devices"], [])
+        self.assertFalse(result["complete"])
 
     @patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled", return_value=True)
     @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
@@ -250,6 +329,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         placement = SimpleNamespace(width=2, horizontal_position=2)
         device = SimpleNamespace(
             pk=10,
+            rack_id=5,
             name="Fritzbox",
             label="Fritzbox",
             virtual_chassis=None,
@@ -266,6 +346,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         )
         adjacent_device = SimpleNamespace(
             pk=12,
+            rack_id=5,
             name="Router",
             label="Router",
             virtual_chassis=None,
@@ -282,6 +363,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         )
         full_width_device = SimpleNamespace(
             pk=11,
+            rack_id=5,
             name="Switch",
             label="Switch",
             virtual_chassis=None,
@@ -315,6 +397,8 @@ class ReorderRackFrontendTest(SimpleTestCase):
 
         self.assertEqual(result["columns"], 12)
         self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["schema_version"], 3)
+        self.assertTrue(result["complete"])
         self.assertEqual(len(result["devices"]), 3)
         self.assertEqual(result["devices"][0]["label"], "Fritzbox")
         self.assertFalse(result["images"])
@@ -335,6 +419,10 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(
             {key: result["devices"][2][key] for key in ("id", "grid_x", "grid_width", "width")},
             {"id": 11, "grid_x": 0, "grid_width": 12, "width": 1},
+        )
+        self.assertEqual(
+            [device["width_source"] for device in result["devices"]],
+            ["stored", "stored", "default"],
         )
 
 

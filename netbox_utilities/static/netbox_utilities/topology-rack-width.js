@@ -11,6 +11,10 @@
     console.error('NetBox Utilities could not read the Topology Views rack widths.', error);
     return;
   }
+  if (!Array.isArray(payload) && (payload?.schema_version !== 3 || payload?.complete !== true)) {
+    console.warn('NetBox Utilities received an incomplete Topology Views payload and kept the native layout.');
+    return;
+  }
   if (!Array.isArray(payload) && payload?.status && payload.status !== 'ready') {
     console.warn('NetBox Utilities is leaving Topology Views in its native layout.', payload.status);
     return;
@@ -36,6 +40,7 @@
     return {
       width,
       horizontalPosition,
+      source: String(value.width_source || 'stored'),
       leftPercent: Number.isFinite(Number(value.left_percent))
         ? Number(value.left_percent)
         : (horizontalPosition - 1) / width * 100,
@@ -87,6 +92,7 @@
     device.classList.add('netbox-utilities-partial-width');
     device.dataset.rackWidth = String(placement.width);
     device.dataset.horizontalPosition = String(placement.horizontalPosition);
+    device.dataset.rackWidthSource = placement.source;
     device.style.setProperty('--netbox-utilities-rack-device-left', `${placement.leftPercent}%`);
     device.style.setProperty('--netbox-utilities-rack-device-width', `${placement.widthPercent}%`);
   });

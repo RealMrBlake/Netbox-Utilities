@@ -28,6 +28,8 @@ class OptionalRackIntegrationHeadTest(SimpleTestCase):
             "labels": True,
             "devices": [],
             "status": "ready",
+            "schema_version": 3,
+            "complete": True,
         }
         with (
             patch("netbox_utilities.template_content.get_reorder_rack_width_data", return_value=data),
@@ -40,7 +42,7 @@ class OptionalRackIntegrationHeadTest(SimpleTestCase):
         self.assertIn('"status": "ready"', html)
 
     def test_topology_adapter_is_emitted_for_an_empty_enabled_payload(self):
-        data = {"devices": [], "status": "ready"}
+        data = {"devices": [], "status": "ready", "schema_version": 3, "complete": True}
         with (
             patch("netbox_utilities.template_content.get_reorder_rack_width_data", return_value=None),
             patch("netbox_utilities.template_content.get_topology_rack_width_data", return_value=data),

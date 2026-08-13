@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import OperationalError, ProgrammingError
 from netbox.plugins import get_plugin_config
 
-from .models import DeviceRackPlacement
+from .rack_width import effective_width_positions
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +27,25 @@ def topology_rack_width_enabled(request):
 
 
 def serialize_topology_placement(placement):
-    width = int(placement.width)
-    horizontal_position = int(placement.horizontal_position)
+    return serialize_topology_width(
+        placement.device,
+        placement.width,
+        placement.horizontal_position,
+        source="stored",
+    )
+
+
+def serialize_topology_width(device, width, horizontal_position, *, source):
+    width = int(width)
+    horizontal_position = int(horizontal_position)
     return {
-        "device_id": placement.device_id,
-        "url": placement.device.get_absolute_url(),
+        "device_id": device.pk,
+        "url": device.get_absolute_url(),
         "width": width,
         "horizontal_position": horizontal_position,
         "left_percent": round((horizontal_position - 1) / width * 100, 8),
         "width_percent": round(100 / width, 8),
+        "width_source": source,
     }
 
 
@@ -44,7 +54,7 @@ def get_topology_rack_width_data(request):
     if not topology_rack_width_enabled(request):
         return None
 
-    data = {"devices": [], "status": "ready"}
+    data = {"devices": [], "status": "ready", "schema_version": 3, "complete": False}
     if not request.GET:
         return data
 
@@ -63,14 +73,24 @@ def get_topology_rack_width_data(request):
             if selected_locations:
                 racks = racks.filter(location_id__in=selected_locations)
 
-        devices = Device.objects.restrict(request.user, "view").filter(
-            rack_id__in=racks.values("pk"),
-            position__isnull=False,
+        devices = list(
+            Device.objects.restrict(request.user, "view")
+            .filter(
+                rack_id__in=racks.values("pk"),
+                position__gt=0,
+                device_type__u_height__gt=0,
+            )
+            .select_related("device_type", "netbox_utilities_rack_placement")
+            .order_by("rack_id", "face", "position", "pk")
         )
-        placements = (
-            DeviceRackPlacement.objects.filter(device__in=devices).select_related("device").order_by("device_id")
-        )
-        data["devices"] = [serialize_topology_placement(placement) for placement in placements]
+        widths = effective_width_positions(devices)
+        data["devices"] = [
+            serialize_topology_width(device, width, position, source=source)
+            for device in devices
+            for width, position, source in (widths[device.pk],)
+            if width > 1
+        ]
+        data["complete"] = True
         return data
     except (
         AttributeError,

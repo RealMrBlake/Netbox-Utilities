@@ -105,13 +105,23 @@ sudo systemctl restart netbox netbox-rq
 Nach Änderungen an JavaScript oder CSS kann ein Hard-Reload des Browsers mit
 `Strg+F5` erforderlich sein.
 
-Ab Version `0.9.2` werden Rack-SVG und Reorder direkt aus allen Geräten des
+Ab Version `0.9.3` werden Rack-SVG und Reorder direkt aus allen Geräten des
 Racks aufgebaut. Dadurch können mehrere Geräte derselben HE nicht mehr durch
 NetBox' native Ein-Gerät-pro-HE-Darstellung verloren gehen. Die Adapter werden
 auch dann eingebunden, wenn keine Teilbreitengeräte gefunden wurden. Nach
 diesem Update ist `collectstatic` deshalb zwingend erforderlich;
 die Dateien `topology-rack-width.js` und `reorder-rack-width.js` müssen unter
 `/opt/netbox/netbox/static/netbox_utilities/` vorhanden sein.
+
+Reorder ersetzt seine nativen Gerätekacheln erst, nachdem ein vollständiger
+und zur JavaScript-Version passender Datensatz geprüft wurde. Bei einer
+gemischten Installation aus altem Python-Code und neuen statischen Dateien
+bleibt deshalb die native Ansicht erhalten, statt ein leeres Rack zu zeigen.
+Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
+keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
+Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander
+dargestellt. Explizit gespeicherte Rackbreiten und Breitenpositionen haben
+stets Vorrang vor dieser Anzeige-Ableitung.
 
 Die Installation lässt sich anschließend mit diesen Befehlen kontrollieren:
 
@@ -121,6 +131,8 @@ Die Installation lässt sich anschließend mit diesen Befehlen kontrollieren:
 
 test -f /opt/netbox/netbox/static/netbox_utilities/reorder-rack-width.js
 test -f /opt/netbox/netbox/static/netbox_utilities/topology-rack-width.js
+grep -q "schema_version !== 3" \
+  /opt/netbox/netbox/static/netbox_utilities/reorder-rack-width.js
 
 cd /opt/netbox/netbox
 /opt/netbox/venv/bin/python manage.py shell -c \
@@ -130,6 +142,23 @@ cd /opt/netbox/netbox
 Die letzten beiden Routen müssen auflösbar sein. Die Topology-Rack-Route ist
 im getesteten MrBlake-Develop-Stand `86a8daf45ef380d57ac73b461dbc47a16bb831ba`
 enthalten, aber nicht im gleich bezeichneten öffentlichen Tag `v4.5.1`.
+
+Für Rack `2` kann zusätzlich geprüft werden, welche gespeicherten Breiten das
+Plugin findet. Zwei Geräte derselben HE dürfen dabei unterschiedliche oder
+noch leere Plugin-Werte besitzen; leere Werte werden ab `0.9.3` für die
+Darstellung abgeleitet:
+
+```bash
+cd /opt/netbox/netbox
+/opt/netbox/venv/bin/python manage.py shell -c "
+from dcim.models import Device
+print(list(Device.objects.filter(rack_id=2).order_by('position', 'id').values(
+    'id', 'name', 'position', 'face',
+    'netbox_utilities_rack_placement__width',
+    'netbox_utilities_rack_placement__horizontal_position',
+)))
+"
+```
 
 ## Aktualisierung
 
@@ -183,10 +212,14 @@ unterstützt.
 Nach einer Änderung der Rackbreite wird die **Breitenposition** unmittelbar
 aktualisiert; ein Zwischenspeichern oder Neuladen ist nicht erforderlich.
 
-Ohne Breitenangabe belegt ein Gerät wie bisher die volle Rackbreite. Das gilt
-automatisch für sämtliche vorhandenen Geräte; es findet keine Änderung oder
-Migration bestehender Platzierungen statt. Teilbreite und Position werden auf
-der Geräteseite angezeigt und in der Rackgrafik nebeneinander dargestellt.
+Ohne Breitenangabe belegt ein Gerät wie bisher die volle Rackbreite. Ausnahme
+ist eine bereits vorhandene gemeinsame Belegung derselben HE und Rackseite:
+Fehlen dort Plugin-Platzierungen, teilt die Darstellung den verfügbaren Platz
+gleichmäßig auf die zwei bis vier vorhandenen Geräte auf. Diese Ableitung
+ändert keine Datenbankwerte und dient nur dazu, bereits gemeinsam eingepflegte
+Geräte wieder sichtbar zu machen. Es findet keine Migration bestehender
+Platzierungen statt. Explizit gewählte Teilbreite und Position werden auf der
+Geräteseite angezeigt und in der Rackgrafik nebeneinander dargestellt.
 
 NetBox besitzt standardmäßig eine Datenbank-Eindeutigkeit für Rack, HE und
 Rackseite. Die Plugin-Migration `0007` entfernt ausschließlich diese
