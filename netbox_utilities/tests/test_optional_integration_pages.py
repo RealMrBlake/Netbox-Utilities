@@ -54,3 +54,30 @@ class OptionalRackIntegrationHeadTest(SimpleTestCase):
         self.assertIn('id="netbox-utilities-topology-rack-width-data"', html)
         self.assertIn("netbox_utilities/topology-rack-width.js", html)
         self.assertIn('"status": "ready"', html)
+
+    def test_topology_widths_are_rendered_server_side_without_javascript(self):
+        data = {
+            "devices": [
+                {
+                    "device_id": 17,
+                    "url": "/dcim/devices/17/",
+                    "left_percent": 50,
+                    "width_percent": 50,
+                }
+            ],
+            "status": "ready",
+            "schema_version": 3,
+            "complete": True,
+        }
+        with (
+            patch("netbox_utilities.template_content.get_reorder_rack_width_data", return_value=None),
+            patch("netbox_utilities.template_content.get_topology_rack_width_data", return_value=data),
+        ):
+            html = UtilitiesGlobalContent(
+                self._context("/plugins/netbox_topology_views/rack-elevation/?rack_id=3")
+            ).head()
+
+        self.assertIn('id="netbox-utilities-topology-rack-width-styles"', html)
+        self.assertIn('.rack-device[href="/dcim/devices/17/"]', html)
+        self.assertIn("left: calc(50% + 3px) !important", html)
+        self.assertIn("width: calc(50% - 6px) !important", html)

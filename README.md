@@ -121,6 +121,12 @@ Ab Version `0.9.4` werden vorhandene Reorder-Kacheln außerdem direkt auf das
 12-Spalten-Raster erweitert und nicht mehr vorsorglich neu erzeugt. Nur ein
 zweites, von NetBox' Ein-Gerät-pro-HE-Darstellung unterschlagenes Gerät wird
 aus den Plugin-Daten ergänzt. Das verhindert browserabhängige leere Racks.
+Ab Version `0.9.5` rendert das Plugin das vollständige 12-Spalten-Rack bereits
+serverseitig in die Reorder-Seite. Die sichtbaren Geräte sind dadurch nicht
+mehr vom Ladezeitpunkt des Browseradapters abhängig. Für die optionale
+Topology-Rack-Ansicht wird die Teilbreitengeometrie zusätzlich als
+serverseitiges CSS ausgegeben; JavaScript wird dort nur noch für Exporte und
+ergänzende Metadaten benötigt.
 Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
 keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
 Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander

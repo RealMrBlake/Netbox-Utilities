@@ -9,6 +9,17 @@
   <script src="{% static 'netbox_utilities/navigation.js' %}?v={{ asset_version }}" defer></script>
 {% endif %}
 {% if topology_rack_width_data %}
+  {% if topology_rack_width_data.complete %}
+    <style id="netbox-utilities-topology-rack-width-styles">
+      {% for device in topology_rack_width_data.devices %}
+        .rack-device[href="{{ device.url|escapejs }}"] {
+          right: auto !important;
+          left: calc({{ device.left_percent }}% + 3px) !important;
+          width: calc({{ device.width_percent }}% - 6px) !important;
+        }
+      {% endfor %}
+    </style>
+  {% endif %}
   {{ topology_rack_width_data|json_script:"netbox-utilities-topology-rack-width-data" }}
   <script src="{% static 'netbox_utilities/topology-rack-width.js' %}?v={{ asset_version }}" defer></script>
 {% endif %}

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_REORDER_RACK_VERSIONS = {"1.1.4"}
 PATCH_MARKER = "_netbox_utilities_bulk_save"
+VIEW_PATCH_MARKER = "_netbox_utilities_width_aware_view"
 GRID_COLUMNS = 12
 REORDER_RACK_VIEW = "dcim:rack_reorder"
 
@@ -394,6 +395,43 @@ def bulk_reorder_update(self, request, pk=None):
         )
 
 
+def width_aware_reorder_get(self, request, pk):
+    """Render every rack device server-side on the native Reorder page."""
+    from dcim.choices import SubdeviceRoleChoices
+    from django.conf import settings
+    from django.shortcuts import render
+
+    rack = get_object_or_404(Rack, pk=pk)
+    selected_view = request.GET.get("view", "images-and-labels")
+    images = selected_view != "labels-only"
+    labels = selected_view != "images-only"
+    non_racked = (
+        Device.objects.filter(rack=rack, position__isnull=True, parent_bay__isnull=True)
+        .exclude(device_type__subdevice_role=SubdeviceRoleChoices.ROLE_CHILD)
+        .select_related("device_type", "role")
+    )
+    width_data = get_reorder_rack_width_data(request)
+    if not width_data or not width_data.get("complete"):
+        original_get = getattr(type(self), "_netbox_utilities_original_get", None)
+        if original_get is not None:
+            return original_get(self, request, pk)
+        raise Http404
+
+    return render(
+        request,
+        "netbox_utilities/reorder_rack.html",
+        {
+            "object": rack,
+            "images": images,
+            "labels": labels,
+            "unit_width": width_data["unit_width"],
+            "reorder_devices": width_data["devices"],
+            "non_racked": non_racked,
+            "basepath": settings.BASE_PATH,
+        },
+    )
+
+
 def install_reorder_rack_bulk_save():
     if not apps.is_installed("netbox_reorder_rack"):
         return False
@@ -408,13 +446,19 @@ def install_reorder_rack_bulk_save():
         )
         return False
 
-    views = import_module("netbox_reorder_rack.api.views")
-    save_viewset = views.SaveViewSet
-    if getattr(save_viewset, PATCH_MARKER, False):
-        return True
+    api_views = import_module("netbox_reorder_rack.api.views")
+    save_viewset = api_views.SaveViewSet
+    if not getattr(save_viewset, PATCH_MARKER, False):
+        save_viewset._netbox_utilities_original_update = save_viewset.update
+        save_viewset.update = bulk_reorder_update
+        setattr(save_viewset, PATCH_MARKER, True)
 
-    save_viewset._netbox_utilities_original_update = save_viewset.update
-    save_viewset.update = bulk_reorder_update
-    setattr(save_viewset, PATCH_MARKER, True)
+    page_views = import_module("netbox_reorder_rack.views")
+    reorder_view = page_views.ReorderView
+    if not getattr(reorder_view, VIEW_PATCH_MARKER, False):
+        reorder_view._netbox_utilities_original_get = reorder_view.get
+        reorder_view.get = width_aware_reorder_get
+        setattr(reorder_view, VIEW_PATCH_MARKER, True)
+
     logger.info("Enabled atomic multi-device saving for netbox-reorder-rack %s", plugin_version)
     return True

@@ -1,0 +1,51 @@
+{% extends "netbox_reorder_rack/rack.html" %}
+{% load perms %}
+{% load rack %}
+{% load i18n %}
+
+{% block content %}
+  <div class="row">
+    <div class="d-flex justify-content-end btn-list mb-2">
+      <select class="btn btn-outline-secondary no-ts rack-view" id="view-selector">
+        <option value="images-and-labels"{% if images and labels %} selected{% endif %}>{% trans "Images and Labels" %}</option>
+        <option value="images-only"{% if images and not labels %} selected{% endif %}>{% trans "Images only" %}</option>
+        <option value="labels-only"{% if labels and not images %} selected{% endif %}>{% trans "Labels only" %}</option>
+      </select>
+      <button class="btn btn-success" id="saveButton" disabled>Save</button>
+    </div>
+  </div>
+  <div class="container mt-2">
+    <div class="row">
+      <div class="col-lg-4 col-md-6 col-sm-12 text-center">
+        <h4>Front</h4>
+        {% include "netbox_utilities/reorder_rack_grid.html" with face="front" grid_id=0 %}
+      </div>
+      <div class="col-lg-4 col-md-6 col-sm-12 text-center">
+        <h4>Back</h4>
+        {% include "netbox_utilities/reorder_rack_grid.html" with face="rear" grid_id=1 %}
+      </div>
+      <div class="col-lg-4 col-md-6 col-sm-12 text-center">
+        <h4>Non-Racked Devices</h4>
+        <div class="d-flex justify-content-center">
+          <div class="grid-stack rack" id="grid-other" gs-column="12" gs-max-row="150"
+               gs-min-row="{{ object.u_height|mul:2 }}" data-grid-id="2">
+            {% for device in non_racked %}
+              <div class="grid-stack-item" gs-w="12" gs-h="{{ device.device_type.u_height|mul:2 }}"
+                   gs-x="0" gs-id="{{ device.pk }}" data-item-face="none"
+                   data-item-color="{{ device.role.color|default:'1685fc' }}"
+                   data-item-text-color="{% if device.role.color %}{{ device.role.color|text_color }}{% else %}000000{% endif %}"
+                   data-full-depth="{{ device.device_type.is_full_depth }}"
+                   gs-locked="{% if not request.user|can_change:device %}true{% else %}false{% endif %}"
+                   gs-no-move="{% if not request.user|can_change:device %}true{% else %}false{% endif %}">
+                <div class="grid-stack-item-content"
+                     style="background-color: #{{ device.role.color|default:'1685fc' }}; color: #{% if device.role.color %}{{ device.role.color|text_color }}{% else %}000000{% endif %}">
+                  {{ device.name|default:device.device_type }}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

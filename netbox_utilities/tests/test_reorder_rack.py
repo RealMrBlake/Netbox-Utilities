@@ -3,7 +3,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.template.loader import get_template, render_to_string
 from django.test import RequestFactory, SimpleTestCase
+from django.urls import resolve, reverse
 from rest_framework.exceptions import PermissionDenied
 
 from netbox_utilities.reorder_rack import (
@@ -16,6 +18,7 @@ from netbox_utilities.reorder_rack import (
     install_reorder_rack_bulk_save,
     parse_device_placements,
     reorder_grid_y,
+    width_aware_reorder_get,
 )
 
 
@@ -297,6 +300,110 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertNotIn("partialDeviceIds", script)
         self.assertNotIn("JSON.stringify", script)
 
+    def test_server_template_uses_complete_twelve_column_device_payload(self):
+        templates = Path(__file__).parents[1] / "templates" / "netbox_utilities"
+        page = (templates / "reorder_rack.html").read_text(encoding="utf-8")
+        grid = (templates / "reorder_rack_grid.html").read_text(encoding="utf-8")
+
+        self.assertIn('include "netbox_utilities/reorder_rack_grid.html"', page)
+        self.assertIn('gs-column="12"', grid)
+        self.assertIn("{% for device in reorder_devices %}", grid)
+        self.assertIn('gs-w="{{ device.grid_width }}"', grid)
+        self.assertIn('gs-x="{{ device.grid_x }}"', grid)
+
+        get_template("netbox_utilities/reorder_rack.html")
+        rendered_grid = render_to_string(
+            "netbox_utilities/reorder_rack_grid.html",
+            {
+                "object": SimpleNamespace(units=[1], u_height=42),
+                "face": "front",
+                "grid_id": 0,
+                "reorder_devices": [
+                    {
+                        "id": 10,
+                        "label": "LEO-Fritzbox",
+                        "face": "front",
+                        "full_depth": False,
+                        "grid_x": 0,
+                        "grid_y": 62,
+                        "grid_width": 6,
+                        "grid_height": 2,
+                        "width": 2,
+                        "horizontal_position": 1,
+                        "color": "f0a000",
+                        "text_color": "000000",
+                        "locked": False,
+                    }
+                ],
+            },
+        )
+        self.assertIn('gs-column="12"', rendered_grid)
+        self.assertIn('gs-id="10"', rendered_grid)
+        self.assertIn("LEO-Fritzbox", rendered_grid)
+
+    def test_resolved_reorder_page_uses_server_side_width_view(self):
+        view_class = resolve(reverse("dcim:rack_reorder", kwargs={"pk": 3})).func.view_class
+
+        self.assertIs(view_class.get, width_aware_reorder_get)
+        self.assertEqual(view_class.get.__module__, "netbox_utilities.reorder_rack")
+
+    @patch("netbox_utilities.reorder_rack.get_reorder_rack_width_data")
+    @patch("netbox_utilities.reorder_rack.get_object_or_404")
+    @patch("netbox_utilities.reorder_rack.Device")
+    @patch("django.shortcuts.render")
+    def test_server_side_reorder_view_renders_payload_devices(
+        self,
+        render_mock,
+        device_model,
+        get_object,
+        get_width_data,
+    ):
+        from dcim.models import Rack, Site
+
+        rack = Rack(
+            pk=3,
+            name="Rack02 - Rechts",
+            site=Site(pk=1, name="AWO-MWT Leonardo Schule", slug="leonardo"),
+            u_height=42,
+        )
+        get_object.return_value = rack
+        device_model.objects.filter.return_value.exclude.return_value.select_related.return_value = []
+        get_width_data.return_value = {
+            "complete": True,
+            "unit_width": 220,
+            "devices": [
+                {
+                    "id": 10,
+                    "label": "LEO-Fritzbox",
+                    "face": "front",
+                    "full_depth": False,
+                    "grid_x": 0,
+                    "grid_y": 62,
+                    "grid_width": 6,
+                    "grid_height": 2,
+                    "width": 2,
+                    "horizontal_position": 1,
+                    "color": "f0a000",
+                    "text_color": "000000",
+                    "locked": False,
+                }
+            ],
+        }
+        request = RequestFactory().get("/dcim/racks/3/reorder/")
+        request.user = MagicMock()
+        request.user.is_authenticated = True
+        expected_response = SimpleNamespace(status_code=200)
+        render_mock.return_value = expected_response
+
+        response = width_aware_reorder_get(SimpleNamespace(), request, 3)
+
+        self.assertIs(response, expected_response)
+        template_name = render_mock.call_args.args[1]
+        context = render_mock.call_args.args[2]
+        self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
+        self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
+        self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
+
     @patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled", return_value=True)
     @patch("netbox_utilities.reorder_rack.Rack")
     def test_malformed_partial_placement_fails_open(self, rack_model, _enabled):
@@ -433,22 +540,34 @@ class ReorderRackPatchTest(SimpleTestCase):
     def test_patches_supported_plugin_only_once(self):
         original_update = object()
 
+        def original_get(self, request, pk):
+            return self, request, pk
+
         class SaveViewSet:
             update = original_update
 
-        views = SimpleNamespace(SaveViewSet=SaveViewSet)
+        class ReorderView:
+            get = original_get
+
+        api_views = SimpleNamespace(SaveViewSet=SaveViewSet)
+        page_views = SimpleNamespace(ReorderView=ReorderView)
         plugin_config = SimpleNamespace(version="1.1.4")
 
         with (
             patch("netbox_utilities.reorder_rack.apps.is_installed", return_value=True),
             patch("netbox_utilities.reorder_rack.apps.get_app_config", return_value=plugin_config),
-            patch("netbox_utilities.reorder_rack.import_module", return_value=views),
+            patch(
+                "netbox_utilities.reorder_rack.import_module",
+                side_effect=lambda name: api_views if name.endswith("api.views") else page_views,
+            ),
         ):
             self.assertTrue(install_reorder_rack_bulk_save())
             self.assertTrue(install_reorder_rack_bulk_save())
 
         self.assertIs(SaveViewSet.update, bulk_reorder_update)
         self.assertIs(SaveViewSet._netbox_utilities_original_update, original_update)
+        self.assertIs(ReorderView.get, width_aware_reorder_get)
+        self.assertIs(ReorderView._netbox_utilities_original_get, original_get)
 
     def test_skips_unsupported_plugin_version(self):
         with (

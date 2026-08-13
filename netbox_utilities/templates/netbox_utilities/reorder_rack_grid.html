@@ -1,0 +1,33 @@
+{% load rack %}
+<div class="d-flex justify-content-center">
+  <div class="rack_front d-flex">
+    <ul class="unit_numbers">
+      {% for unit in object.units %}
+        {% if unit|rack_unit %}<li>{{ unit|rack_unit_to_int }}</li>{% else %}<li></li>{% endif %}
+      {% endfor %}
+    </ul>
+    <div class="grid-stack rack" id="grid-{{ face }}" gs-column="12"
+         gs-max-row="{{ object.u_height|mul:2 }}" gs-min-row="{{ object.u_height|mul:2 }}"
+         data-grid-id="{{ grid_id }}">
+      {% for device in reorder_devices %}
+        {% if device.face == face or device.full_depth %}
+          <div class="grid-stack-item" gs-w="{{ device.grid_width }}" gs-h="{{ device.grid_height }}"
+               gs-x="{{ device.grid_x }}" gs-y="{{ device.grid_y }}" gs-id="{{ device.id }}"
+               gs-locked="{% if device.locked %}true{% else %}false{% endif %}"
+               gs-no-move="{% if device.locked %}true{% else %}false{% endif %}"
+               data-item-color="{{ device.color }}" data-item-text-color="{{ device.text_color }}"
+               data-full-depth="{% if device.full_depth %}True{% else %}False{% endif %}"
+               data-item-face="{% if device.face == face %}{{ face }}{% else %}back{% endif %}"
+               data-rack-width="{{ device.width }}"
+               data-horizontal-position="{{ device.horizontal_position }}">
+            <div class="grid-stack-item-content{% if device.face != face %} device_rear{% endif %}"
+                 style="{% if device.face == face %}background-color: #{{ device.color }}; color: #{{ device.text_color }}{% else %}color: #000000{% endif %}">
+              {{ device.label }}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <ul class="indexes"></ul>
+  </div>
+</div>
