@@ -212,6 +212,8 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn("grid.on('dropped'", script)
         self.assertIn("closest('#saveButton')", script)
         self.assertIn("X-NetBox-Utilities-Rack-Grid-Columns", script)
+        self.assertIn("if (face !== 'other')", script)
+        self.assertNotIn("partialDeviceIds", script)
         self.assertNotIn("JSON.stringify", script)
 
     @patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled", return_value=True)
@@ -232,7 +234,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
     @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
     @patch("netbox_utilities.reorder_rack.Device")
     @patch("netbox_utilities.reorder_rack.Rack")
-    def test_describes_partial_devices_for_reorder_grid(
+    def test_describes_every_mounted_device_for_reorder_grid(
         self,
         rack_model,
         device_model,
@@ -262,8 +264,44 @@ class ReorderRackFrontendTest(SimpleTestCase):
             position=Decimal(4),
             netbox_utilities_rack_placement=placement,
         )
+        adjacent_device = SimpleNamespace(
+            pk=12,
+            name="Router",
+            label="Router",
+            virtual_chassis=None,
+            device_type=SimpleNamespace(
+                u_height=1,
+                is_full_depth=False,
+                front_image=None,
+                rear_image=None,
+            ),
+            role=SimpleNamespace(color="fedcba"),
+            face="front",
+            position=Decimal(4),
+            netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=1),
+        )
+        full_width_device = SimpleNamespace(
+            pk=11,
+            name="Switch",
+            label="Switch",
+            virtual_chassis=None,
+            device_type=SimpleNamespace(
+                u_height=1,
+                is_full_depth=False,
+                front_image=None,
+                rear_image=None,
+            ),
+            role=SimpleNamespace(color="123456"),
+            face="front",
+            position=Decimal(5),
+            netbox_utilities_rack_placement=None,
+        )
         device_queryset = MagicMock()
-        device_queryset.filter.return_value.select_related.return_value.order_by.return_value = [device]
+        device_queryset.filter.return_value.select_related.return_value.order_by.return_value = [
+            device,
+            adjacent_device,
+            full_width_device,
+        ]
         device_model.objects.restrict.return_value = device_queryset
 
         with (
@@ -277,12 +315,26 @@ class ReorderRackFrontendTest(SimpleTestCase):
 
         self.assertEqual(result["columns"], 12)
         self.assertEqual(result["status"], "ready")
+        self.assertEqual(len(result["devices"]), 3)
         self.assertEqual(result["devices"][0]["label"], "Fritzbox")
         self.assertFalse(result["images"])
         self.assertTrue(result["labels"])
+        device_queryset.filter.assert_called_once_with(
+            rack=rack,
+            position__gt=0,
+            device_type__u_height__gt=0,
+        )
         self.assertEqual(
             {key: result["devices"][0][key] for key in ("id", "grid_x", "grid_width", "width", "horizontal_position")},
             {"id": 10, "grid_x": 6, "grid_width": 6, "width": 2, "horizontal_position": 2},
+        )
+        self.assertEqual(
+            {key: result["devices"][1][key] for key in ("id", "grid_x", "grid_width", "width")},
+            {"id": 12, "grid_x": 0, "grid_width": 6, "width": 2},
+        )
+        self.assertEqual(
+            {key: result["devices"][2][key] for key in ("id", "grid_x", "grid_width", "width")},
+            {"id": 11, "grid_x": 0, "grid_width": 12, "width": 1},
         )
 
 

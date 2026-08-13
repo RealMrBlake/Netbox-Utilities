@@ -238,6 +238,16 @@ def _device_label(device):
     return device.label or str(device.device_type)
 
 
+def _device_width_position(device):
+    try:
+        placement = device.netbox_utilities_rack_placement
+    except ObjectDoesNotExist:
+        placement = None
+    if placement is None:
+        return FULL_WIDTH, 1
+    return normalize_width_position(placement.width, placement.horizontal_position)
+
+
 def _empty_reorder_rack_width_data(request, *, status="ready"):
     selected_view = request.GET.get("view", "images-and-labels")
     return {
@@ -251,7 +261,7 @@ def _empty_reorder_rack_width_data(request, *, status="ready"):
 
 
 def get_reorder_rack_width_data(request):
-    """Describe partial-width widgets for netbox-reorder-rack's GridStack UI."""
+    """Describe every mounted widget for netbox-reorder-rack's GridStack UI."""
     if not reorder_rack_width_enabled(request):
         return None
 
@@ -272,16 +282,22 @@ def get_reorder_rack_width_data(request):
             Device.objects.restrict(request.user, "view")
             .filter(
                 rack=rack,
-                position__isnull=False,
-                netbox_utilities_rack_placement__isnull=False,
+                position__gt=0,
+                device_type__u_height__gt=0,
             )
-            .select_related("device_type", "role", "netbox_utilities_rack_placement")
-            .order_by("pk")
+            .select_related(
+                "device_type",
+                "device_type__manufacturer",
+                "role",
+                "virtual_chassis",
+                "netbox_utilities_rack_placement",
+            )
+            .order_by("position", "pk")
         )
         permission = get_permission_for_model(Device, "change")
         for device in devices:
-            placement = device.netbox_utilities_rack_placement
-            grid_width, grid_x = grid_dimensions(placement.width, placement.horizontal_position)
+            width, horizontal_position = _device_width_position(device)
+            grid_width, grid_x = grid_dimensions(width, horizontal_position)
             role_color = device.role.color or "1685fc"
             grid_height = int(Decimal(str(device.device_type.u_height)) * 2)
             data["devices"].append(
@@ -294,8 +310,8 @@ def get_reorder_rack_width_data(request):
                     "grid_y": reorder_grid_y(rack, device.position, device.device_type.u_height),
                     "grid_width": grid_width,
                     "grid_height": grid_height,
-                    "width": placement.width,
-                    "horizontal_position": placement.horizontal_position,
+                    "width": width,
+                    "horizontal_position": horizontal_position,
                     "color": role_color,
                     "text_color": foreground_color(role_color),
                     "front_image": _image_url(device.device_type.front_image),

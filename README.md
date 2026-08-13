@@ -105,9 +105,11 @@ sudo systemctl restart netbox netbox-rq
 Nach Änderungen an JavaScript oder CSS kann ein Hard-Reload des Browsers mit
 `Strg+F5` erforderlich sein.
 
-Ab Version `0.9.1` werden die Teilbreiten-Adapter auf der Rack- und
-Reorder-Seite auch dann eingebunden, wenn keine Teilbreitengeräte gefunden
-wurden. Nach diesem Update ist `collectstatic` deshalb zwingend erforderlich;
+Ab Version `0.9.2` werden Rack-SVG und Reorder direkt aus allen Geräten des
+Racks aufgebaut. Dadurch können mehrere Geräte derselben HE nicht mehr durch
+NetBox' native Ein-Gerät-pro-HE-Darstellung verloren gehen. Die Adapter werden
+auch dann eingebunden, wenn keine Teilbreitengeräte gefunden wurden. Nach
+diesem Update ist `collectstatic` deshalb zwingend erforderlich;
 die Dateien `topology-rack-width.js` und `reorder-rack-width.js` müssen unter
 `/opt/netbox/netbox/static/netbox_utilities/` vorhanden sein.
 

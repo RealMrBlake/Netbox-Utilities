@@ -251,7 +251,20 @@ def _decimal_range(start, stop):
 def _install_rack_methods():
     from dcim.models import Rack
 
-    if getattr(Rack, "_netbox_utilities_rack_width_installed", False):
+    # Version 0.9.0 replaced get_rack_units() globally. A long-running
+    # process which reloads the plugin must restore NetBox's native method
+    # before installing the current, non-destructive implementation.
+    already_installed = getattr(Rack, "_netbox_utilities_rack_width_installed", False)
+    installed_version = getattr(Rack, "_netbox_utilities_rack_width_version", None)
+    if already_installed and installed_version is None:
+        for method_name in ("get_rack_units", "get_available_units"):
+            method = getattr(Rack, method_name)
+            if wrapped := getattr(method, "__wrapped__", None):
+                setattr(Rack, method_name, wrapped)
+        already_installed = False
+
+    if already_installed:
+        Rack._netbox_utilities_rack_width_version = 2
         return
     original_available_units = Rack.get_available_units
 
@@ -275,6 +288,7 @@ def _install_rack_methods():
 
     Rack.get_available_units = width_aware_available_units
     Rack._netbox_utilities_rack_width_installed = True
+    Rack._netbox_utilities_rack_width_version = 2
 
 
 def _install_device_validation():
@@ -418,42 +432,32 @@ def _install_device_form():
 def _install_rack_svg():
     from dcim.svg.racks import RackElevationSVG
 
-    if getattr(RackElevationSVG, "_netbox_utilities_rack_width_installed", False):
+    if getattr(RackElevationSVG, "_netbox_utilities_rack_width_version", None) == 3:
         return
-    original_draw_face = RackElevationSVG.draw_face
+    current_draw_face = RackElevationSVG.draw_face
+    current_globals = getattr(current_draw_face, "__globals__", {})
+    if current_globals.get("__name__") == __name__ and hasattr(current_draw_face, "__wrapped__"):
+        original_draw_face = current_draw_face.__wrapped__
+    else:
+        original_draw_face = current_draw_face
 
     @wraps(original_draw_face)
     def width_aware_draw_face(elevation, face, opposite=False):
-        partial_devices = list(_partial_width_elevation_devices(elevation.rack, face))
-        partial_device_ids = {device.pk for device in partial_devices}
+        from svgwrite.shapes import Rect
 
-        # Draw regular devices with NetBox's native geometry. Partial devices
-        # are skipped here and rendered once with their stored horizontal slot
-        # below. Rack.get_rack_units() deliberately remains untouched so that
-        # other consumers such as netbox-reorder-rack keep receiving devices.
-        for unit in elevation.rack.get_rack_units(face=face, expand_devices=False):
-            device = unit["device"]
-            if device and device.pk in partial_device_ids:
-                continue
-            height = unit.get("height", decimal.Decimal("1.0"))
-            coords = elevation._get_device_coords(unit["id"], height)
-            size = (elevation.unit_width, int(elevation.unit_height * height))
-            if device and device.pk in elevation.permitted_device_ids:
-                if device.face == face and not opposite:
-                    elevation.draw_device_front(device, coords, size)
-                else:
-                    elevation.draw_device_rear(device, coords, size)
-            elif device:
-                from svgwrite.shapes import Rect
-
-                elevation.drawing.add(Rect(coords, size, class_="blocked"))
-
-        for device in partial_devices:
-            placement = device.netbox_utilities_rack_placement
+        # NetBox's get_rack_units() stores only one device per rack unit and
+        # therefore cannot represent two devices mounted beside each other.
+        # Query every mounted device directly and render each exactly once.
+        for device in _rack_elevation_devices(elevation.rack, face):
+            try:
+                placement = device.netbox_utilities_rack_placement
+            except ObjectDoesNotExist:
+                placement = None
             height = decimal.Decimal(str(device.device_type.u_height))
             coords = elevation._get_device_coords(device.position, height)
-            width = elevation.unit_width / placement.width
-            coords = (coords[0] + width * (placement.horizontal_position - 1), coords[1])
+            width = elevation.unit_width if placement is None else elevation.unit_width / placement.width
+            if placement is not None:
+                coords = (coords[0] + width * (placement.horizontal_position - 1), coords[1])
             size = (width, int(elevation.unit_height * height))
             if device.pk in elevation.permitted_device_ids:
                 if device.face == face and not opposite:
@@ -461,16 +465,15 @@ def _install_rack_svg():
                 else:
                     elevation.draw_device_rear(device, coords, size)
             else:
-                from svgwrite.shapes import Rect
-
                 elevation.drawing.add(Rect(coords, size, class_="blocked"))
 
     RackElevationSVG.draw_face = width_aware_draw_face
     RackElevationSVG._netbox_utilities_rack_width_installed = True
+    RackElevationSVG._netbox_utilities_rack_width_version = 3
 
 
-def _partial_width_elevation_devices(rack, face):
-    """Return the annotated Device instances expected by NetBox's SVG renderer."""
+def _rack_elevation_devices(rack, face):
+    """Return every annotated device which must be drawn on a rack face."""
     from dcim.models import Device
 
     return (
@@ -478,16 +481,17 @@ def _partial_width_elevation_devices(rack, face):
             rack=rack,
             position__gt=0,
             device_type__u_height__gt=0,
-            netbox_utilities_rack_placement__isnull=False,
         )
         .filter(Q(face=face) | Q(device_type__is_full_depth=True))
         .select_related(
             "device_type",
             "device_type__manufacturer",
             "role",
+            "virtual_chassis",
             "netbox_utilities_rack_placement",
         )
         .annotate(devicebay_count=Count("devicebays"))
+        .order_by("position", "pk")
     )
 
 

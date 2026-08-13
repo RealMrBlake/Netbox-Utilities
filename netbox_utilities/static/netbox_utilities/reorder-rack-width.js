@@ -25,8 +25,6 @@
   if (!gridElements.front || !gridElements.rear || !gridElements.other) return;
 
   const setAttribute = (element, name, value) => element.setAttribute(name, String(value));
-  const partialDeviceIds = new Set(data.devices.map(device => String(device.id)));
-
   const originalFetch = window.fetch.bind(window);
   window.fetch = (resource, options = {}) => {
     const resourceUrl = typeof resource === 'string' || resource instanceof URL
@@ -48,10 +46,13 @@
     return originalFetch(resource, {...options, headers});
   };
 
-  Object.values(gridElements).forEach(grid => {
+  Object.entries(gridElements).forEach(([face, grid]) => {
     setAttribute(grid, 'gs-column', columns);
     grid.querySelectorAll('.grid-stack-item').forEach(item => {
-      if (partialDeviceIds.has(item.getAttribute('gs-id'))) {
+      // The native Reorder view is based on Rack.get_rack_units(), which can
+      // expose only one device per rack unit. Rebuild the mounted grids from
+      // the complete server payload; keep native non-racked devices intact.
+      if (face !== 'other') {
         item.remove();
         return;
       }

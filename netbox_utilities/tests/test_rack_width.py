@@ -1,3 +1,4 @@
+from functools import wraps
 from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,7 +14,8 @@ from django.urls import resolve, reverse
 
 from netbox_utilities.rack_width import (
     _cleanup_unracked_placement,
-    _partial_width_elevation_devices,
+    _install_rack_methods,
+    _rack_elevation_devices,
     available_units_for_device,
     horizontal_interval,
     include_rack_width_in_fieldsets,
@@ -32,16 +34,17 @@ class RackWidthTest(SimpleTestCase):
         self.assertIn("positionField.disabled = width === 1", script)
         self.assertIn("positionField.tomselect.sync()", script)
 
-    def test_partial_width_svg_devices_include_core_device_bay_annotation(self):
+    def test_svg_devices_include_core_device_bay_annotation_and_optional_placement(self):
         from dcim.choices import DeviceFaceChoices
         from dcim.models import Rack
 
-        devices = _partial_width_elevation_devices(Rack(pk=3), DeviceFaceChoices.FACE_FRONT)
+        devices = _rack_elevation_devices(Rack(pk=3), DeviceFaceChoices.FACE_FRONT)
 
         self.assertIn("devicebay_count", devices.query.annotations)
         self.assertIn("netbox_utilities_rack_placement", devices.query.select_related)
         self.assertIn("device_type", devices.query.select_related)
         self.assertIn("manufacturer", devices.query.select_related["device_type"])
+        self.assertNotIn("netbox_utilities_rack_placement__isnull", str(devices.query))
 
     def test_core_rack_units_remain_available_to_other_plugins(self):
         from dcim.models import Rack
@@ -49,10 +52,43 @@ class RackWidthTest(SimpleTestCase):
         self.assertEqual(Rack.get_rack_units.__module__, "dcim.models.racks")
         self.assertFalse(hasattr(Rack.get_rack_units, "__wrapped__"))
 
+    def test_replaces_legacy_rack_unit_wrapper_during_upgrade(self):
+        def native_rack_units(rack):
+            return rack
+
+        def native_available_units(rack, *args, **kwargs):
+            return rack, args, kwargs
+
+        @wraps(native_rack_units)
+        def legacy_rack_units(rack):
+            return native_rack_units(rack)
+
+        @wraps(native_available_units)
+        def legacy_available_units(rack, *args, **kwargs):
+            return native_available_units(rack, *args, **kwargs)
+
+        class LegacyRack:
+            get_rack_units = legacy_rack_units
+            get_available_units = legacy_available_units
+            _netbox_utilities_rack_width_installed = True
+
+        with patch.dict("sys.modules", {"dcim.models": SimpleNamespace(Rack=LegacyRack)}):
+            _install_rack_methods()
+
+        self.assertIs(LegacyRack.get_rack_units, native_rack_units)
+        self.assertIs(LegacyRack.get_available_units.__wrapped__, native_available_units)
+        self.assertEqual(LegacyRack._netbox_utilities_rack_width_version, 2)
+
     def test_svg_draws_all_partial_devices_sharing_one_unit_exactly_once(self):
         from dcim.svg.racks import RackElevationSVG
 
-        regular = SimpleNamespace(pk=1, face="front")
+        regular = SimpleNamespace(
+            pk=1,
+            face="front",
+            position=12,
+            device_type=SimpleNamespace(u_height=1),
+            netbox_utilities_rack_placement=None,
+        )
         partial_right = SimpleNamespace(
             pk=2,
             face="front",
@@ -67,16 +103,7 @@ class RackWidthTest(SimpleTestCase):
             device_type=SimpleNamespace(u_height=1),
             netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=1),
         )
-        rack = SimpleNamespace(
-            get_rack_units=MagicMock(
-                return_value=[
-                    {"id": 12, "device": regular, "height": 1},
-                    # NetBox's native unit list can expose only one of multiple
-                    # partial devices occupying the same rack unit.
-                    {"id": 11, "device": partial_right, "height": 1},
-                ]
-            )
-        )
+        rack = SimpleNamespace(get_rack_units=MagicMock())
         elevation = SimpleNamespace(
             rack=rack,
             unit_width=200,
@@ -89,12 +116,12 @@ class RackWidthTest(SimpleTestCase):
         )
 
         with patch(
-            "netbox_utilities.rack_width._partial_width_elevation_devices",
-            return_value=[partial_left, partial_right],
+            "netbox_utilities.rack_width._rack_elevation_devices",
+            return_value=[regular, partial_left, partial_right],
         ):
             RackElevationSVG.draw_face(elevation, "front")
 
-        rack.get_rack_units.assert_called_once_with(face="front", expand_devices=False)
+        rack.get_rack_units.assert_not_called()
         self.assertEqual(
             elevation.draw_device_front.call_args_list,
             [
