@@ -348,9 +348,44 @@ class ReorderRackFrontendTest(SimpleTestCase):
             encoding="utf-8"
         )
         self.assertIn('.netbox-utilities-reorder-grid[gs-column="12"]', stylesheet)
-        self.assertIn('.grid-stack-item[gs-w="6"] { width: 50% !important; }', stylesheet)
-        self.assertIn('.grid-stack-item[gs-w="12"] { width: 100% !important; }', stylesheet)
-        self.assertIn('.grid-stack-item[gs-x="6"] { left: 50% !important; }', stylesheet)
+        self.assertIn('.grid-stack-item[gs-w="6"] { width: 50%; }', stylesheet)
+        self.assertIn('.grid-stack-item[gs-w="12"] { width: 100%; }', stylesheet)
+        self.assertIn('.grid-stack-item[gs-x="6"] { left: 50%; }', stylesheet)
+        self.assertNotIn('.grid-stack-item[gs-w="6"] { width: 50% !important; }', stylesheet)
+
+        rendered_image_grid = render_to_string(
+            "netbox_utilities/reorder_rack_grid.html",
+            {
+                "object": SimpleNamespace(units=[1], u_height=42),
+                "face": "front",
+                "grid_id": 0,
+                "images": True,
+                "labels": False,
+                "unit_width": 220,
+                "reorder_devices": [
+                    {
+                        "id": 10,
+                        "label": "LEO-Fritzbox",
+                        "face": "front",
+                        "full_depth": False,
+                        "grid_x": 0,
+                        "grid_y": 62,
+                        "grid_width": 6,
+                        "grid_height": 2,
+                        "width": 2,
+                        "horizontal_position": 1,
+                        "color": "f0a000",
+                        "text_color": "000000",
+                        "locked": False,
+                        "front_image": "/media/device-type-images/fritzbox.png",
+                        "rear_image": None,
+                    }
+                ],
+            },
+        )
+        self.assertIn("background-image: url('/media/device-type-images/fritzbox.png')", rendered_image_grid)
+        self.assertIn("background-size: 220px", rendered_image_grid)
+        self.assertNotIn(">LEO-Fritzbox<", rendered_image_grid.replace("\n", ""))
 
     def test_resolved_reorder_page_uses_server_side_width_view(self):
         view_class = resolve(reverse("dcim:rack_reorder", kwargs={"pk": 3})).func.view_class
@@ -414,7 +449,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
         self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
         self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
-        self.assertEqual(context["asset_version"], "0.9.7")
+        self.assertEqual(context["asset_version"], "0.9.8")
         self.assertIs(context["reorder_rack_width_data"], get_width_data.return_value)
         get_width_data.assert_called_once()
         self.assertIs(get_width_data.call_args.kwargs["rack"], rack)

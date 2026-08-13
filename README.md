@@ -138,6 +138,12 @@ GridStack-11-Stylesheet von NetBox 4.6.7, durch die Gerätekacheln mit einer
 berechneten Breite von `0px` unsichtbar waren. Topology-Breiten werden außerdem
 nach dem vollständigen Rendern zentral auf die HTTP-Antwort angewendet und
 zusätzlich direkt in die vorhandenen Geräte-Styles geschrieben.
+Ab Version `0.9.8` behalten Geräte beim Ziehen in Reorder ihre tatsächliche
+Rackbreite. Die 12-Spalten-Regeln lassen dazu GridStacks temporären
+Pixelkoordinaten während des Ziehens Vorrang, statt eine Prozentbreite auf das
+Browserfenster anzuwenden. Die serverseitig aufgebauten Reorder-Kacheln zeigen
+außerdem wieder die Front- und Rückseitenbilder des Gerätetyps entsprechend
+der gewählten Ansicht an.
 Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
 keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
 Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander

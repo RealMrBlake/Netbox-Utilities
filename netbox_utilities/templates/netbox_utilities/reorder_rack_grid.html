@@ -20,10 +20,17 @@
                data-item-face="{% if device.face == face %}{{ face }}{% else %}back{% endif %}"
                data-rack-width="{{ device.width }}"
                data-horizontal-position="{{ device.horizontal_position }}">
-            <div class="grid-stack-item-content{% if device.face != face %} device_rear{% endif %}"
-                 style="{% if device.face == face %}background-color: #{{ device.color }}; color: #{{ device.text_color }}{% else %}color: #000000{% endif %}">
-              {{ device.label }}
-            </div>
+            {% if device.face == face %}
+              <div class="grid-stack-item-content"
+                   style="{% if images and device.front_image %}background-image: url('{{ device.front_image }}'); background-size: {{ unit_width }}px; color: #{{ device.text_color }}{% else %}background-color: #{{ device.color }}; color: #{{ device.text_color }}{% endif %}">
+                {% if images and device.front_image %}{% if labels %}{{ device.label }}{% endif %}{% else %}{{ device.label }}{% endif %}
+              </div>
+            {% else %}
+              <div class="grid-stack-item-content device_rear"
+                   style="{% if images and device.rear_image %}background-image: url('{{ device.rear_image }}'); background-size: {{ unit_width }}px; color: #{{ device.text_color }}{% else %}color: #000000{% endif %}">
+                {% if images and device.rear_image %}{% if labels %}{{ device.label }}{% endif %}{% else %}{{ device.label }}{% endif %}
+              </div>
+            {% endif %}
           </div>
         {% endif %}
       {% endfor %}
