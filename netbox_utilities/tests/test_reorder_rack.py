@@ -310,6 +310,8 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertIn("{% for device in reorder_devices %}", grid)
         self.assertIn('gs-w="{{ device.grid_width }}"', grid)
         self.assertIn('gs-x="{{ device.grid_x }}"', grid)
+        self.assertIn('json_script:"netbox-utilities-reorder-rack-width-data"', page)
+        self.assertIn("netbox_utilities/reorder-rack-width.js", page)
 
         get_template("netbox_utilities/reorder_rack.html")
         rendered_grid = render_to_string(
@@ -403,6 +405,45 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
         self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
         self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
+        self.assertEqual(context["asset_version"], "0.9.6")
+        self.assertIs(context["reorder_rack_width_data"], get_width_data.return_value)
+        get_width_data.assert_called_once()
+        self.assertIs(get_width_data.call_args.kwargs["rack"], rack)
+        self.assertIsNotNone(get_width_data.call_args.kwargs["devices"])
+
+    @patch("netbox_utilities.reorder_rack.get_permission_for_model", return_value="dcim.change_device")
+    def test_view_owned_rack_data_does_not_repeat_route_or_object_filtering(self, _get_permission):
+        request = RequestFactory().get("/dcim/racks/3/reorder/")
+        request.user = MagicMock()
+        request.user.has_perm.return_value = True
+        rack = SimpleNamespace(pk=3, u_height=42, desc_units=False)
+        device = SimpleNamespace(
+            pk=334,
+            rack_id=3,
+            label="LEO-Fritzbox",
+            device_type=SimpleNamespace(
+                u_height=1,
+                is_full_depth=False,
+                front_image=None,
+                rear_image=None,
+            ),
+            role=SimpleNamespace(color="f0a000"),
+            face="front",
+            position=Decimal(11),
+            netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=1),
+        )
+
+        with (
+            patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled") as enabled,
+            patch("netbox.config.get_config", return_value=SimpleNamespace(RACK_ELEVATION_DEFAULT_UNIT_WIDTH=220)),
+            patch("utilities.html.foreground_color", return_value="000000"),
+        ):
+            result = get_reorder_rack_width_data(request, rack=rack, devices=[device])
+
+        enabled.assert_not_called()
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["devices"][0]["id"], 334)
+        self.assertEqual(result["devices"][0]["grid_width"], 6)
 
     @patch("netbox_utilities.reorder_rack.reorder_rack_width_enabled", return_value=True)
     @patch("netbox_utilities.reorder_rack.Rack")

@@ -2,6 +2,13 @@
 {% load perms %}
 {% load rack %}
 {% load i18n %}
+{% load static %}
+
+{% block head %}
+  {{ block.super }}
+  {{ reorder_rack_width_data|json_script:"netbox-utilities-reorder-rack-width-data" }}
+  <script src="{% static 'netbox_utilities/reorder-rack-width.js' %}?v={{ asset_version }}" defer></script>
+{% endblock %}
 
 {% block content %}
   <div class="row">

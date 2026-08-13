@@ -2,10 +2,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from netbox_utilities.topology_views import (
+    _inject_topology_widths,
+    _topology_data_for_visible_devices,
+    _visible_topology_device_urls,
     get_topology_rack_width_data,
+    install_topology_rack_width_support,
     is_topology_rack_elevation_request,
     serialize_topology_placement,
     topology_rack_width_enabled,
@@ -156,3 +161,108 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn(".rack-device.netbox-utilities-partial-width", stylesheet)
         self.assertIn("--netbox-utilities-rack-device-left", stylesheet)
         self.assertIn("--netbox-utilities-rack-device-width", stylesheet)
+
+    def test_extracts_only_devices_rendered_by_the_authorized_topology_view(self):
+        html = """
+        <a class="rack-device" href="/dcim/devices/334/">Fritzbox</a>
+        <a class="rack-device active" href="/dcim/devices/340/">Grandstream</a>
+        <a href="/dcim/devices/999/">Not a rack device</a>
+        """
+
+        self.assertEqual(
+            _visible_topology_device_urls(html),
+            {334: "/dcim/devices/334/", 340: "/dcim/devices/340/"},
+        )
+
+    @patch("dcim.models.Device")
+    def test_builds_both_stored_half_widths_from_visible_he11_devices(self, device_model):
+        devices = [
+            SimpleNamespace(
+                pk=334,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=1),
+                get_absolute_url=lambda: "/dcim/devices/334/",
+            ),
+            SimpleNamespace(
+                pk=340,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=SimpleNamespace(width=2, horizontal_position=2),
+                get_absolute_url=lambda: "/dcim/devices/340/",
+            ),
+        ]
+        device_model.objects.filter.return_value.select_related.return_value.order_by.return_value = devices
+
+        result = _topology_data_for_visible_devices({334: "/dcim/devices/334/", 340: "/dcim/devices/340/"})
+
+        self.assertTrue(result["complete"])
+        self.assertEqual(
+            [(item["device_id"], item["width"], item["horizontal_position"]) for item in result["devices"]],
+            [(334, 2, 1), (340, 2, 2)],
+        )
+
+    @patch("netbox_utilities.topology_views._topology_data_for_visible_devices")
+    def test_injects_stored_widths_into_the_completed_foreign_response(self, get_data):
+        get_data.return_value = {
+            "devices": [
+                {
+                    "device_id": 334,
+                    "url": "/dcim/devices/334/",
+                    "width": 2,
+                    "horizontal_position": 1,
+                    "width_source": "stored",
+                    "left_percent": 0,
+                    "width_percent": 50,
+                },
+                {
+                    "device_id": 340,
+                    "url": "/dcim/devices/340/",
+                    "width": 2,
+                    "horizontal_position": 2,
+                    "width_source": "stored",
+                    "left_percent": 50,
+                    "width_percent": 50,
+                },
+            ],
+            "status": "ready",
+            "schema_version": 3,
+            "complete": True,
+        }
+        response = HttpResponse(
+            '<html><head></head><body><a class="rack-device" href="/dcim/devices/334/">A</a>'
+            '<a class="rack-device" href="/dcim/devices/340/">B</a></body></html>'
+        )
+
+        result = _inject_topology_widths(response)
+        html = result.content.decode()
+
+        get_data.assert_called_once_with({334: "/dcim/devices/334/", 340: "/dcim/devices/340/"})
+        self.assertIn('id="netbox-utilities-topology-rack-width-styles"', html)
+        self.assertIn('.rack-device[href="/dcim/devices/334/"]', html)
+        self.assertIn("left: calc(50% + 3px) !important", html)
+        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.9.6", html)
+
+    def test_patches_the_optional_topology_view_only_once(self):
+        def original_get(self, request):
+            return self, request
+
+        class RackElevationView:
+            get = original_get
+
+        module = SimpleNamespace(RackElevationView=RackElevationView)
+        with (
+            patch("netbox_utilities.topology_views.apps.is_installed", return_value=True),
+            patch("netbox_utilities.topology_views.get_plugin_config", return_value=True),
+            patch("netbox_utilities.topology_views.import_module", return_value=module),
+        ):
+            self.assertTrue(install_topology_rack_width_support())
+            patched_get = RackElevationView.get
+            self.assertTrue(install_topology_rack_width_support())
+
+        self.assertIs(RackElevationView.get, patched_get)
+        self.assertIs(RackElevationView._netbox_utilities_original_get, original_get)

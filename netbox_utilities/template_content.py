@@ -14,16 +14,12 @@ from .navigation_helpers import (
     normalize_preferences,
     normalize_sidebar_width,
 )
-from .reorder_rack import get_reorder_rack_width_data
 from .runtime import navigation_customization_enabled, tenant_filter_enabled
-from .topology_views import get_topology_rack_width_data
 
 
 class UtilitiesGlobalContent(PluginTemplateExtension):
     def head(self):
         request = self.context["request"]
-        reorder_rack_width_data = get_reorder_rack_width_data(request)
-        topology_rack_width_data = get_topology_rack_width_data(request)
         preference_data = {
             "order": [],
             "hidden": [],
@@ -60,8 +56,6 @@ class UtilitiesGlobalContent(PluginTemplateExtension):
                 },
                 "navigation_enabled": request.user.is_authenticated and navigation_customization_enabled(),
                 "navigation_preferences": preference_data,
-                "reorder_rack_width_data": reorder_rack_width_data,
-                "topology_rack_width_data": topology_rack_width_data,
                 "asset_version": __version__,
             },
         )

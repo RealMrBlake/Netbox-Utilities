@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -38,6 +38,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .reorder_rack import install_reorder_rack_bulk_save
 
             install_reorder_rack_bulk_save()
+        if get_plugin_config("netbox_utilities", "topology_views_rack_width_enabled"):
+            from .topology_views import install_topology_rack_width_support
+
+            install_topology_rack_width_support()
 
 
 config = NetBoxUtilitiesConfig

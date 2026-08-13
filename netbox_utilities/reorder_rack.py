@@ -15,6 +15,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from utilities.permissions import get_permission_for_model
 
+from . import __version__
 from .models import DeviceRackPlacement
 from .rack_width import FULL_WIDTH, effective_width_positions, normalize_width_position, stage_width_position
 
@@ -256,13 +257,17 @@ def _empty_reorder_rack_width_data(request, *, status="ready"):
     }
 
 
-def get_reorder_rack_width_data(request):
+def get_reorder_rack_width_data(request, *, rack=None, devices=None):
     """Describe every mounted widget for netbox-reorder-rack's GridStack UI."""
-    if not reorder_rack_width_enabled(request):
+    # The patched Reorder view passes its already-authorized rack and device
+    # queryset explicitly.  The global helper keeps the permission-scoped
+    # lookup for callers which do not own the rendered view.
+    view_owned_data = rack is not None
+    if not view_owned_data and not reorder_rack_width_enabled(request):
         return None
 
     data = _empty_reorder_rack_width_data(request)
-    rack_id = getattr(request.resolver_match, "kwargs", {}).get("pk")
+    rack_id = rack.pk if rack is not None else getattr(request.resolver_match, "kwargs", {}).get("pk")
     if not rack_id:
         data["status"] = "missing-rack"
         return data
@@ -271,25 +276,27 @@ def get_reorder_rack_width_data(request):
     from utilities.html import foreground_color
 
     try:
-        rack = Rack.objects.restrict(request.user, "view").filter(pk=rack_id).first()
+        if rack is None:
+            rack = Rack.objects.restrict(request.user, "view").filter(pk=rack_id).first()
         if rack is None:
             return None
-        devices = (
-            Device.objects.restrict(request.user, "view")
-            .filter(
-                rack=rack,
-                position__gt=0,
-                device_type__u_height__gt=0,
+        if devices is None:
+            devices = (
+                Device.objects.restrict(request.user, "view")
+                .filter(
+                    rack=rack,
+                    position__gt=0,
+                    device_type__u_height__gt=0,
+                )
+                .select_related(
+                    "device_type",
+                    "device_type__manufacturer",
+                    "role",
+                    "virtual_chassis",
+                    "netbox_utilities_rack_placement",
+                )
+                .order_by("position", "pk")
             )
-            .select_related(
-                "device_type",
-                "device_type__manufacturer",
-                "role",
-                "virtual_chassis",
-                "netbox_utilities_rack_placement",
-            )
-            .order_by("position", "pk")
-        )
         devices = list(devices)
         widths = effective_width_positions(devices)
         permission = get_permission_for_model(Device, "change")
@@ -410,7 +417,22 @@ def width_aware_reorder_get(self, request, pk):
         .exclude(device_type__subdevice_role=SubdeviceRoleChoices.ROLE_CHILD)
         .select_related("device_type", "role")
     )
-    width_data = get_reorder_rack_width_data(request)
+    mounted_devices = (
+        Device.objects.filter(
+            rack=rack,
+            position__gt=0,
+            device_type__u_height__gt=0,
+        )
+        .select_related(
+            "device_type",
+            "device_type__manufacturer",
+            "role",
+            "virtual_chassis",
+            "netbox_utilities_rack_placement",
+        )
+        .order_by("position", "pk")
+    )
+    width_data = get_reorder_rack_width_data(request, rack=rack, devices=mounted_devices)
     if not width_data or not width_data.get("complete"):
         original_get = getattr(type(self), "_netbox_utilities_original_get", None)
         if original_get is not None:
@@ -426,8 +448,10 @@ def width_aware_reorder_get(self, request, pk):
             "labels": labels,
             "unit_width": width_data["unit_width"],
             "reorder_devices": width_data["devices"],
+            "reorder_rack_width_data": width_data,
             "non_racked": non_racked,
             "basepath": settings.BASE_PATH,
+            "asset_version": __version__,
         },
     )
 

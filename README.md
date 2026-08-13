@@ -127,6 +127,11 @@ mehr vom Ladezeitpunkt des Browseradapters abhängig. Für die optionale
 Topology-Rack-Ansicht wird die Teilbreitengeometrie zusätzlich als
 serverseitiges CSS ausgegeben; JavaScript wird dort nur noch für Exporte und
 ergänzende Metadaten benötigt.
+Ab Version `0.9.6` verwendet Reorder direkt den bereits durch seinen View
+autorisierten Rack-Datensatz. Die Topology-Rack-Ansicht leitet ihre Breiten
+ausschließlich aus den Geräten ab, die der Topology-View tatsächlich in seine
+HTML-Antwort geschrieben hat. Zusätzliche Berechtigungsabfragen können die
+beiden Ansichten dadurch nicht mehr fälschlich leeren.
 Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
 keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
 Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander
