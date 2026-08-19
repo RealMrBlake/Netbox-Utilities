@@ -287,6 +287,13 @@ Test- und Echtimport auch unter PostgreSQL, ohne einen unzulässigen
 `FOR UPDATE`-Outer-Join zu erzeugen. Bereits mit Version `0.9.9` erstellte
 Archive müssen dafür nicht neu exportiert werden.
 
+Ab Version `0.9.11` werden alle im Archiv enthaltenen Rackbreiten vor der
+eigentlichen Geräteplatzierung innerhalb derselben Transaktion vorgemerkt.
+Dadurch erkennt die Konfliktprüfung mehrere teilbreite Geräte derselben HE
+bereits während des Imports korrekt und löst kein zuvor platziertes Gerät aus
+dem Rack. Nach der Platzierung werden die Breiten mit dem endgültigen
+Importergebnis abgeglichen.
+
 ### Teilbreiten in MrBlake NetBox Topology Views
 
 Ist

@@ -30,7 +30,12 @@ class FakeQuerySet(list):
         return self
 
     def filter(self, **kwargs):
-        return self
+        values = self
+        if kwargs.get("position__isnull") is False:
+            values = [item for item in values if item.position is not None]
+        result = FakeQuerySet(values)
+        result.selected_related = self.selected_related
+        return result
 
     def exclude(self, **kwargs):
         pk = kwargs.get("pk")
@@ -155,6 +160,12 @@ class NetBoxExportRackWidthTest(SimpleTestCase):
             self.assertEqual(received, placements)
             self.assertEqual(partial._netbox_utilities_rack_width, 2)
             self.assertEqual(full._netbox_utilities_rack_width, 1)
+            placement_objects.update_or_create.assert_called_once_with(
+                device=partial,
+                defaults={"width": 2, "horizontal_position": 1},
+            )
+            placement_objects.filter.assert_called_once_with(device=full)
+            placement_objects.filter.return_value.delete.assert_called_once_with()
             partial.rack_id = full.rack_id = 1
             partial.position = 11
             full.position = 12
@@ -163,12 +174,73 @@ class NetBoxExportRackWidthTest(SimpleTestCase):
         result = _apply_rack_widths(native_apply, placements, resolved, object(), object())
 
         self.assertEqual(result, "saved")
-        placement_objects.update_or_create.assert_called_once_with(
-            device=partial,
-            defaults={"width": 2, "horizontal_position": 1},
-        )
-        placement_objects.filter.assert_called_once_with(device=full)
-        placement_objects.filter.return_value.delete.assert_called_once_with()
+        self.assertEqual(placement_objects.update_or_create.call_count, 2)
+        self.assertEqual(placement_objects.filter.call_count, 2)
+        self.assertEqual(placement_objects.filter.return_value.delete.call_count, 2)
+
+    @patch("netbox_utilities.netbox_export.DeviceRackPlacement.objects")
+    def test_import_preloads_all_partial_widths_before_native_placement(self, placement_objects):
+        left = FakeDevice(1)
+        right = FakeDevice(2)
+        placements = [
+            ("left", WidthAwareDeferredDevicePlacement(None, 11, "front", 2, 1)),
+            ("right", WidthAwareDeferredDevicePlacement(None, 11, "front", 2, 2)),
+        ]
+        resolved = {"left": left, "right": right}
+
+        def native_apply(*_args, **_kwargs):
+            self.assertEqual(placement_objects.update_or_create.call_count, 2)
+            self.assertEqual(
+                [call.kwargs["device"] for call in placement_objects.update_or_create.call_args_list],
+                [left, right],
+            )
+            left.rack_id = right.rack_id = 1
+            left.position = right.position = 11
+
+        _apply_rack_widths(native_apply, placements, resolved, object(), object())
+
+        self.assertEqual(placement_objects.update_or_create.call_count, 4)
+
+    @patch("netbox_utilities.netbox_export.DeviceRackPlacement.objects")
+    def test_two_partial_devices_remain_in_the_same_unit_during_import(self, placement_objects):
+        left = FakeDevice(1)
+        right = FakeDevice(2)
+        FakeDevice._default_manager = FakeQuerySet([left, right])
+        placements = [
+            ("left", WidthAwareDeferredDevicePlacement(None, 11, "front", 2, 1)),
+            ("right", WidthAwareDeferredDevicePlacement(None, 11, "front", 2, 2)),
+        ]
+        resolved = {"left": left, "right": right}
+        stored = {}
+
+        def store_width(*, device, defaults):
+            stored[device.pk] = SimpleNamespace(device_id=device.pk, **defaults)
+
+        def locked_widths(**kwargs):
+            return [stored[pk] for pk in kwargs["device_id__in"] if pk in stored]
+
+        placement_objects.update_or_create.side_effect = store_width
+        placement_objects.select_for_update.return_value.filter.side_effect = locked_widths
+
+        def native_apply(received, *_args, **_kwargs):
+            for record_id, placement in received:
+                device = resolved[record_id]
+                conflicts = _width_aware_device_placement_conflicts(
+                    MagicMock(),
+                    device,
+                    object(),
+                    placement.position,
+                    placement.face,
+                )
+                self.assertEqual(conflicts, [])
+                device.rack_id = 1
+                device.position = placement.position
+                device.face = placement.face
+
+        _apply_rack_widths(native_apply, placements, resolved, object(), object())
+
+        self.assertEqual(left.position, 11)
+        self.assertEqual(right.position, 11)
 
     @patch("netbox_utilities.netbox_export.import_module")
     @patch("netbox_utilities.netbox_export.apps.get_app_config")

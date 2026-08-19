@@ -141,20 +141,33 @@ def _apply_rack_widths(original, placements, resolved, resolver, compatibility, 
         stage_width_position(device, placement.width, placement.horizontal_position)
         width_aware.append((device, placement))
 
+    # The native placement pass reloads rack occupants from the database for
+    # every device. Persist all imported widths first so a device placed early
+    # in the same pass is not mistaken for a full-width conflict later on.
+    for device, placement in width_aware:
+        _save_rack_width(device, placement)
+
     result = original(placements, resolved, resolver, compatibility, **kwargs)
 
     for device, placement in width_aware:
         if placement.width == FULL_WIDTH or not device.rack_id or not device.position:
             DeviceRackPlacement.objects.filter(device=device).delete()
         else:
-            DeviceRackPlacement.objects.update_or_create(
-                device=device,
-                defaults={
-                    "width": placement.width,
-                    "horizontal_position": placement.horizontal_position,
-                },
-            )
+            _save_rack_width(device, placement)
     return result
+
+
+def _save_rack_width(device, placement):
+    if placement.width == FULL_WIDTH:
+        DeviceRackPlacement.objects.filter(device=device).delete()
+        return
+    DeviceRackPlacement.objects.update_or_create(
+        device=device,
+        defaults={
+            "width": placement.width,
+            "horizontal_position": placement.horizontal_position,
+        },
+    )
 
 
 def _rack_placement_is_exportable(original, model):
