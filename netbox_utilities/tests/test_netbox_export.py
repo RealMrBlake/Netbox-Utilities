@@ -18,10 +18,15 @@ from netbox_utilities.netbox_export import (
 
 
 class FakeQuerySet(list):
+    def __init__(self, values=()):
+        super().__init__(values)
+        self.selected_related = []
+
     def select_for_update(self):
         return self
 
     def select_related(self, *args):
+        self.selected_related.append(args)
         return self
 
     def filter(self, **kwargs):
@@ -29,7 +34,9 @@ class FakeQuerySet(list):
 
     def exclude(self, **kwargs):
         pk = kwargs.get("pk")
-        return FakeQuerySet(item for item in self if item.pk != pk)
+        result = FakeQuerySet(item for item in self if item.pk != pk)
+        result.selected_related = self.selected_related
+        return result
 
 
 class FakeDevice:
@@ -111,17 +118,22 @@ class NetBoxExportRackWidthTest(SimpleTestCase):
 
         self.assertIs(_defer_rack_width(original, FakeDevice, record)[1], native)
 
-    def test_import_conflicts_respect_horizontal_rack_positions(self):
+    @patch("netbox_utilities.netbox_export.DeviceRackPlacement.objects")
+    def test_import_conflicts_respect_horizontal_rack_positions(self, placement_objects):
         left = FakeDevice(1, width=2, horizontal_position=1, position=11)
         right = FakeDevice(2, width=2, horizontal_position=2)
         right.rack_id = 1
         FakeDevice._default_manager = FakeQuerySet([left])
+        stored_left = SimpleNamespace(device_id=1, width=2, horizontal_position=1)
+        placement_objects.select_for_update.return_value.filter.return_value = [stored_left]
         original = MagicMock()
 
         conflicts = _width_aware_device_placement_conflicts(original, right, object(), 11, "front")
 
         self.assertEqual(conflicts, [])
         original.assert_not_called()
+        self.assertEqual(FakeDevice._default_manager.selected_related, [("device_type",)])
+        placement_objects.select_for_update.return_value.filter.assert_called_with(device_id__in=[1])
 
         overlapping = FakeDevice(3, width=2, horizontal_position=1)
         overlapping.rack_id = 1

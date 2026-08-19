@@ -281,6 +281,12 @@ entfernt der Import deshalb seine veraltete Teilbreitenzuordnung. Ältere
 Archive ohne diese Zusatzmetadaten bleiben importierbar; vorhandene
 `DeviceRackPlacement`-Datensätze darin werden weiterhin berücksichtigt.
 
+Ab Version `0.9.10` sperrt der Import Geräte und ihre optionalen
+Rackbreitenzuordnungen in getrennten Datenbankabfragen. Damit funktioniert der
+Test- und Echtimport auch unter PostgreSQL, ohne einen unzulässigen
+`FOR UPDATE`-Outer-Join zu erzeugen. Bereits mit Version `0.9.9` erstellte
+Archive müssen dafür nicht neu exportiert werden.
+
 ### Teilbreiten in MrBlake NetBox Topology Views
 
 Ist

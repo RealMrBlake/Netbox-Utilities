@@ -91,19 +91,32 @@ def _width_aware_device_placement_conflicts(original, device, rack, position, fa
 
     width, horizontal_position = get_width_position(device)
     height, full_depth = _device_footprint(device)
-    candidates = (
+    candidates = list(
         type(device)
         ._default_manager.select_for_update()
-        .select_related("device_type", "netbox_utilities_rack_placement")
+        .select_related("device_type")
         .filter(rack=rack, position__isnull=False)
         .exclude(pk=device.pk)
     )
+    stored_placements = {
+        placement.device_id: placement
+        for placement in DeviceRackPlacement.objects.select_for_update().filter(
+            device_id__in=[candidate.pk for candidate in candidates]
+        )
+    }
     conflicts = []
     for candidate in candidates:
         candidate_height, candidate_full_depth = _device_footprint(candidate)
         if not (full_depth or candidate_full_depth or candidate.face == face):
             continue
-        candidate_width, candidate_horizontal_position = get_width_position(candidate)
+        stored_placement = stored_placements.get(candidate.pk)
+        if stored_placement is None:
+            candidate_width, candidate_horizontal_position = FULL_WIDTH, 1
+        else:
+            candidate_width, candidate_horizontal_position = normalize_width_position(
+                stored_placement.width,
+                stored_placement.horizontal_position,
+            )
         if placement_rectangles_overlap(
             position,
             height,
