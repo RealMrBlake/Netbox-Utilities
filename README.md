@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.7** mit zwölf Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.8** mit zwölf Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -16,6 +16,11 @@ Plugin für **NetBox 4.6.5 bis 4.6.7** mit zwölf Funktionen:
 - Kabel- und Funkverbindungen können direkt einem oder mehreren VLANs zugeordnet werden.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
+
+Ab Version `0.10.1` ignoriert die automatische Mandantenermittlung
+mehrwertige Reverse-Relationen. Das behebt unter NetBox 4.6.8 insbesondere den
+Fehler `'RelatedManager' object has no attribute '_meta'` beim Öffnen der
+Seite zum Anlegen einer VLAN-Gruppe.
 
 ## Kompatibilität
 

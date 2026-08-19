@@ -25,16 +25,20 @@ def tenant_id_from_object(obj, depth=0):
     if isinstance(obj, Tenant):
         return obj.pk
 
-    field_names = {field.name for field in obj._meta.get_fields()}
-    if "tenant" in field_names and getattr(obj, "tenant_id", None):
+    meta = getattr(obj, "_meta", None)
+    if meta is None or not hasattr(meta, "get_fields"):
+        return None
+    fields = {field.name: field for field in meta.get_fields()}
+    if "tenant" in fields and getattr(obj, "tenant_id", None):
         return obj.tenant_id
 
     for relation in PARENT_RELATIONS:
-        if relation not in field_names:
+        field = fields.get(relation)
+        if field is None or getattr(field, "one_to_many", False) or getattr(field, "many_to_many", False):
             continue
         try:
             parent = getattr(obj, relation, None)
-        except (ObjectDoesNotExist, ValueError):
+        except (AttributeError, ObjectDoesNotExist, ValueError):
             continue
         if tenant_id := tenant_id_from_object(parent, depth + 1):
             return tenant_id
@@ -76,11 +80,7 @@ def _related_objects(form, field_name):
 
 def _is_cable(instance):
     meta = getattr(instance, "_meta", None)
-    return bool(
-        meta
-        and getattr(meta, "app_label", None) == "dcim"
-        and getattr(meta, "model_name", None) == "cable"
-    )
+    return bool(meta and getattr(meta, "app_label", None) == "dcim" and getattr(meta, "model_name", None) == "cable")
 
 
 def _instance_cable_terminations(instance):

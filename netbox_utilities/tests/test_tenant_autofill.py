@@ -50,6 +50,17 @@ class FakeQuerySet:
 
 
 class TenantAutofillTest(SimpleTestCase):
+    def test_netbox_vlan_group_reverse_scopes_do_not_break_autofill(self):
+        from ipam.models import VLANGroup
+
+        self.assertIsNone(tenant_id_from_object(VLANGroup()))
+
+    def test_ignores_reverse_relation_managers_on_scoped_objects(self):
+        reverse_manager = SimpleNamespace()
+        vlan_group = FakeObject(site=reverse_manager, rack=reverse_manager)
+
+        self.assertIsNone(tenant_id_from_object(vlan_group))
+
     def test_finds_tenant_through_parent_relation(self):
         rack = FakeObject(tenant_id=42)
         device = FakeObject(rack=rack)
