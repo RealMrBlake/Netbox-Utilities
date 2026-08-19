@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.9.8"
+__version__ = "0.9.9"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -34,6 +34,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
         install_tenant_validation()
         install_patchpanel_automation()
         install_rack_width_support()
+        if self.apps.is_installed("netbox_export"):
+            from .netbox_export import install_netbox_export_rack_width_support
+
+            install_netbox_export_rack_width_support()
         if get_plugin_config("netbox_utilities", "reorder_rack_bulk_save_enabled"):
             from .reorder_rack import install_reorder_rack_bulk_save
 

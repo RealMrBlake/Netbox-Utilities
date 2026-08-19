@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.7** mit zehn Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.7** mit elf Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -12,6 +12,7 @@ Plugin für **NetBox 4.6.5 bis 4.6.7** mit zehn Funktionen:
 - Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
+- Rackbreiten bleiben beim optionalen NetBox-Export und -Import erhalten.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
@@ -20,6 +21,7 @@ Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gr
 - NetBox `>=4.6.5,<4.7`
 - Python `>=3.12`
 - optional: NetBox Reorder Rack `1.1.4`
+- optional: NetBox-Export `0.3.11`
 - optional: [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views) mit Rack-Ansicht
 
 Andere NetBox-Versionen werden vom Plugin absichtlich abgelehnt, da die Anpassung der Core-Navigation von deren HTML-Struktur abhängt.
@@ -256,8 +258,28 @@ späteren Entfernen des Plugins müssen geteilte Höheneinheiten wieder aufgelö
 werden; die Core-Eindeutigkeit wird bei einer Deinstallation nicht automatisch
 wiederhergestellt.
 
-Die Zusatzfelder werden derzeit im NetBox-Webformular gepflegt. REST- oder
-CSV-Vorgänge ohne diese Felder behandeln neue Geräte als volle Rackbreite.
+Die Zusatzfelder werden im NetBox-Webformular gepflegt. REST- oder normale
+NetBox-CSV-Vorgänge ohne diese Felder behandeln neue Geräte als volle
+Rackbreite. Der nachfolgend beschriebene portable ZIP-Export überträgt sie
+dagegen ausdrücklich.
+
+### Rackbreiten in NetBox-Export
+
+Ist das optionale Plugin
+[NetBox-Export](https://git.mrblake.cc/MrBlake/netbox-export) in Version
+`0.3.11` installiert, erweitert NetBox Utilities dessen ZIP-Export und Import
+automatisch. Für jedes Gerät werden auch die Rackbreite und die von links
+gezählte Breitenposition im Archiv gespeichert. Beim Import berücksichtigt die
+Konfliktprüfung sowohl die Gerätehöhe als auch die horizontale Rackfläche.
+Dadurch können beispielsweise zwei Geräte mit halber Breite wieder in dieselbe
+HE importiert werden, ohne dass das zuerst importierte Gerät aus dem Rack
+entfernt wird.
+
+Auch volle Rackbreite wird ausdrücklich gespeichert. Wird ein früher
+teilbreites Zielgerät durch einen neueren Export auf volle Breite zurückgesetzt,
+entfernt der Import deshalb seine veraltete Teilbreitenzuordnung. Ältere
+Archive ohne diese Zusatzmetadaten bleiben importierbar; vorhandene
+`DeviceRackPlacement`-Datensätze darin werden weiterhin berücksichtigt.
 
 ### Teilbreiten in MrBlake NetBox Topology Views
 

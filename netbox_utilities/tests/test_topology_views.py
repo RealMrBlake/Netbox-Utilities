@@ -246,7 +246,7 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn('id="netbox-utilities-topology-rack-width-styles"', html)
         self.assertIn('.rack-device[href="/dcim/devices/334/"]', html)
         self.assertIn("left: calc(50% + 3px) !important", html)
-        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.9.8", html)
+        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.9.9", html)
         self.assertIn("left:calc(0% + 3px)!important", html)
         self.assertIn("left:calc(50% + 3px)!important", html)
         self.assertIn("width:calc(50% - 6px)!important", html)
