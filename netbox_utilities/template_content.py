@@ -5,7 +5,12 @@ from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
 from . import __version__
-from .models import DeviceRackPlacement, NavigationPreference
+from .models import (
+    CableVLANAssignment,
+    DeviceRackPlacement,
+    NavigationPreference,
+    WirelessLinkVLANAssignment,
+)
 from .navigation_helpers import (
     SIDEBAR_WIDTH_DEFAULT,
     SIDEBAR_WIDTH_MAX,
@@ -14,7 +19,7 @@ from .navigation_helpers import (
     normalize_preferences,
     normalize_sidebar_width,
 )
-from .runtime import navigation_customization_enabled, tenant_filter_enabled
+from .runtime import connection_vlans_enabled, navigation_customization_enabled, tenant_filter_enabled
 
 
 class UtilitiesGlobalContent(PluginTemplateExtension):
@@ -112,4 +117,34 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
         )
 
 
-template_extensions = [UtilitiesGlobalContent, DeviceUtilitiesContent]
+class ConnectionVLANContent(PluginTemplateExtension):
+    models = ["dcim.cable", "wireless.wirelesslink"]
+
+    def right_page(self):
+        if not connection_vlans_enabled():
+            return ""
+
+        connection = self.context["object"]
+        if connection._meta.label_lower == "dcim.cable":
+            assignment_model = CableVLANAssignment
+            lookup = {"cable": connection}
+        else:
+            assignment_model = WirelessLinkVLANAssignment
+            lookup = {"wireless_link": connection}
+
+        assignment = assignment_model.objects.filter(**lookup).first()
+        if assignment is None:
+            return ""
+
+        from ipam.models import VLAN
+
+        visible_vlans = VLAN.objects.restrict(self.context["request"].user, "view").filter(
+            pk__in=assignment.vlans.values("pk")
+        )
+        return self.render(
+            "netbox_utilities/connection_vlans_panel.html",
+            {"connection_vlans": visible_vlans},
+        )
+
+
+template_extensions = [UtilitiesGlobalContent, DeviceUtilitiesContent, ConnectionVLANContent]

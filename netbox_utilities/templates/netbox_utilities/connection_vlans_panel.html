@@ -1,0 +1,12 @@
+<div class="card">
+  <h2 class="card-header">VLANs der Verbindung</h2>
+  <div class="card-body">
+    {% if connection_vlans %}
+      {% for vlan in connection_vlans %}
+        <a href="{{ vlan.get_absolute_url }}" class="badge text-bg-primary me-1 mb-1">{{ vlan }}</a>
+      {% endfor %}
+    {% else %}
+      <span class="text-muted">Keine VLANs zugeordnet</span>
+    {% endif %}
+  </div>
+</div>

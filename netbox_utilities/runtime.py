@@ -11,6 +11,10 @@ def navigation_customization_enabled():
     return bool(get_plugin_config("netbox_utilities", "navigation_customization_enabled"))
 
 
+def connection_vlans_enabled():
+    return bool(get_plugin_config("netbox_utilities", "connection_vlans_enabled"))
+
+
 def tenant_filter_enabled():
     if not get_plugin_config("netbox_utilities", "tenant_filter_enabled"):
         return False

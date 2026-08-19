@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.7** mit elf Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.7** mit zwölf Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -13,6 +13,7 @@ Plugin für **NetBox 4.6.5 bis 4.6.7** mit elf Funktionen:
 - Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
 - Rackbreiten bleiben beim optionalen NetBox-Export und -Import erhalten.
+- Kabel- und Funkverbindungen können direkt einem oder mehreren VLANs zugeordnet werden.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
@@ -73,6 +74,7 @@ PLUGINS = [
 PLUGINS_CONFIG = {
     "netbox_utilities": {
         "navigation_customization_enabled": True,
+        "connection_vlans_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
@@ -220,6 +222,34 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### VLANs direkt an Verbindungen dokumentieren
+
+Ab Version `0.10.0` erscheint beim normalen **Anlegen und Bearbeiten** einer
+Kabelverbindung oder Funkverbindung das optionale Feld **VLANs der
+Verbindung**. Darin können ein oder mehrere bestehende NetBox-VLANs ausgewählt
+werden. Die Auswahl wird außerdem auf der Detailseite der Verbindung
+angezeigt.
+
+Die Zuordnung dokumentiert, welche VLANs über die jeweilige Verbindung
+transportiert werden. Sie verändert bewusst nicht automatisch die nativen
+Felder **Untagged VLAN** und **Tagged VLANs** der beteiligten Interfaces, da
+beide Enden unterschiedliche Interface-Modi besitzen können. Diese bleiben
+weiterhin die technische Konfiguration der einzelnen Interfaces.
+
+Die Funktion gilt für:
+
+- physische NetBox-Kabel, einschließlich Verbindungen über Patchfelder;
+- NetBox-Funkverbindungen (`WirelessLink`).
+
+Leere Auswahlen erzeugen keinen Zuordnungsdatensatz. Beim Löschen einer
+Verbindung wird ihre VLAN-Zuordnung automatisch mit entfernt. Das Feature kann
+installationsweit mit `connection_vlans_enabled = False` in `PLUGINS_CONFIG`
+deaktiviert werden.
+
+Ist das optionale NetBox-Export-Plugin installiert, werden diese
+VLAN-Zuordnungen als normale Plugin-Datensätze zusammen mit den Verbindungen
+und VLANs exportiert und wieder importiert.
 
 ### Mehrere Geräte nebeneinander in derselben HE
 

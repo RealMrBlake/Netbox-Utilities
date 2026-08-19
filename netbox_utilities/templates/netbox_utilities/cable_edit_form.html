@@ -1,0 +1,12 @@
+{% load form_helpers %}
+
+{% include 'dcim/htmx/cable_edit.html' %}
+
+{% if form.utilities_vlans %}
+  <div class="field-group mb-5">
+    <div class="row">
+      <h2 class="col-9 offset-3">VLANs der Verbindung</h2>
+    </div>
+    {% render_field form.utilities_vlans %}
+  </div>
+{% endif %}

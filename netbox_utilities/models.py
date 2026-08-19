@@ -79,3 +79,45 @@ class DeviceRackPlacement(models.Model):
 
     def __str__(self):
         return f"{self.device}: 1/{self.width}, Position {self.horizontal_position}"
+
+
+class CableVLANAssignment(models.Model):
+    cable = models.OneToOneField(
+        "dcim.Cable",
+        on_delete=models.CASCADE,
+        related_name="netbox_utilities_vlan_assignment",
+    )
+    vlans = models.ManyToManyField(
+        "ipam.VLAN",
+        related_name="netbox_utilities_cable_assignments",
+        blank=True,
+    )
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "VLAN-Zuordnung einer Kabelverbindung"
+        verbose_name_plural = "VLAN-Zuordnungen von Kabelverbindungen"
+
+    def __str__(self):
+        return f"VLANs für Kabel {self.cable}"
+
+
+class WirelessLinkVLANAssignment(models.Model):
+    wireless_link = models.OneToOneField(
+        "wireless.WirelessLink",
+        on_delete=models.CASCADE,
+        related_name="netbox_utilities_vlan_assignment",
+    )
+    vlans = models.ManyToManyField(
+        "ipam.VLAN",
+        related_name="netbox_utilities_wireless_link_assignments",
+        blank=True,
+    )
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "VLAN-Zuordnung einer Funkverbindung"
+        verbose_name_plural = "VLAN-Zuordnungen von Funkverbindungen"
+
+    def __str__(self):
+        return f"VLANs für Funkverbindung {self.wireless_link}"

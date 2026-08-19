@@ -449,7 +449,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
         self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
         self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
-        self.assertEqual(context["asset_version"], "0.9.11")
+        self.assertEqual(context["asset_version"], "0.10.0")
         self.assertIs(context["reorder_rack_width_data"], get_width_data.return_value)
         get_width_data.assert_called_once()
         self.assertIs(get_width_data.call_args.kwargs["rack"], rack)

@@ -62,6 +62,14 @@ class FakeDevice:
 
 
 class NetBoxExportRackWidthTest(SimpleTestCase):
+    def test_connection_vlan_assignments_remain_exportable(self):
+        from netbox_export.services.graph import is_exportable_model
+
+        from netbox_utilities.models import CableVLANAssignment, WirelessLinkVLANAssignment
+
+        self.assertTrue(is_exportable_model(CableVLANAssignment))
+        self.assertTrue(is_exportable_model(WirelessLinkVLANAssignment))
+
     def test_export_embeds_partial_and_full_rack_widths_on_devices(self):
         partial = FakeDevice(1, width=2, horizontal_position=2)
         full = FakeDevice(2)

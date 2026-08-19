@@ -1,12 +1,12 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.9.11"
+__version__ = "0.10.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Navigation, tenant utilities, partial-width rack devices, bulk uploads, and rack reordering"
+    description = "Navigation, tenant utilities, connection VLANs, partial-width racks, and bulk operations"
     version = __version__
     author = "LKE"
     base_url = "utilities"
@@ -14,6 +14,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
     max_version = "4.6.99"
     default_settings = {
         "navigation_customization_enabled": True,
+        "connection_vlans_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
@@ -34,6 +35,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
         install_tenant_validation()
         install_patchpanel_automation()
         install_rack_width_support()
+        if get_plugin_config("netbox_utilities", "connection_vlans_enabled"):
+            from .connection_vlans import install_connection_vlan_support
+
+            install_connection_vlan_support()
         if self.apps.is_installed("netbox_export"):
             from .netbox_export import install_netbox_export_rack_width_support
 
