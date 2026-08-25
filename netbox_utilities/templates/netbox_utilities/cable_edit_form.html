@@ -45,6 +45,9 @@
   {% if 'b_terminations' in form.fields %}
     {% render_field form.b_terminations %}
   {% endif %}
+  {% if form.utilities_vlan_group %}
+    {% render_field form.utilities_vlan_group %}
+  {% endif %}
   {% if form.utilities_vlans %}
     {% render_field form.utilities_vlans %}
   {% endif %}

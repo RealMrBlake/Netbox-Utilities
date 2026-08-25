@@ -1,29 +1,30 @@
 from copy import deepcopy
 from functools import wraps
 
-from ipam.models import VLAN
-from utilities.forms.fields import DynamicModelMultipleChoiceField
+from ipam.models import VLAN, VLANGroup
+from utilities.forms.fields import DynamicModelChoiceField, DynamicModelMultipleChoiceField
 from utilities.forms.rendering import FieldSet
 
 from .models import CableVLANAssignment, WirelessLinkVLANAssignment
 
 FORM_FIELD = "utilities_vlans"
+GROUP_FILTER_FIELD = "utilities_vlan_group"
 PATCH_MARKER = "_netbox_utilities_connection_vlans_installed"
 
 
 def include_connection_vlans_in_fieldsets(fieldsets):
     """Add the connection VLAN field to an isolated copy of a form layout."""
     if not fieldsets:
-        return (FieldSet(FORM_FIELD, name="VLANs der Verbindung"),)
+        return (FieldSet(GROUP_FILTER_FIELD, FORM_FIELD, name="VLANs der Verbindung"),)
 
     copied_fieldsets = deepcopy(fieldsets)
 
     def insert_into_link_group(group):
         items = list(getattr(group, "items", ()))
         if "description" in items or "tags" in items:
+            items = [item for item in items if item not in (GROUP_FILTER_FIELD, FORM_FIELD)]
             index = items.index("tags") if "tags" in items else len(items)
-            if FORM_FIELD not in items:
-                items.insert(index, FORM_FIELD)
+            items[index:index] = (GROUP_FILTER_FIELD, FORM_FIELD)
             group.items = tuple(items)
             return True
 
@@ -34,7 +35,7 @@ def include_connection_vlans_in_fieldsets(fieldsets):
 
     if any(insert_into_link_group(fieldset) for fieldset in copied_fieldsets):
         return tuple(copied_fieldsets)
-    return (*copied_fieldsets, FieldSet(FORM_FIELD, name="VLANs der Verbindung"))
+    return (*copied_fieldsets, FieldSet(GROUP_FILTER_FIELD, FORM_FIELD, name="VLANs der Verbindung"))
 
 
 def _build_connection_vlan_form(base_form, assignment_model, target_field):
@@ -42,10 +43,18 @@ def _build_connection_vlan_form(base_form, assignment_model, target_field):
         return base_form
 
     class ConnectionVLANForm(base_form):
+        utilities_vlan_group = DynamicModelChoiceField(
+            queryset=VLANGroup.objects.all(),
+            required=False,
+            selector=True,
+            label="VLAN-Gruppe (Filter)",
+            help_text="Optional: Schränkt die nachfolgende VLAN-Auswahl auf diese Gruppe ein.",
+        )
         utilities_vlans = DynamicModelMultipleChoiceField(
             queryset=VLAN.objects.all(),
             required=False,
             selector=True,
+            query_params={"group_id": f"${GROUP_FILTER_FIELD}"},
             label="VLANs der Verbindung",
             help_text=(
                 "Dokumentiert ein oder mehrere VLANs auf dieser Verbindung. "
@@ -64,7 +73,11 @@ def _build_connection_vlan_form(base_form, assignment_model, target_field):
                     assignment_model.objects.filter(**{target_field: self.instance}).prefetch_related("vlans").first()
                 )
                 if assignment is not None:
-                    self.initial[FORM_FIELD] = assignment.vlans.all()
+                    selected_vlans = list(assignment.vlans.all())
+                    self.initial[FORM_FIELD] = selected_vlans
+                    group_ids = {vlan.group_id for vlan in selected_vlans if getattr(vlan, "group_id", None)}
+                    if len(group_ids) == 1:
+                        self.initial[GROUP_FILTER_FIELD] = group_ids.pop()
 
         def save(self, commit=True):
             connection = super().save(commit=commit)

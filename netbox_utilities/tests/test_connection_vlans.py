@@ -9,6 +9,7 @@ from django.test import SimpleTestCase
 
 from netbox_utilities.connection_vlans import (
     FORM_FIELD,
+    GROUP_FILTER_FIELD,
     _build_connection_vlan_form,
     include_connection_vlans_in_fieldsets,
 )
@@ -22,11 +23,14 @@ class ConnectionVLANTest(SimpleTestCase):
         template = template_path.read_text(encoding="utf-8")
 
         b_side = template.index('{% trans "B Side" %}')
+        group_filter = template.index("{% render_field form.utilities_vlan_group %}")
         vlan_field = template.index("{% render_field form.utilities_vlans %}")
         cable_section = template.index('{% trans "Cable" %}')
 
-        self.assertLess(b_side, vlan_field)
+        self.assertLess(b_side, group_filter)
+        self.assertLess(group_filter, vlan_field)
         self.assertLess(vlan_field, cable_section)
+        self.assertEqual(template.count("{% render_field form.utilities_vlan_group %}"), 1)
         self.assertEqual(template.count("{% render_field form.utilities_vlans %}"), 1)
 
     def test_assignment_models_are_tied_to_their_connection_and_vlans(self):
@@ -50,7 +54,10 @@ class ConnectionVLANTest(SimpleTestCase):
 
         extended = include_connection_vlans_in_fieldsets(original)
 
-        self.assertEqual(extended[0].items, ("status", "description", FORM_FIELD, "tags"))
+        self.assertEqual(
+            extended[0].items,
+            ("status", "description", GROUP_FILTER_FIELD, FORM_FIELD, "tags"),
+        )
         self.assertEqual(original[0].items, ("status", "description", "tags"))
 
     def test_resolved_edit_views_expose_connection_vlan_field(self):
@@ -61,10 +68,17 @@ class ConnectionVLANTest(SimpleTestCase):
 
         cable_form = dcim.forms.get_cable_form(Interface, Interface)
 
+        self.assertIn(GROUP_FILTER_FIELD, cable_form.base_fields)
         self.assertIn(FORM_FIELD, cable_form.base_fields)
+        self.assertEqual(cable_form.base_fields[FORM_FIELD].query_params, {"group_id": f"${GROUP_FILTER_FIELD}"})
         self.assertEqual(CableEditView.template_name, "netbox_utilities/cable_edit.html")
         self.assertEqual(CableEditView.htmx_template_name, "netbox_utilities/cable_edit_form.html")
+        self.assertIn(GROUP_FILTER_FIELD, WirelessLinkEditView.form.base_fields)
         self.assertIn(FORM_FIELD, WirelessLinkEditView.form.base_fields)
+        self.assertEqual(
+            WirelessLinkEditView.form.base_fields[FORM_FIELD].query_params,
+            {"group_id": f"${GROUP_FILTER_FIELD}"},
+        )
 
     @patch("netbox_utilities.connection_vlans.CableVLANAssignment.objects")
     def test_form_loads_and_saves_multiple_vlans(self, assignment_objects):
@@ -78,8 +92,8 @@ class ConnectionVLANTest(SimpleTestCase):
                 model = Cable
                 fields = ()
 
-        vlan_a = SimpleNamespace(pk=10)
-        vlan_b = SimpleNamespace(pk=20)
+        vlan_a = SimpleNamespace(pk=10, group_id=5)
+        vlan_b = SimpleNamespace(pk=20, group_id=5)
         assignment = MagicMock()
         assignment.vlans.all.return_value = [vlan_a, vlan_b]
         assignment_objects.filter.return_value.prefetch_related.return_value.first.return_value = assignment
@@ -93,6 +107,7 @@ class ConnectionVLANTest(SimpleTestCase):
             form = form_class(instance=cable)
 
         self.assertEqual(form.initial[FORM_FIELD], [vlan_a, vlan_b])
+        self.assertEqual(form.initial[GROUP_FILTER_FIELD], 5)
 
         form._errors = ErrorDict()
         form.cleaned_data = {FORM_FIELD: [vlan_a, vlan_b]}

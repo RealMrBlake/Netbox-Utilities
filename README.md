@@ -26,6 +26,10 @@ Ab Version `0.10.2` befindet sich die VLAN-Auswahl beim Anlegen und Bearbeiten
 eines Kabels direkt im Abschnitt **B-Seite**, unterhalb des B-seitigen
 Verbindungsendes.
 
+Ab Version `0.10.3` kann dort optional eine VLAN-Gruppe ausgewählt werden. Sie
+dient als dynamischer Filter für die VLAN-Mehrfachauswahl und wird nicht als
+zusätzliche Eigenschaft der Verbindung gespeichert.
+
 ## Kompatibilität
 
 - NetBox `>=4.6.5,<4.7`
