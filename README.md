@@ -22,6 +22,10 @@ mehrwertige Reverse-Relationen. Das behebt unter NetBox 4.6.8 insbesondere den
 Fehler `'RelatedManager' object has no attribute '_meta'` beim Öffnen der
 Seite zum Anlegen einer VLAN-Gruppe.
 
+Ab Version `0.10.2` befindet sich die VLAN-Auswahl beim Anlegen und Bearbeiten
+eines Kabels direkt im Abschnitt **B-Seite**, unterhalb des B-seitigen
+Verbindungsendes.
+
 ## Kompatibilität
 
 - NetBox `>=4.6.5,<4.7`

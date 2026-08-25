@@ -1,8 +1,10 @@
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django import forms
 from django.forms.utils import ErrorDict
+from django.template.loader import get_template
 from django.test import SimpleTestCase
 
 from netbox_utilities.connection_vlans import (
@@ -14,6 +16,19 @@ from netbox_utilities.models import CableVLANAssignment, WirelessLinkVLANAssignm
 
 
 class ConnectionVLANTest(SimpleTestCase):
+    def test_cable_vlan_field_is_rendered_below_b_side(self):
+        self.assertIsNotNone(get_template("netbox_utilities/cable_edit_form.html"))
+        template_path = Path(__file__).parents[1] / "templates" / "netbox_utilities" / "cable_edit_form.html"
+        template = template_path.read_text(encoding="utf-8")
+
+        b_side = template.index('{% trans "B Side" %}')
+        vlan_field = template.index("{% render_field form.utilities_vlans %}")
+        cable_section = template.index('{% trans "Cable" %}')
+
+        self.assertLess(b_side, vlan_field)
+        self.assertLess(vlan_field, cable_section)
+        self.assertEqual(template.count("{% render_field form.utilities_vlans %}"), 1)
+
     def test_assignment_models_are_tied_to_their_connection_and_vlans(self):
         self.assertEqual(
             CableVLANAssignment._meta.get_field("cable").remote_field.model._meta.label_lower, "dcim.cable"
