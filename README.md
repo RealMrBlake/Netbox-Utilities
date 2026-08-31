@@ -30,6 +30,11 @@ Ab Version `0.10.3` kann dort optional eine VLAN-Gruppe ausgewählt werden. Sie
 dient als dynamischer Filter für die VLAN-Mehrfachauswahl und wird nicht als
 zusätzliche Eigenschaft der Verbindung gespeichert.
 
+Ab Version `0.10.4` verwendet die Patchpanel-Automatik die numerische
+Portkennung unabhängig von zusätzlichen Bezeichnungen wie `LC`, `Front` oder
+`Rear`. Damit werden auch kleinere LC/LC-Patchpanels, etwa mit sechs Ports,
+fortlaufend eins-zu-eins zugeordnet.
+
 ## Kompatibilität
 
 - NetBox `>=4.6.5,<4.7`

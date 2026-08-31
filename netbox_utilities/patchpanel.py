@@ -26,6 +26,9 @@ def port_identifier(port):
     name = str(getattr(port, "name", "")).casefold()
     name = re.sub(r"\b(?:front|rear)(?:[\s_-]*port)?(?=\b|\d)", " ", name)
     name = re.sub(r"^(?:fp|rp|f|r)(?=\s*[-_.:/]?\s*\d)", "", name)
+    numbers = tuple(int(token) for token in re.findall(r"\d+", name))
+    if numbers:
+        return numbers
     tokens = re.findall(r"\d+|[^\W\d_]+", name)
     identifier = tuple(int(token) if token.isdigit() else token for token in tokens)
     return identifier or None
