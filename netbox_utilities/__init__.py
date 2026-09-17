@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.11.3"
+__version__ = "0.11.4"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):

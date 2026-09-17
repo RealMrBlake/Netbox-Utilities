@@ -654,6 +654,31 @@ class ReorderRackPatchTest(SimpleTestCase):
         self.assertIs(ReorderView.get, width_aware_reorder_get)
         self.assertIs(ReorderView._netbox_utilities_original_get, original_get)
 
+    def test_falls_back_to_original_get_with_keyword_pk_and_extra_kwargs(self):
+        """netbox-reorder-rack 1.1.5 changed ReorderView.get to (self, request, **kwargs)."""
+        calls = []
+
+        def original_get(self, request, **kwargs):
+            calls.append(kwargs)
+            return "native-response"
+
+        class ReorderView:
+            get = original_get
+
+        ReorderView._netbox_utilities_original_get = original_get
+
+        with (
+            patch("netbox_utilities.reorder_rack.get_object_or_404", return_value=SimpleNamespace(pk=3)),
+            patch("netbox_utilities.reorder_rack.Device") as device_model,
+            patch("netbox_utilities.reorder_rack.get_reorder_rack_width_data", return_value=None),
+        ):
+            device_model.objects.filter.return_value.exclude.return_value.select_related.return_value = []
+            device_model.objects.filter.return_value.select_related.return_value.order_by.return_value = []
+            result = width_aware_reorder_get(ReorderView(), MagicMock(), pk=3, extra="value")
+
+        self.assertEqual(result, "native-response")
+        self.assertEqual(calls, [{"pk": 3, "extra": "value"}])
+
     def test_skips_unsupported_plugin_version(self):
         with (
             patch("netbox_utilities.reorder_rack.apps.is_installed", return_value=True),

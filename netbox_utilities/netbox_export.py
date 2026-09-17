@@ -18,7 +18,7 @@ from .rack_width import (
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_NETBOX_EXPORT_VERSIONS = {"0.3.11"}
+SUPPORTED_NETBOX_EXPORT_VERSIONS = {"0.3.11", "0.3.14"}
 RACK_WIDTH_RECORD_KEY = "netbox_utilities_rack_placement"
 PATCH_MARKER = "_netbox_utilities_rack_width_version"
 PATCH_VERSION = 1

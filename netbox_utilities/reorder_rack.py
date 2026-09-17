@@ -21,7 +21,7 @@ from .rack_width import FULL_WIDTH, effective_width_positions, normalize_width_p
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_REORDER_RACK_VERSIONS = {"1.1.4"}
+SUPPORTED_REORDER_RACK_VERSIONS = {"1.1.4", "1.1.5"}
 PATCH_MARKER = "_netbox_utilities_bulk_save"
 VIEW_PATCH_MARKER = "_netbox_utilities_width_aware_view"
 GRID_COLUMNS = 12
@@ -402,7 +402,7 @@ def bulk_reorder_update(self, request, pk=None):
         )
 
 
-def width_aware_reorder_get(self, request, pk):
+def width_aware_reorder_get(self, request, pk=None, **kwargs):
     """Render every rack device server-side on the native Reorder page."""
     from dcim.choices import SubdeviceRoleChoices
     from django.conf import settings
@@ -436,7 +436,7 @@ def width_aware_reorder_get(self, request, pk):
     if not width_data or not width_data.get("complete"):
         original_get = getattr(type(self), "_netbox_utilities_original_get", None)
         if original_get is not None:
-            return original_get(self, request, pk)
+            return original_get(self, request, pk=pk, **kwargs)
         raise Http404
 
     return render(
