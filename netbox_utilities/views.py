@@ -36,7 +36,7 @@ from .runtime import (
     offline_svg_export_enabled,
     tenant_filter_enabled,
 )
-from .svg_export import strip_svg_hyperlinks
+from .svg_export import RACK_VIEW_MODES, apply_rack_view_mode, strip_svg_hyperlinks
 
 
 def _safe_return_url(request, default_name="home"):
@@ -410,6 +410,9 @@ class RackElevationOfflineSVGView(LoginRequiredMixin, View):
         face = request.GET.get("face", "front")
         if face not in ("front", "rear"):
             return HttpResponseBadRequest("Ungültige Rack-Seite.")
+        view_mode = request.GET.get("view", "images-and-labels")
+        if view_mode not in RACK_VIEW_MODES:
+            return HttpResponseBadRequest("Ungültige Ansicht.")
 
         from dcim.api.views import RackViewSet
         from rest_framework.test import APIRequestFactory
@@ -425,7 +428,8 @@ class RackElevationOfflineSVGView(LoginRequiredMixin, View):
         if hasattr(response, "render"):
             response.render()
 
-        offline_svg = strip_svg_hyperlinks(response.content, image_loader=_media_data_uri_loader())
+        svg_content = apply_rack_view_mode(response.content, view_mode)
+        offline_svg = strip_svg_hyperlinks(svg_content, image_loader=_media_data_uri_loader())
         filename = f"{rack.name}-{face}-offline.svg".replace(" ", "_")
         http_response = HttpResponse(offline_svg, content_type="image/svg+xml")
         http_response["Content-Disposition"] = f'attachment; filename="{filename}"'

@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from netbox_utilities.svg_export import strip_svg_hyperlinks
+from netbox_utilities.svg_export import apply_rack_view_mode, strip_svg_hyperlinks
 
 
 class StripSvgHyperlinksTest(SimpleTestCase):
@@ -91,3 +91,32 @@ class StripSvgHyperlinksTest(SimpleTestCase):
 
         self.assertIn("<rect", result)
         self.assertNotIn("href", result)
+
+
+class ApplyRackViewModeTest(SimpleTestCase):
+    SVG = (
+        '<svg xmlns="http://www.w3.org/2000/svg">'
+        '<text class="label">USV 8</text>'
+        '<image class="device-image"/>'
+        '<text class="device-image-label">USV 8</text>'
+        "</svg>"
+    )
+
+    def test_images_and_labels_leaves_svg_untouched(self):
+        self.assertEqual(apply_rack_view_mode(self.SVG, "images-and-labels"), self.SVG)
+
+    def test_images_only_removes_label_text(self):
+        result = apply_rack_view_mode(self.SVG, "images-only")
+
+        self.assertNotIn('class="label"', result)
+        self.assertIn('class="device-image"', result)
+        self.assertIn('class="device-image-label"', result)
+
+    def test_labels_only_removes_device_images(self):
+        result = apply_rack_view_mode(self.SVG, "labels-only")
+
+        self.assertIn('class="label"', result)
+        self.assertNotIn("device-image", result)
+
+    def test_unknown_mode_leaves_svg_untouched(self):
+        self.assertEqual(apply_rack_view_mode(self.SVG, "bogus"), self.SVG)

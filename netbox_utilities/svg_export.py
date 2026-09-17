@@ -10,6 +10,36 @@ _ANCHOR_TAGS = (f"{{{SVG_NS}}}a", "a")
 _IMAGE_TAGS = (f"{{{SVG_NS}}}image", "image")
 _HREF_ATTRS = ("href", f"{{{XLINK_NS}}}href")
 
+RACK_VIEW_MODES = {"images-and-labels", "images-only", "labels-only"}
+_LABEL_CLASSES = {"label"}
+_IMAGE_CLASSES = {"device-image", "device-image-label"}
+
+
+def apply_rack_view_mode(svg_source, mode):
+    """Mirror the rack elevation page's "Bilder"/"Beschriftungen" toggle server-side.
+
+    That toggle only hides elements client-side via CSS after the browser
+    already has the full SVG, so a freshly server-rendered export needs its
+    own equivalent to honor the mode the user had selected.
+    """
+    if mode not in RACK_VIEW_MODES or mode == "images-and-labels":
+        return svg_source
+    root = ET.fromstring(svg_source)
+    if mode == "images-only":
+        _remove_elements_with_class(root, _LABEL_CLASSES)
+    elif mode == "labels-only":
+        _remove_elements_with_class(root, _IMAGE_CLASSES)
+    return ET.tostring(root, encoding="unicode")
+
+
+def _remove_elements_with_class(parent, class_names):
+    for child in list(parent):
+        classes = set(child.attrib.get("class", "").split())
+        if classes & class_names:
+            parent.remove(child)
+        else:
+            _remove_elements_with_class(child, class_names)
+
 
 def strip_svg_hyperlinks(svg_source, image_loader=None):
     """Return svg_source with every <a> wrapper unwrapped and dead links removed.
