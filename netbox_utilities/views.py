@@ -1,10 +1,10 @@
-from dcim.models import Device, Module
+from dcim.models import Device, Module, Rack
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.db import DatabaseError, transaction
-from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -33,8 +33,10 @@ from .navigation_helpers import (
 from .runtime import (
     clear_runtime_settings_cache,
     navigation_customization_enabled,
+    offline_svg_export_enabled,
     tenant_filter_enabled,
 )
+from .svg_export import strip_svg_hyperlinks
 
 
 def _safe_return_url(request, default_name="home"):
@@ -364,3 +366,35 @@ class SelectTenantView(LoginRequiredMixin, View):
             return HttpResponseBadRequest("Ungültiger Mandantenfilter.")
 
         return redirect(_safe_return_url(request))
+
+
+class RackElevationOfflineSVGView(LoginRequiredMixin, View):
+    """Serve a rack elevation SVG stripped of hyperlinks, for offline use."""
+
+    def get(self, request, pk):
+        if not offline_svg_export_enabled():
+            return HttpResponseBadRequest("Der Offline-SVG-Export ist deaktiviert.")
+
+        rack = get_object_or_404(Rack.objects.restrict(request.user, "view"), pk=pk)
+        face = request.GET.get("face", "front")
+        if face not in ("front", "rear"):
+            return HttpResponseBadRequest("Ungültige Rack-Seite.")
+
+        from dcim.api.views import RackViewSet
+        from rest_framework.test import APIRequestFactory
+
+        factory = APIRequestFactory()
+        api_request = factory.get(
+            f"/api/dcim/racks/{rack.pk}/elevation/",
+            {"render": "svg", "face": face},
+        )
+        api_request.user = request.user
+        drf_view = RackViewSet.as_view({"get": "elevation"})
+        response = drf_view(api_request, pk=rack.pk)
+        response.render()
+
+        offline_svg = strip_svg_hyperlinks(response.content)
+        filename = f"{rack.name}-{face}-offline.svg".replace(" ", "_")
+        http_response = HttpResponse(offline_svg, content_type="image/svg+xml")
+        http_response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return http_response

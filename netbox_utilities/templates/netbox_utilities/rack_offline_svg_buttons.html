@@ -1,0 +1,10 @@
+<a href="{% url 'plugins:netbox_utilities:rack_elevation_offline_svg' pk=rack.pk %}?face=front"
+   class="btn btn-outline-secondary" title="Vorderseite als linkfreie SVG-Datei herunterladen">
+  <i class="mdi mdi-download" aria-hidden="true"></i>
+  SVG offline (vorne)
+</a>
+<a href="{% url 'plugins:netbox_utilities:rack_elevation_offline_svg' pk=rack.pk %}?face=rear"
+   class="btn btn-outline-secondary" title="Rückseite als linkfreie SVG-Datei herunterladen">
+  <i class="mdi mdi-download" aria-hidden="true"></i>
+  SVG offline (hinten)
+</a>

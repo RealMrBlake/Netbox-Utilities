@@ -19,7 +19,12 @@ from .navigation_helpers import (
     normalize_preferences,
     normalize_sidebar_width,
 )
-from .runtime import connection_vlans_enabled, navigation_customization_enabled, tenant_filter_enabled
+from .runtime import (
+    connection_vlans_enabled,
+    navigation_customization_enabled,
+    offline_svg_export_enabled,
+    tenant_filter_enabled,
+)
 
 
 class UtilitiesGlobalContent(PluginTemplateExtension):
@@ -147,4 +152,22 @@ class ConnectionVLANContent(PluginTemplateExtension):
         )
 
 
-template_extensions = [UtilitiesGlobalContent, DeviceUtilitiesContent, ConnectionVLANContent]
+class RackUtilitiesContent(PluginTemplateExtension):
+    models = ["dcim.rack"]
+
+    def buttons(self):
+        if not offline_svg_export_enabled():
+            return ""
+        rack = self.context["object"]
+        return self.render(
+            "netbox_utilities/rack_offline_svg_buttons.html",
+            {"rack": rack},
+        )
+
+
+template_extensions = [
+    UtilitiesGlobalContent,
+    DeviceUtilitiesContent,
+    ConnectionVLANContent,
+    RackUtilitiesContent,
+]

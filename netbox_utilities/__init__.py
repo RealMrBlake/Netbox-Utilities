@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.10.4"
+__version__ = "0.11.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -19,6 +19,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
+        "offline_svg_export_enabled": True,
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
