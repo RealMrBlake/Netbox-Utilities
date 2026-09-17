@@ -19,15 +19,53 @@ class StripSvgHyperlinksTest(SimpleTestCase):
         self.assertNotIn("href", result)
         self.assertIn("<rect", result)
 
-    def test_removes_href_on_non_anchor_elements(self):
+    def test_removes_href_on_non_image_non_anchor_elements(self):
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg" '
             'xmlns:xlink="http://www.w3.org/1999/xlink">'
-            '<image xlink:href="/static/logo.png" href="/static/logo.png"/>'
+            '<use xlink:href="#some-symbol" href="#some-symbol"/>'
             "</svg>"
         )
 
         result = strip_svg_hyperlinks(svg)
+
+        self.assertNotIn("href", result)
+        self.assertIn("<use", result)
+
+    def test_leaves_image_href_untouched_without_a_loader(self):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink">'
+            '<image xlink:href="/media/devicetype-images/example.png"/>'
+            "</svg>"
+        )
+
+        result = strip_svg_hyperlinks(svg)
+
+        self.assertIn("/media/devicetype-images/example.png", result)
+
+    def test_replaces_image_href_with_data_uri_from_loader(self):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink">'
+            '<image xlink:href="/media/devicetype-images/example.png"/>'
+            "</svg>"
+        )
+
+        result = strip_svg_hyperlinks(svg, image_loader=lambda href: "data:image/png;base64,AAAA")
+
+        self.assertIn("data:image/png;base64,AAAA", result)
+        self.assertNotIn("/media/devicetype-images/example.png", result)
+
+    def test_drops_image_href_when_loader_cannot_resolve_it(self):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink">'
+            '<image xlink:href="/media/devicetype-images/missing.png"/>'
+            "</svg>"
+        )
+
+        result = strip_svg_hyperlinks(svg, image_loader=lambda href: None)
 
         self.assertNotIn("href", result)
         self.assertIn("<image", result)

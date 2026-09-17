@@ -368,6 +368,37 @@ class SelectTenantView(LoginRequiredMixin, View):
         return redirect(_safe_return_url(request))
 
 
+def _media_data_uri_loader():
+    import base64
+    import mimetypes
+    from urllib.parse import urlparse
+
+    from django.conf import settings
+    from django.core.files.storage import default_storage
+
+    media_url_path = urlparse(settings.MEDIA_URL).path
+
+    def load(href):
+        storage_path = urlparse(href).path
+        if media_url_path and storage_path.startswith(media_url_path):
+            storage_path = storage_path[len(media_url_path) :]
+        storage_path = storage_path.lstrip("/")
+        try:
+            if not storage_path or not default_storage.exists(storage_path):
+                return None
+            with default_storage.open(storage_path, "rb") as image_file:
+                data = image_file.read()
+        except OSError:
+            return None
+
+        mime_type, _ = mimetypes.guess_type(storage_path)
+        mime_type = mime_type or "application/octet-stream"
+        encoded = base64.b64encode(data).decode("ascii")
+        return f"data:{mime_type};base64,{encoded}"
+
+    return load
+
+
 class RackElevationOfflineSVGView(LoginRequiredMixin, View):
     """Serve a rack elevation SVG stripped of hyperlinks, for offline use."""
 
@@ -394,7 +425,7 @@ class RackElevationOfflineSVGView(LoginRequiredMixin, View):
         if hasattr(response, "render"):
             response.render()
 
-        offline_svg = strip_svg_hyperlinks(response.content)
+        offline_svg = strip_svg_hyperlinks(response.content, image_loader=_media_data_uri_loader())
         filename = f"{rack.name}-{face}-offline.svg".replace(" ", "_")
         http_response = HttpResponse(offline_svg, content_type="image/svg+xml")
         http_response["Content-Disposition"] = f'attachment; filename="{filename}"'
