@@ -11,24 +11,30 @@ _IMAGE_TAGS = (f"{{{SVG_NS}}}image", "image")
 _HREF_ATTRS = ("href", f"{{{XLINK_NS}}}href")
 
 RACK_VIEW_MODES = {"images-and-labels", "images-only", "labels-only"}
-_LABEL_CLASSES = {"label"}
-_IMAGE_CLASSES = {"device-image", "device-image-label"}
+_PLAIN_LABEL_CLASS = "label"
+_IMAGE_CLASS = "device-image"
+_IMAGE_LABEL_CLASS = "device-image-label"
 
 
 def apply_rack_view_mode(svg_source, mode):
-    """Mirror the rack elevation page's "Bilder"/"Beschriftungen" toggle server-side.
+    """Filter the rack elevation SVG down to images-only or labels-only content.
 
-    That toggle only hides elements client-side via CSS after the browser
-    already has the full SVG, so a freshly server-rendered export needs its
-    own equivalent to honor the mode the user had selected.
+    NetBox's own "Bilder"/"Beschriftungen" toggle never actually removes the
+    plain .label text: it just leaves an opaque .device-image sitting on top
+    of it, so a device without a photo still shows its name in "images-only"
+    live. A downloaded, static export has no such fallback text to hide
+    behind an image, so here "images-only" removes every label outright
+    (.label and .device-image-label) to always produce a pure image view,
+    and "labels-only" removes the image layer to reproduce the same
+    box-with-text view NetBox itself already shows for that mode.
     """
     if mode not in RACK_VIEW_MODES or mode == "images-and-labels":
         return svg_source
     root = ET.fromstring(svg_source)
     if mode == "images-only":
-        _remove_elements_with_class(root, _LABEL_CLASSES)
+        _remove_elements_with_class(root, {_PLAIN_LABEL_CLASS, _IMAGE_LABEL_CLASS})
     elif mode == "labels-only":
-        _remove_elements_with_class(root, _IMAGE_CLASSES)
+        _remove_elements_with_class(root, {_IMAGE_CLASS, _IMAGE_LABEL_CLASS})
     return ET.tostring(root, encoding="unicode")
 
 

@@ -105,14 +105,14 @@ class ApplyRackViewModeTest(SimpleTestCase):
     def test_images_and_labels_leaves_svg_untouched(self):
         self.assertEqual(apply_rack_view_mode(self.SVG, "images-and-labels"), self.SVG)
 
-    def test_images_only_removes_label_text(self):
+    def test_images_only_keeps_only_the_image(self):
         result = apply_rack_view_mode(self.SVG, "images-only")
 
         self.assertNotIn('class="label"', result)
+        self.assertNotIn("device-image-label", result)
         self.assertIn('class="device-image"', result)
-        self.assertIn('class="device-image-label"', result)
 
-    def test_labels_only_removes_device_images(self):
+    def test_labels_only_keeps_only_the_plain_label(self):
         result = apply_rack_view_mode(self.SVG, "labels-only")
 
         self.assertIn('class="label"', result)
