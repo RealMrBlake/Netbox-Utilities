@@ -11,7 +11,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
     author = "LKE"
     base_url = "utilities"
     min_version = "4.6.5"
-    max_version = "4.6.99"
+    max_version = "4.7.99"
     default_settings = {
         "navigation_customization_enabled": True,
         "connection_vlans_enabled": True,
