@@ -155,12 +155,12 @@ class ConnectionVLANContent(PluginTemplateExtension):
 class RackUtilitiesContent(PluginTemplateExtension):
     models = ["dcim.rack"]
 
-    def buttons(self):
+    def right_page(self):
         if not offline_svg_export_enabled():
             return ""
         rack = self.context["object"]
         return self.render(
-            "netbox_utilities/rack_offline_svg_buttons.html",
+            "netbox_utilities/rack_offline_svg_panel.html",
             {"rack": rack},
         )
 
