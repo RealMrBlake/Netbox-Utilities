@@ -156,6 +156,10 @@ class RackUtilitiesContent(PluginTemplateExtension):
     models = ["dcim.rack"]
 
     def right_page(self):
+        # Injects a script (no visible panel here) which places an "SVG
+        # offline" button right next to each native "SVG herunterladen"
+        # link, since NetBox renders those inside the per-face elevation
+        # cards rather than through a plugin buttons() extension point.
         if not offline_svg_export_enabled():
             return ""
         rack = self.context["object"]
