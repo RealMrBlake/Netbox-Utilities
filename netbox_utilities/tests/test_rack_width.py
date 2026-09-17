@@ -191,6 +191,34 @@ class RackWidthTest(SimpleTestCase):
             },
         )
 
+    def test_ignores_unracked_devices_without_a_position(self):
+        devices = [
+            SimpleNamespace(
+                pk=41,
+                rack_id=None,
+                face="front",
+                position=None,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+            ),
+            SimpleNamespace(
+                pk=42,
+                rack_id=3,
+                face="front",
+                position=11,
+                device_type=SimpleNamespace(u_height=1),
+                netbox_utilities_rack_placement=None,
+            ),
+        ]
+
+        self.assertEqual(
+            effective_width_positions(devices),
+            {
+                41: (1, 1, "default"),
+                42: (1, 1, "default"),
+            },
+        )
+
     def test_adds_rack_width_fields_to_existing_location_fieldset(self):
         from utilities.forms.rendering import FieldSet
 

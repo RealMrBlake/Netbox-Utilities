@@ -391,7 +391,8 @@ class RackElevationOfflineSVGView(LoginRequiredMixin, View):
         api_request.user = request.user
         drf_view = RackViewSet.as_view({"get": "elevation"})
         response = drf_view(api_request, pk=rack.pk)
-        response.render()
+        if hasattr(response, "render"):
+            response.render()
 
         offline_svg = strip_svg_hyperlinks(response.content)
         filename = f"{rack.name}-{face}-offline.svg".replace(" ", "_")

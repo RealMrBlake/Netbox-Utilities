@@ -122,6 +122,9 @@ def effective_width_positions(devices, placements=None):
     result = {}
 
     for device in devices:
+        if device.position is None:
+            result.setdefault(device.pk, (FULL_WIDTH, 1, "default"))
+            continue
         key = (
             device.rack_id,
             device.face,
