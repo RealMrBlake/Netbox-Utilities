@@ -33,6 +33,15 @@
     <h2 class="col-9 offset-3">{% trans "B Side" %}</h2>
   </div>
   {% render_field form.b_terminations_type %}
+  {% if form.utilities_b_tenant_group %}
+    {% render_field form.utilities_b_tenant_group %}
+  {% endif %}
+  {% if form.utilities_b_tenant %}
+    {% render_field form.utilities_b_tenant %}
+  {% endif %}
+  {% if form.utilities_b_site %}
+    {% render_field form.utilities_b_site %}
+  {% endif %}
   {% if 'termination_b_device' in form.fields %}
     {% render_field form.termination_b_device %}
   {% endif %}

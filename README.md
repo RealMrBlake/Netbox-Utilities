@@ -1,6 +1,6 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.8** mit zwölf Funktionen:
+Plugin für **NetBox 4.6.5 bis 4.6.8** mit dreizehn Funktionen:
 
 - Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
 - Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
@@ -14,6 +14,7 @@ Plugin für **NetBox 4.6.5 bis 4.6.8** mit zwölf Funktionen:
 - Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
 - Rackbreiten bleiben beim optionalen NetBox-Export und -Import erhalten.
 - Kabel- und Funkverbindungen können direkt einem oder mehreren VLANs zugeordnet werden.
+- Die Geräteauswahl der B-Seite einer Verkabelung lässt sich nach Mandantengruppe, Mandant und Standort vorfiltern.
 
 Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
 
@@ -34,6 +35,11 @@ Ab Version `0.10.4` verwendet die Patchpanel-Automatik die numerische
 Portkennung unabhängig von zusätzlichen Bezeichnungen wie `LC`, `Front` oder
 `Rear`. Damit werden auch kleinere LC/LC-Patchpanels, etwa mit sechs Ports,
 fortlaufend eins-zu-eins zugeordnet.
+
+Ab Version `0.13.0` besitzt die **B-Seite** einer Verkabelung drei optionale
+Filterfelder für Mandantengruppe, Mandant und Standort. Sie schränken die
+Auswahlliste des B-seitigen Geräts ein und sind mit dem Mandanten der A-Seite
+beziehungsweise dem globalen Mandantenfilter vorbelegt.
 
 ## Kompatibilität
 
@@ -93,6 +99,7 @@ PLUGINS_CONFIG = {
     "netbox_utilities": {
         "navigation_customization_enabled": True,
         "connection_vlans_enabled": True,
+        "connection_tenant_filter_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
@@ -240,6 +247,34 @@ werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
 ## Verwendung
+
+### Vorfilter für die B-Seite einer Verkabelung
+
+Beim Anlegen und Bearbeiten eines Kabels erscheint im Abschnitt **B-Seite**
+oberhalb der Geräteauswahl je ein optionales Feld für **Mandantengruppe**,
+**Mandant** und **Standort**. Die Felder filtern die Auswahllisten der
+B-Seite live mit; das gilt für Geräte, Stromverteiler (nur Standort) und
+Circuits.
+
+Die Felder sind vorbelegt:
+
+- mit Mandant und Standort der bereits gewählten A-Seite, sofern diese
+  eindeutig sind;
+- sonst mit dem Mandanten oder der Mandantengruppe aus dem globalen
+  Mandantenfilter der Kopfleiste.
+
+Es handelt sich bewusst um einen reinen **Vorfilter**: Die Werte werden nicht
+am Kabel gespeichert, und wer über Mandanten- oder Standortgrenzen hinweg
+verkabeln muss, leert das jeweilige Feld einfach wieder. Eine Verkabelung wird
+dadurch nie blockiert.
+
+Zu beachten: Der Mandantenfilter wertet das Feld `tenant` des Geräts aus.
+Geräte, deren Mandant faktisch nur über den Standort abgeleitet ist, erscheinen
+bei gesetztem Mandantenfilter nicht in der Liste — in diesem Fall ist der
+Standortfilter der passende Einstieg.
+
+Das Feature kann installationsweit mit `connection_tenant_filter_enabled = False`
+in `PLUGINS_CONFIG` deaktiviert werden.
 
 ### VLANs direkt an Verbindungen dokumentieren
 

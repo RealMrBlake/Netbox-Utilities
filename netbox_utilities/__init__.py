@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.12.2"
+__version__ = "0.13.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -15,6 +15,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
     default_settings = {
         "navigation_customization_enabled": True,
         "connection_vlans_enabled": True,
+        "connection_tenant_filter_enabled": True,
         "reorder_rack_bulk_save_enabled": True,
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
@@ -40,6 +41,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .connection_vlans import install_connection_vlan_support
 
             install_connection_vlan_support()
+        if get_plugin_config("netbox_utilities", "connection_tenant_filter_enabled"):
+            from .connection_scope import install_connection_scope_filter
+
+            install_connection_scope_filter()
         if self.apps.is_installed("netbox_export"):
             from .netbox_export import install_netbox_export_rack_width_support
 
