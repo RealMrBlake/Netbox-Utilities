@@ -21,6 +21,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "tenant_filter_enabled": True,
         "tenant_required": True,
         "offline_svg_export_enabled": True,
+        "site_prefix_column_enabled": True,
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
@@ -37,6 +38,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
         install_tenant_validation()
         install_patchpanel_automation()
         install_rack_width_support()
+        if get_plugin_config("netbox_utilities", "site_prefix_column_enabled"):
+            from .site_prefix import install_site_prefix_column
+
+            install_site_prefix_column()
         if get_plugin_config("netbox_utilities", "connection_vlans_enabled"):
             from .connection_vlans import install_connection_vlan_support
 

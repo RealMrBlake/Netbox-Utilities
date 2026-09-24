@@ -104,6 +104,7 @@ PLUGINS_CONFIG = {
         "topology_views_rack_width_enabled": True,
         "tenant_filter_enabled": True,
         "tenant_required": True,
+        "site_prefix_column_enabled": True,
     },
 }
 ```
@@ -246,7 +247,34 @@ Vor Produktivupdates sollte der neue Stand in einer Testumgebung geprüft
 werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
 empfohlen.
 
+### Umstieg von NetBox Site Prefix
+
+Die Prefix-Spalte ist jetzt Teil von NetBox Utilities. Das separate Plugin
+`netbox_site_prefix` muss entfernt werden, sonst wird die Spalte doppelt
+registriert:
+
+1. `"netbox_site_prefix"` aus `PLUGINS` in `configuration.py` entfernen.
+2. Die Zeile `git+https://git.mrblake.cc/MrBlake/Netbox-Prefixes.git` aus
+   `/opt/netbox/local_requirements.txt` entfernen.
+3. `/opt/netbox/venv/bin/pip uninstall netbox-site-prefix` ausführen und
+   NetBox neu starten.
+
+Der Spaltenname `site_prefix` bleibt gleich, gespeicherte Tabellenkonfigurationen
+der Benutzer funktionieren daher weiter.
+
 ## Verwendung
+
+### Prefix-Spalte in Geräte- und Rack-Listen
+
+Die Geräte- und Rack-Listen erhalten eine Spalte **Prefix** als erste
+Datenspalte. Der Wert ist das erste Wort des Standortnamens, z. B. `Berlin`
+für `Berlin Campus West` oder `DC01` für `DC01 Frankfurt`; ohne Standort
+bleibt die Zelle leer.
+
+Hat ein Benutzer bereits eine eigene Spaltenauswahl gespeichert, hat diese
+Vorrang. Dann unter **Spalten konfigurieren** die Spalte **Prefix** auswählen
+und nach vorne schieben oder die Tabellenkonfiguration zurücksetzen. Mit
+`"site_prefix_column_enabled": False` lässt sich die Spalte abschalten.
 
 ### Vorfilter für die B-Seite einer Verkabelung
 
