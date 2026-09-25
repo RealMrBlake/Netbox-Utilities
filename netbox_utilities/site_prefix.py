@@ -104,7 +104,8 @@ def install_site_prefix_column():
         accessor=tables.A("site"),
         verbose_name="Prefix",
         empty_values=(),
-        orderable=False,
+        # Der Standortname beginnt mit dem Prefix, sortiert also in derselben Reihenfolge.
+        order_by=("site__name",),
     )
     register_table_column(column, COLUMN_NAME, DeviceTable, RackTable)
     prepend_to_default_columns(DeviceTable)

@@ -74,5 +74,9 @@ class SitePrefixTest(SimpleTestCase):
 
         self.assertIn(COLUMN_NAME, DeviceTable.base_columns)
         self.assertIn(COLUMN_NAME, RackTable.base_columns)
+        for table in (DeviceTable, RackTable):
+            column = table.base_columns[COLUMN_NAME]
+            self.assertTrue(column.orderable)
+            self.assertEqual(tuple(column.order_by), ("site__name",))
         self.assertEqual(DeviceTable.Meta.default_columns[:2], ("pk", COLUMN_NAME))
         self.assertEqual(RackTable.Meta.default_columns[:2], ("pk", COLUMN_NAME))

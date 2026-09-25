@@ -43,7 +43,7 @@ beziehungsweise dem globalen Mandantenfilter vorbelegt.
 
 Ab Version `0.14.0` enthält das Plugin die Prefix-Spalte des bisherigen
 Plugins NetBox Site Prefix. Geräte- und Rack-Listen lassen sich zusätzlich
-nach diesem Prefix filtern.
+nach diesem Prefix sortieren und filtern.
 
 ## Kompatibilität
 
@@ -274,6 +274,10 @@ Die Geräte- und Rack-Listen erhalten eine Spalte **Prefix** als erste
 Datenspalte. Der Wert ist das erste Wort des Standortnamens, z. B. `Berlin`
 für `Berlin Campus West` oder `DC01` für `DC01 Frankfurt`; ohne Standort
 bleibt die Zelle leer.
+
+Ein Klick auf die Spaltenüberschrift **Prefix** sortiert die Liste auf- bzw.
+absteigend, wie bei **Name**. Sortiert wird nach dem Standortnamen, der mit
+dem Prefix beginnt.
 
 Hat ein Benutzer bereits eine eigene Spaltenauswahl gespeichert, hat diese
 Vorrang. Dann unter **Spalten konfigurieren** die Spalte **Prefix** auswählen
