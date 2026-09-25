@@ -41,6 +41,10 @@ Filterfelder für Mandantengruppe, Mandant und Standort. Sie schränken die
 Auswahlliste des B-seitigen Geräts ein und sind mit dem Mandanten der A-Seite
 beziehungsweise dem globalen Mandantenfilter vorbelegt.
 
+Ab Version `0.14.0` enthält das Plugin die Prefix-Spalte des bisherigen
+Plugins NetBox Site Prefix. Geräte- und Rack-Listen lassen sich zusätzlich
+nach diesem Prefix filtern.
+
 ## Kompatibilität
 
 - NetBox `>=4.6.5,<4.7`
@@ -273,7 +277,15 @@ bleibt die Zelle leer.
 
 Hat ein Benutzer bereits eine eigene Spaltenauswahl gespeichert, hat diese
 Vorrang. Dann unter **Spalten konfigurieren** die Spalte **Prefix** auswählen
-und nach vorne schieben oder die Tabellenkonfiguration zurücksetzen. Mit
+und nach vorne schieben oder die Tabellenkonfiguration zurücksetzen.
+
+Im Filter-Reiter beider Listen steht unter **Standort** das Feld **Prefix**
+zur Verfügung. Der Vergleich ignoriert Groß- und Kleinschreibung und trifft
+nur das erste Wort des Standortnamens: `DC01` findet `DC01 Frankfurt`, aber
+nicht `DC011 Hamburg`. Mehrere Prefixe werden durch Komma getrennt
+(`Berlin, DC01`). Derselbe Filter funktioniert auch per URL und REST-API,
+z. B. `/dcim/devices/?site_prefix=DC01` oder
+`/api/dcim/racks/?site_prefix=Berlin&site_prefix=DC01`. Mit
 `"site_prefix_column_enabled": False` lässt sich die Spalte abschalten.
 
 ### Vorfilter für die B-Seite einer Verkabelung
