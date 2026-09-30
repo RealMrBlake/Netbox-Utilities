@@ -1,98 +1,82 @@
 # NetBox Utilities
 
-Plugin für **NetBox 4.6.5 bis 4.6.8** mit dreizehn Funktionen:
+A collection of quality-of-life improvements for NetBox: personalised navigation,
+a global tenant filter, mandatory tenancy, partial-width rack devices, bulk
+uploads and more.
 
-- Jeder Benutzer kann die Menüs der linken Navigation verschieben oder ausblenden.
-- Ein Dropdown in der Kopfleiste setzt einen sitzungsweiten Filter für einen Mandanten oder eine Mandantengruppe.
-- Optional verpflichtende Mandantenzuordnung für alle mandantenfähigen Objekte.
-- Automatische Vorbelegung von Mandant und Mandantengruppe aus dem Objekt- oder Filterkontext.
-- Automatische 1:1-Verknüpfung von Front- und Rearports auf Geräten mit der Rolle `Patchpanel`.
-- Geräte mit optionaler Teilbreite können sich dieselbe Höheneinheit teilen.
-- Die Rack-Ansicht von MrBlakes optionalem Topology-Views-Plugin stellt Teilbreitengeräte korrekt dar.
-- Mehrere Bilder in einem Schritt im Bilder-Tab eines Objekts hochladen.
-- Mehrere Module desselben Typs in einem Schritt in freie Modulschächte einbauen.
-- Optionale Mehrfachspeicherung für verschobene Geräte aus NetBox Reorder Rack.
-- Rackbreiten bleiben beim optionalen NetBox-Export und -Import erhalten.
-- Kabel- und Funkverbindungen können direkt einem oder mehreren VLANs zugeordnet werden.
-- Die Geräteauswahl der B-Seite einer Verkabelung lässt sich nach Mandantengruppe, Mandant und Standort vorfiltern.
+| | |
+|---|---|
+| **Plugin name** | `netbox_utilities` |
+| **Package** | `netbox-utilities` |
+| **NetBox** | `4.6.5` – `4.7.x` |
+| **Python** | `>=3.12` |
+| **Repository** | <https://git.mrblake.cc/MrBlake/Netbox-Utilities> |
 
-Die Navigationseinstellungen sind benutzerbezogen. Die aktive Mandanten- oder Gruppenauswahl wird in der jeweiligen Browser-Session gespeichert.
+## Features
 
-Ab Version `0.10.1` ignoriert die automatische Mandantenermittlung
-mehrwertige Reverse-Relationen. Das behebt unter NetBox 4.6.8 insbesondere den
-Fehler `'RelatedManager' object has no attribute '_meta'` beim Öffnen der
-Seite zum Anlegen einer VLAN-Gruppe.
+- Every user can reorder or hide the menus of the left navigation.
+- A header dropdown sets a session-wide filter for a tenant or tenant group.
+- Optional mandatory tenant assignment for all tenant-aware objects.
+- Automatic pre-fill of tenant and tenant group from the object or filter context.
+- Automatic 1:1 mapping of front and rear ports on devices with the role `Patchpanel`.
+- Devices with an optional partial width can share the same rack unit.
+- The rack view of the optional [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views) plugin renders partial-width devices correctly.
+- Upload multiple images at once in an object's **Images** tab.
+- Install multiple modules of the same type into free module bays in one step.
+- Optional bulk save for devices moved in NetBox Reorder Rack.
+- Rack widths are preserved by the optional [NetBox-Export](https://git.mrblake.cc/MrBlake/NetBox-Export) export/import.
+- Cables and wireless links can be assigned to one or more VLANs.
+- The B-side device selection of a cable can be pre-filtered by tenant group, tenant and site.
+- A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
 
-Ab Version `0.10.2` befindet sich die VLAN-Auswahl beim Anlegen und Bearbeiten
-eines Kabels direkt im Abschnitt **B-Seite**, unterhalb des B-seitigen
-Verbindungsendes.
+Navigation settings are stored per user. The active tenant or tenant-group
+selection is stored in the browser session.
 
-Ab Version `0.10.3` kann dort optional eine VLAN-Gruppe ausgewählt werden. Sie
-dient als dynamischer Filter für die VLAN-Mehrfachauswahl und wird nicht als
-zusätzliche Eigenschaft der Verbindung gespeichert.
+## Compatibility
 
-Ab Version `0.10.4` verwendet die Patchpanel-Automatik die numerische
-Portkennung unabhängig von zusätzlichen Bezeichnungen wie `LC`, `Front` oder
-`Rear`. Damit werden auch kleinere LC/LC-Patchpanels, etwa mit sechs Ports,
-fortlaufend eins-zu-eins zugeordnet.
-
-Ab Version `0.13.0` besitzt die **B-Seite** einer Verkabelung drei optionale
-Filterfelder für Mandantengruppe, Mandant und Standort. Sie schränken die
-Auswahlliste des B-seitigen Geräts ein und sind mit dem Mandanten der A-Seite
-beziehungsweise dem globalen Mandantenfilter vorbelegt.
-
-Ab Version `0.14.0` enthält das Plugin die Prefix-Spalte des bisherigen
-Plugins NetBox Site Prefix. Geräte- und Rack-Listen lassen sich zusätzlich
-nach diesem Prefix sortieren und filtern.
-
-## Kompatibilität
-
-- NetBox `>=4.6.5,<4.7`
+- NetBox `4.6.5` – `4.7.x`
 - Python `>=3.12`
-- optional: NetBox Reorder Rack `1.1.4`
-- optional: NetBox-Export `0.3.11`
-- optional: [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views) mit Rack-Ansicht
+- Optional: NetBox Reorder Rack `1.1.4`
+- Optional: NetBox-Export `0.3.11` or newer
+- Optional: MrBlake NetBox Topology Views with rack view
 
-Andere NetBox-Versionen werden vom Plugin absichtlich abgelehnt, da die Anpassung der Core-Navigation von deren HTML-Struktur abhängt.
+Other NetBox versions are rejected on purpose, because the navigation
+customisation depends on the HTML structure of the NetBox core menu.
 
-## Installation aus Gitea
+## Installation
 
-Das Plugin kann direkt aus dem `main`-Branch installiert werden:
+All paths assume a standard installation under `/opt/netbox`.
+
+### 1. Install the package
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
   "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@main"
 ```
 
-Für eine reproduzierbare Produktivinstallation sollte statt `main` ein
-bereits veröffentlichter Release-Tag oder eine bestimmte Commit-ID verwendet
-werden. `COMMIT-ID` wird dabei durch den gewünschten Stand ersetzt:
+For reproducible production installs, replace `main` with a release tag or a
+full commit ID.
+
+### 2. Add the plugin to `local_requirements.txt`
+
+This makes `upgrade.sh` reinstall the plugin automatically on every NetBox upgrade:
 
 ```bash
-/opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@COMMIT-ID"
+grep -qxF "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@main" /opt/netbox/local_requirements.txt \
+  || echo "git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@main" | sudo tee -a /opt/netbox/local_requirements.txt
 ```
 
-Alternativ kann hinter dem `@` die vollständige Commit-ID stehen.
-
-Damit das Plugin bei zukünftigen NetBox-Upgrades automatisch erneut
-installiert wird, wird derselbe Eintrag in `/opt/netbox/local_requirements.txt`
-hinterlegt:
-
-```text
-git+https://git.mrblake.cc/MrBlake/Netbox-Utilities.git@main
-```
-
-Bei einem privaten Gitea-Repository benötigt der NetBox-Server einen
-Deploy-Token oder einen SSH-Key. Für SSH lautet der Eintrag beispielsweise:
+If the repository is private, the NetBox server needs a read-only deploy token
+or an SSH key. Do not store credentials in `local_requirements.txt`. With SSH the
+entry looks like this:
 
 ```text
 git+ssh://git@git.mrblake.cc/MrBlake/Netbox-Utilities.git@main
 ```
 
-### NetBox-Konfiguration
+### 3. Enable the plugin
 
-Das Plugin wird in `/opt/netbox/netbox/netbox/configuration.py` aktiviert:
+In `/opt/netbox/netbox/netbox/configuration.py`:
 
 ```python
 PLUGINS = [
@@ -113,13 +97,10 @@ PLUGINS_CONFIG = {
 }
 ```
 
-Wenn bereits andere Plugins eingetragen sind, wird `netbox_utilities` zu den
-bestehenden Listen beziehungsweise Dictionaries hinzugefügt; deren Inhalt darf
-nicht überschrieben werden.
+If other plugins are already configured, add `netbox_utilities` to the existing
+list and dictionary instead of replacing them.
 
-### Installation abschließen
-
-Migrationen und statische Dateien werden nach der Installation verarbeitet:
+### 4. Apply migrations, collect static files, restart
 
 ```bash
 cd /opt/netbox/netbox
@@ -128,63 +109,10 @@ cd /opt/netbox/netbox
 sudo systemctl restart netbox netbox-rq
 ```
 
-Alternativ erledigt das NetBox-Upgrade-Skript die Installation aus
-`local_requirements.txt`, Migrationen und `collectstatic` gemeinsam:
+After changes to JavaScript or CSS a hard reload in the browser (`Ctrl+F5`) may
+be necessary.
 
-```bash
-sudo /opt/netbox/upgrade.sh
-sudo systemctl restart netbox netbox-rq
-```
-
-Nach Änderungen an JavaScript oder CSS kann ein Hard-Reload des Browsers mit
-`Strg+F5` erforderlich sein.
-
-Ab Version `0.9.3` werden Rack-SVG und Reorder direkt aus allen Geräten des
-Racks aufgebaut. Dadurch können mehrere Geräte derselben HE nicht mehr durch
-NetBox' native Ein-Gerät-pro-HE-Darstellung verloren gehen. Die Adapter werden
-auch dann eingebunden, wenn keine Teilbreitengeräte gefunden wurden. Nach
-diesem Update ist `collectstatic` deshalb zwingend erforderlich;
-die Dateien `topology-rack-width.js` und `reorder-rack-width.js` müssen unter
-`/opt/netbox/netbox/static/netbox_utilities/` vorhanden sein.
-
-Reorder ersetzt seine nativen Gerätekacheln erst, nachdem ein vollständiger
-und zur JavaScript-Version passender Datensatz geprüft wurde. Bei einer
-gemischten Installation aus altem Python-Code und neuen statischen Dateien
-bleibt deshalb die native Ansicht erhalten, statt ein leeres Rack zu zeigen.
-Ab Version `0.9.4` werden vorhandene Reorder-Kacheln außerdem direkt auf das
-12-Spalten-Raster erweitert und nicht mehr vorsorglich neu erzeugt. Nur ein
-zweites, von NetBox' Ein-Gerät-pro-HE-Darstellung unterschlagenes Gerät wird
-aus den Plugin-Daten ergänzt. Das verhindert browserabhängige leere Racks.
-Ab Version `0.9.5` rendert das Plugin das vollständige 12-Spalten-Rack bereits
-serverseitig in die Reorder-Seite. Die sichtbaren Geräte sind dadurch nicht
-mehr vom Ladezeitpunkt des Browseradapters abhängig. Für die optionale
-Topology-Rack-Ansicht wird die Teilbreitengeometrie zusätzlich als
-serverseitiges CSS ausgegeben; JavaScript wird dort nur noch für Exporte und
-ergänzende Metadaten benötigt.
-Ab Version `0.9.6` verwendet Reorder direkt den bereits durch seinen View
-autorisierten Rack-Datensatz. Die Topology-Rack-Ansicht leitet ihre Breiten
-ausschließlich aus den Geräten ab, die der Topology-View tatsächlich in seine
-HTML-Antwort geschrieben hat. Zusätzliche Berechtigungsabfragen können die
-beiden Ansichten dadurch nicht mehr fälschlich leeren.
-Ab Version `0.9.7` enthält Reorder eigene 12-Spalten-CSS-Regeln. Diese beheben
-die Inkompatibilität zwischen GridStack 10 aus Reorder Rack `1.1.4` und dem
-GridStack-11-Stylesheet von NetBox 4.6.7, durch die Gerätekacheln mit einer
-berechneten Breite von `0px` unsichtbar waren. Topology-Breiten werden außerdem
-nach dem vollständigen Rendern zentral auf die HTTP-Antwort angewendet und
-zusätzlich direkt in die vorhandenen Geräte-Styles geschrieben.
-Ab Version `0.9.8` behalten Geräte beim Ziehen in Reorder ihre tatsächliche
-Rackbreite. Die 12-Spalten-Regeln lassen dazu GridStacks temporären
-Pixelkoordinaten während des Ziehens Vorrang, statt eine Prozentbreite auf das
-Browserfenster anzuwenden. Die serverseitig aufgebauten Reorder-Kacheln zeigen
-außerdem wieder die Front- und Rückseitenbilder des Gerätetyps entsprechend
-der gewählten Ansicht an.
-Bereits vorhandene Geräte, die dieselbe HE und Rackseite belegen, aber noch
-keine Plugin-Platzierungszeile besitzen, werden in Rack-SVG, Reorder und der
-Topology-Rack-Ansicht ohne Datenbankänderung gleichmäßig nebeneinander
-dargestellt. Explizit gespeicherte Rackbreiten und Breitenpositionen haben
-stets Vorrang vor dieser Anzeige-Ableitung.
-
-Die Installation lässt sich anschließend mit diesen Befehlen kontrollieren:
+### Verify the installation
 
 ```bash
 /opt/netbox/venv/bin/python -c \
@@ -192,39 +120,15 @@ Die Installation lässt sich anschließend mit diesen Befehlen kontrollieren:
 
 test -f /opt/netbox/netbox/static/netbox_utilities/reorder-rack-width.js
 test -f /opt/netbox/netbox/static/netbox_utilities/topology-rack-width.js
-grep -q "schema_version !== 3" \
-  /opt/netbox/netbox/static/netbox_utilities/reorder-rack-width.js
 
 cd /opt/netbox/netbox
 /opt/netbox/venv/bin/python manage.py shell -c \
   "from django.urls import reverse; print(reverse('dcim:rack_reorder', kwargs={'pk': 1})); print(reverse('plugins:netbox_topology_views:rack_elevation'))"
 ```
 
-Die letzten beiden Routen müssen auflösbar sein. Die Topology-Rack-Route ist
-im getesteten MrBlake-Develop-Stand `86a8daf45ef380d57ac73b461dbc47a16bb831ba`
-enthalten, aber nicht im gleich bezeichneten öffentlichen Tag `v4.5.1`.
+The last two routes only resolve when Reorder Rack and Topology Views are installed.
 
-Für Rack `2` kann zusätzlich geprüft werden, welche gespeicherten Breiten das
-Plugin findet. Zwei Geräte derselben HE dürfen dabei unterschiedliche oder
-noch leere Plugin-Werte besitzen; leere Werte werden ab `0.9.3` für die
-Darstellung abgeleitet:
-
-```bash
-cd /opt/netbox/netbox
-/opt/netbox/venv/bin/python manage.py shell -c "
-from dcim.models import Device
-print(list(Device.objects.filter(rack_id=2).order_by('position', 'id').values(
-    'id', 'name', 'position', 'face',
-    'netbox_utilities_rack_placement__width',
-    'netbox_utilities_rack_placement__horizontal_position',
-)))
-"
-```
-
-## Aktualisierung
-
-Bei einer Installation aus dem `main`-Branch wird das Paket erneut aus Gitea
-installiert und anschließend NetBox aktualisiert:
+## Update
 
 ```bash
 /opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
@@ -236,214 +140,154 @@ cd /opt/netbox/netbox
 sudo systemctl restart netbox netbox-rq
 ```
 
-`--force-reinstall` stellt sicher, dass Änderungen aus einem Branch auch dann
-installiert werden, wenn die interne Paketversion noch nicht erhöht wurde.
+`--force-reinstall` makes pip pick up branch changes even if the package
+version has not been bumped.
 
-Wird ein Release-Tag in `/opt/netbox/local_requirements.txt` verwendet, muss
-dieser Eintrag vor dem Update auf den neuen Tag geändert werden. Danach genügt:
+When NetBox itself is upgraded, `upgrade.sh` reinstalls the plugin from
+`local_requirements.txt` and runs migrations and `collectstatic`:
 
 ```bash
 sudo /opt/netbox/upgrade.sh
 sudo systemctl restart netbox netbox-rq
 ```
 
-Vor Produktivupdates sollte der neue Stand in einer Testumgebung geprüft
-werden. Ein Backup der NetBox-Datenbank bleibt unabhängig vom Plugin dringend
-empfohlen.
+If you pinned a release tag in `local_requirements.txt`, change the tag there
+before running the upgrade. Test updates in a staging instance and back up the
+NetBox database first.
 
-### Umstieg von NetBox Site Prefix
+### Migrating from NetBox Site Prefix
 
-Die Prefix-Spalte ist jetzt Teil von NetBox Utilities. Das separate Plugin
-`netbox_site_prefix` muss entfernt werden, sonst wird die Spalte doppelt
-registriert:
+The Prefix column is now part of NetBox Utilities. Remove the separate
+`netbox_site_prefix` plugin, otherwise the column is registered twice:
 
-1. `"netbox_site_prefix"` aus `PLUGINS` in `configuration.py` entfernen.
-2. Die Zeile `git+https://git.mrblake.cc/MrBlake/Netbox-Prefixes.git` aus
-   `/opt/netbox/local_requirements.txt` entfernen.
-3. `/opt/netbox/venv/bin/pip uninstall netbox-site-prefix` ausführen und
-   NetBox neu starten.
+1. Remove `"netbox_site_prefix"` from `PLUGINS` in `configuration.py`.
+2. Remove `git+https://git.mrblake.cc/MrBlake/Netbox-Prefixes.git` from
+   `/opt/netbox/local_requirements.txt`.
+3. Run `/opt/netbox/venv/bin/pip uninstall netbox-site-prefix` and restart NetBox.
 
-Der Spaltenname `site_prefix` bleibt gleich, gespeicherte Tabellenkonfigurationen
-der Benutzer funktionieren daher weiter.
+The column name `site_prefix` is unchanged, so saved user table configurations keep working.
 
-## Verwendung
+## Uninstall
 
-### Prefix-Spalte in Geräte- und Rack-Listen
-
-Die Geräte- und Rack-Listen erhalten eine Spalte **Prefix** als erste
-Datenspalte. Der Wert ist das erste Wort des Standortnamens, z. B. `Berlin`
-für `Berlin Campus West` oder `DC01` für `DC01 Frankfurt`; ohne Standort
-bleibt die Zelle leer.
-
-Ein Klick auf die Spaltenüberschrift **Prefix** sortiert die Liste auf- bzw.
-absteigend, wie bei **Name**. Sortiert wird nach dem Standortnamen, der mit
-dem Prefix beginnt.
-
-Hat ein Benutzer bereits eine eigene Spaltenauswahl gespeichert, hat diese
-Vorrang. Dann unter **Spalten konfigurieren** die Spalte **Prefix** auswählen
-und nach vorne schieben oder die Tabellenkonfiguration zurücksetzen.
-
-Im Filter-Reiter beider Listen steht unter **Standort** das Feld **Prefix**
-zur Verfügung. Der Vergleich ignoriert Groß- und Kleinschreibung und trifft
-nur das erste Wort des Standortnamens: `DC01` findet `DC01 Frankfurt`, aber
-nicht `DC011 Hamburg`. Mehrere Prefixe werden durch Komma getrennt
-(`Berlin, DC01`). Derselbe Filter funktioniert auch per URL und REST-API,
-z. B. `/dcim/devices/?site_prefix=DC01` oder
-`/api/dcim/racks/?site_prefix=Berlin&site_prefix=DC01`. Mit
-`"site_prefix_column_enabled": False` lässt sich die Spalte abschalten.
-
-### Vorfilter für die B-Seite einer Verkabelung
-
-Beim Anlegen und Bearbeiten eines Kabels erscheint im Abschnitt **B-Seite**
-oberhalb der Geräteauswahl je ein optionales Feld für **Mandantengruppe**,
-**Mandant** und **Standort**. Die Felder filtern die Auswahllisten der
-B-Seite live mit; das gilt für Geräte, Stromverteiler (nur Standort) und
-Circuits.
-
-Die Felder sind vorbelegt:
-
-- mit Mandant und Standort der bereits gewählten A-Seite, sofern diese
-  eindeutig sind;
-- sonst mit dem Mandanten oder der Mandantengruppe aus dem globalen
-  Mandantenfilter der Kopfleiste.
-
-Es handelt sich bewusst um einen reinen **Vorfilter**: Die Werte werden nicht
-am Kabel gespeichert, und wer über Mandanten- oder Standortgrenzen hinweg
-verkabeln muss, leert das jeweilige Feld einfach wieder. Eine Verkabelung wird
-dadurch nie blockiert.
-
-Zu beachten: Der Mandantenfilter wertet das Feld `tenant` des Geräts aus.
-Geräte, deren Mandant faktisch nur über den Standort abgeleitet ist, erscheinen
-bei gesetztem Mandantenfilter nicht in der Liste — in diesem Fall ist der
-Standortfilter der passende Einstieg.
-
-Das Feature kann installationsweit mit `connection_tenant_filter_enabled = False`
-in `PLUGINS_CONFIG` deaktiviert werden.
-
-### VLANs direkt an Verbindungen dokumentieren
-
-Ab Version `0.10.0` erscheint beim normalen **Anlegen und Bearbeiten** einer
-Kabelverbindung oder Funkverbindung das optionale Feld **VLANs der
-Verbindung**. Darin können ein oder mehrere bestehende NetBox-VLANs ausgewählt
-werden. Die Auswahl wird außerdem auf der Detailseite der Verbindung
-angezeigt.
-
-Die Zuordnung dokumentiert, welche VLANs über die jeweilige Verbindung
-transportiert werden. Sie verändert bewusst nicht automatisch die nativen
-Felder **Untagged VLAN** und **Tagged VLANs** der beteiligten Interfaces, da
-beide Enden unterschiedliche Interface-Modi besitzen können. Diese bleiben
-weiterhin die technische Konfiguration der einzelnen Interfaces.
-
-Die Funktion gilt für:
-
-- physische NetBox-Kabel, einschließlich Verbindungen über Patchfelder;
-- NetBox-Funkverbindungen (`WirelessLink`).
-
-Leere Auswahlen erzeugen keinen Zuordnungsdatensatz. Beim Löschen einer
-Verbindung wird ihre VLAN-Zuordnung automatisch mit entfernt. Das Feature kann
-installationsweit mit `connection_vlans_enabled = False` in `PLUGINS_CONFIG`
-deaktiviert werden.
-
-Ist das optionale NetBox-Export-Plugin installiert, werden diese
-VLAN-Zuordnungen als normale Plugin-Datensätze zusammen mit den Verbindungen
-und VLANs exportiert und wieder importiert.
-
-### Mehrere Geräte nebeneinander in derselben HE
-
-Auf der normalen Seite zum **Anlegen oder Bearbeiten eines Geräts** stehen
-direkt nach **Position** zwei neue optionale Felder zur Verfügung. Dafür wird
-kein separates Plugin-Menü benötigt:
-
-- **Rackbreite**: volle, halbe, Drittel- oder Viertelbreite;
-- **Breitenposition**: Position 1 bis 4, von links gezählt.
-
-Für eine Fritzbox und ein zweites Gerät in derselben HE wird bei beiden
-Geräten beispielsweise **1/2 Rackbreite** gewählt. Die Fritzbox erhält
-**Position 1 (links)**, das andere Gerät **Position 2**. Rack, HE und Rackseite
-dürfen anschließend identisch sein. Die Kollisionsprüfung berücksichtigt
-sowohl die Gerätehöhe als auch die Breite und verhindert horizontale oder
-vertikale Überschneidungen. Mehrere HE hohe Geräte werden ebenfalls
-unterstützt.
-
-Nach einer Änderung der Rackbreite wird die **Breitenposition** unmittelbar
-aktualisiert; ein Zwischenspeichern oder Neuladen ist nicht erforderlich.
-
-Ohne Breitenangabe belegt ein Gerät wie bisher die volle Rackbreite. Ausnahme
-ist eine bereits vorhandene gemeinsame Belegung derselben HE und Rackseite:
-Fehlen dort Plugin-Platzierungen, teilt die Darstellung den verfügbaren Platz
-gleichmäßig auf die zwei bis vier vorhandenen Geräte auf. Diese Ableitung
-ändert keine Datenbankwerte und dient nur dazu, bereits gemeinsam eingepflegte
-Geräte wieder sichtbar zu machen. Es findet keine Migration bestehender
-Platzierungen statt. Explizit gewählte Teilbreite und Position werden auf der
-Geräteseite angezeigt und in der Rackgrafik nebeneinander dargestellt.
-
-NetBox besitzt standardmäßig eine Datenbank-Eindeutigkeit für Rack, HE und
-Rackseite. Die Plugin-Migration `0007` entfernt ausschließlich diese
-Core-Eindeutigkeit, damit mehrere Geräte dieselbe HE verwenden können. Das
-Plugin übernimmt dafür die breitenabhängige Prüfung beim Speichern. Vor einem
-späteren Entfernen des Plugins müssen geteilte Höheneinheiten wieder aufgelöst
-werden; die Core-Eindeutigkeit wird bei einer Deinstallation nicht automatisch
-wiederhergestellt.
-
-Die Zusatzfelder werden im NetBox-Webformular gepflegt. REST- oder normale
-NetBox-CSV-Vorgänge ohne diese Felder behandeln neue Geräte als volle
-Rackbreite. Der nachfolgend beschriebene portable ZIP-Export überträgt sie
-dagegen ausdrücklich.
-
-### Rackbreiten in NetBox-Export
-
-Ist das optionale Plugin
-[NetBox-Export](https://git.mrblake.cc/MrBlake/netbox-export) in Version
-`0.3.11` installiert, erweitert NetBox Utilities dessen ZIP-Export und Import
-automatisch. Für jedes Gerät werden auch die Rackbreite und die von links
-gezählte Breitenposition im Archiv gespeichert. Beim Import berücksichtigt die
-Konfliktprüfung sowohl die Gerätehöhe als auch die horizontale Rackfläche.
-Dadurch können beispielsweise zwei Geräte mit halber Breite wieder in dieselbe
-HE importiert werden, ohne dass das zuerst importierte Gerät aus dem Rack
-entfernt wird.
-
-Auch volle Rackbreite wird ausdrücklich gespeichert. Wird ein früher
-teilbreites Zielgerät durch einen neueren Export auf volle Breite zurückgesetzt,
-entfernt der Import deshalb seine veraltete Teilbreitenzuordnung. Ältere
-Archive ohne diese Zusatzmetadaten bleiben importierbar; vorhandene
-`DeviceRackPlacement`-Datensätze darin werden weiterhin berücksichtigt.
-
-Ab Version `0.9.10` sperrt der Import Geräte und ihre optionalen
-Rackbreitenzuordnungen in getrennten Datenbankabfragen. Damit funktioniert der
-Test- und Echtimport auch unter PostgreSQL, ohne einen unzulässigen
-`FOR UPDATE`-Outer-Join zu erzeugen. Bereits mit Version `0.9.9` erstellte
-Archive müssen dafür nicht neu exportiert werden.
-
-Ab Version `0.9.11` werden alle im Archiv enthaltenen Rackbreiten vor der
-eigentlichen Geräteplatzierung innerhalb derselben Transaktion vorgemerkt.
-Dadurch erkennt die Konfliktprüfung mehrere teilbreite Geräte derselben HE
-bereits während des Imports korrekt und löst kein zuvor platziertes Gerät aus
-dem Rack. Nach der Platzierung werden die Breiten mit dem endgültigen
-Importergebnis abgeglichen.
-
-### Teilbreiten in MrBlake NetBox Topology Views
-
-Ist
-[MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views)
-mit seiner **Rack-Ansicht** installiert, erkennt NetBox Utilities das Plugin
-automatisch. Teilbreitengeräte werden dort anhand ihrer Rackbreite und
-Breitenposition nebeneinander dargestellt. Die aktuelle Rack-Ansicht wird auch
-bei ihren Exporten nach **SVG**, **PNG** und **draw.io** unterstützt. Die
-Kabeltopologie bleibt unverändert, da sie Geräte als frei verschiebbare Knoten
-und nicht als physische Rackflächen darstellt.
-
-Das Topology-Plugin bleibt eine optionale Abhängigkeit. Eine reproduzierbare
-Installation des derzeit getesteten MrBlake-Stands erfolgt über dessen
-Commit-ID:
+1. Resolve all shared rack units first (see [Multiple devices in one rack unit](#multiple-devices-in-one-rack-unit)).
+2. Remove `"netbox_utilities"` from `PLUGINS` and `PLUGINS_CONFIG`.
+3. Remove the line from `/opt/netbox/local_requirements.txt`.
+4. Uninstall the package and restart NetBox:
 
 ```bash
-/opt/netbox/venv/bin/pip install --upgrade --force-reinstall \
-  "git+https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views.git@86a8daf45ef380d57ac73b461dbc47a16bb831ba"
+/opt/netbox/venv/bin/pip uninstall netbox-utilities
+sudo systemctl restart netbox netbox-rq
 ```
 
-Für automatische NetBox-Updates wird derselbe Git-Eintrag zusätzlich in
-`/opt/netbox/local_requirements.txt` aufgenommen. Anschließend müssen beide
-Plugins aktiviert sein; ihre Reihenfolge ist beliebig:
+## Configuration
+
+| Key | Default | Description |
+|---|---|---|
+| `navigation_customization_enabled` | `True` | Per-user navigation ordering, hiding, resizing and icon mode |
+| `connection_vlans_enabled` | `True` | VLAN assignment on cables and wireless links |
+| `connection_tenant_filter_enabled` | `True` | Tenant group / tenant / site pre-filter on the cable B-side |
+| `reorder_rack_bulk_save_enabled` | `True` | Bulk save integration for NetBox Reorder Rack `1.1.4` |
+| `topology_views_rack_width_enabled` | `True` | Partial-width rendering in Topology Views' rack view |
+| `tenant_filter_enabled` | `True` | Global tenant / tenant-group filter (overrides the UI setting) |
+| `tenant_required` | `True` | Mandatory tenant assignment (overrides the UI setting) |
+| `site_prefix_column_enabled` | `True` | Prefix column in device and rack lists |
+
+## Usage
+
+### Prefix column in device and rack lists
+
+Device and rack lists get a **Prefix** column as the first data column. The
+value is the first word of the site name, e.g. `Berlin` for `Berlin Campus West`
+or `DC01` for `DC01 Frankfurt`. Without a site the cell stays empty.
+
+Clicking the column header sorts ascending/descending by site name. If a user
+has saved a custom column selection, add **Prefix** under **Configure Table**
+or reset the table configuration.
+
+Both lists offer a **Prefix** filter in the **Site** section. The comparison is
+case-insensitive and only matches the first word: `DC01` matches
+`DC01 Frankfurt` but not `DC011 Hamburg`. Separate multiple prefixes with commas
+(`Berlin, DC01`). The filter also works via URL and REST API, e.g.
+`/dcim/devices/?site_prefix=DC01` or
+`/api/dcim/racks/?site_prefix=Berlin&site_prefix=DC01`.
+
+### Pre-filter for the B-side of a cable
+
+When creating or editing a cable, the **B-side** section shows optional
+**Tenant group**, **Tenant** and **Site** fields above the device selection.
+They filter the B-side dropdowns live (devices, power panels — site only — and
+circuits).
+
+The fields are pre-filled with the tenant and site of the selected A-side if
+they are unambiguous, otherwise with the tenant or tenant group of the global
+header filter.
+
+This is only a **pre-filter**: the values are not stored on the cable. To cable
+across tenants or sites, simply clear the field. The tenant filter uses the
+device's own `tenant` field; devices whose tenant is only implied by their site
+do not appear — use the site filter in that case.
+
+### VLANs on connections
+
+The create/edit form of cables and wireless links has an optional
+**Connection VLANs** field. One or more existing VLANs can be selected; the
+assignment is also shown on the connection's detail page.
+
+It documents which VLANs are carried over the connection. It intentionally does
+**not** change the **Untagged VLAN** / **Tagged VLANs** of the connected
+interfaces, since both ends can use different interface modes.
+
+- Applies to physical cables (including paths through patch panels) and `WirelessLink`s.
+- In the cable form the field sits in the **B-side** section, below the B-side termination.
+- An optional **VLAN group** field acts as a dynamic filter for the VLAN selection; it is not stored.
+- Empty selections create no record; deleting a connection removes its VLAN assignment.
+- With NetBox-Export installed, the assignments are exported and imported together with connections and VLANs.
+
+### Multiple devices in one rack unit
+
+The regular device create/edit form gets two optional fields right after **Position**:
+
+- **Rack width**: full, half, third or quarter width;
+- **Width position**: position 1 to 4, counted from the left.
+
+Example: for a router and a second device in the same U, choose **1/2 rack width**
+for both, give the router **Position 1 (left)** and the other device
+**Position 2**. Rack, U and face may then be identical. Collision checks take
+height and width into account; multi-U devices are supported. The width
+position updates immediately when the rack width changes.
+
+Without a width, a device occupies the full rack width as before. If two to
+four devices already share a U and face without plugin placements, the display
+splits the space evenly between them. This does not change database values.
+
+NetBox enforces a unique constraint on rack, U and face. Plugin migration
+`0007` removes only this core constraint so that multiple devices can share a U;
+the plugin performs the width-aware check on save instead. **Before removing the
+plugin, shared rack units must be resolved** — the constraint is not restored
+automatically on uninstall.
+
+The extra fields are maintained in the web form. REST or standard CSV
+operations without these fields treat new devices as full width; the portable
+ZIP export of NetBox-Export does transfer them.
+
+### Rack widths in NetBox-Export
+
+With [NetBox-Export](https://git.mrblake.cc/MrBlake/NetBox-Export) installed,
+NetBox Utilities extends its ZIP export and import automatically. Rack width and
+width position are stored for every device. The import conflict check considers
+both height and horizontal rack space, so two half-width devices can be imported
+into the same U. Full width is stored explicitly, so a device reset to full
+width in a newer export loses its stale partial-width placement. Older archives
+without these metadata remain importable.
+
+### Partial widths in MrBlake NetBox Topology Views
+
+If [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views)
+with its **rack view** is installed, NetBox Utilities detects it automatically.
+Partial-width devices are rendered side by side, including the **SVG**, **PNG**
+and **draw.io** exports. The cable topology is unchanged.
+
+Both plugins must be enabled (order does not matter):
 
 ```python
 PLUGINS = [
@@ -452,56 +296,34 @@ PLUGINS = [
 ]
 ```
 
-Die Integration ändert keine Dateien von Topology Views und erzeugt keine
-zusätzlichen Datenbankeinträge. Sie wird ausschließlich auf dessen Rack-Seite
-geladen und kann mit
-`topology_views_rack_width_enabled = False` in `PLUGINS_CONFIG` deaktiviert
-werden. Ist Topology Views nicht installiert oder enthält der installierte
-Stand keine Rack-Ansicht, bleibt NetBox Utilities unverändert nutzbar.
+The integration does not modify Topology Views' files and creates no database
+records. Disable it with `topology_views_rack_width_enabled = False`.
 
-### Front- und Rearports von Patchpaneln automatisch verknüpfen
+### Automatic front/rear port mapping for patch panels
 
-Geräte, deren NetBox-Geräterolle `Patchpanel` heißt, werden automatisch als
-Patchfeld erkannt. Groß- und Kleinschreibung spielen bei der Rollenbezeichnung
-keine Rolle. Das Plugin verknüpft ausschließlich Ports mit derselben Kennung
-auf Portposition 1: `Front 1` mit `Rear 1`, `Front 2` mit `Rear 2` und so
-weiter. Auch Kurzformen wie `F01` und `R1` werden als dieselbe Kennung erkannt.
-Fehlt die passende Gegenseite, bleibt der Port unverknüpft; die nachfolgenden
-Nummern rutschen nicht auf.
+Devices whose role is named `Patchpanel` (case-insensitive) are treated as patch
+panels. The plugin maps ports with the same number on port position 1:
+`Front 1` ↔ `Rear 1`, `Front 2` ↔ `Rear 2`, and so on. Short forms such as
+`F01` and `R1` and additional labels such as `LC` are recognised. If the
+counterpart is missing, the port stays unmapped; following numbers do not shift.
 
-Die Zuordnung wird ausschließlich beim erstmaligen Anlegen eines Patchpanels,
-beim Einbau eines neuen Moduls sowie beim Anlegen eines neuen Front- oder
-Rearports hergestellt. Das Bearbeiten eines vorhandenen Patchpanels, Moduls
-oder Ports löst die Automatik nicht aus.
+The mapping is only created when a patch panel is first created, a new module
+is installed, or a new front or rear port is created. Editing existing objects
+does not trigger it, and there is no automatic run over existing data on
+install or update.
 
-Bei Installation oder Update findet kein automatischer Bestandslauf statt.
-Vorhandene Patchpanel-Geräte und deren Kabelpfade bleiben unverändert. Die
-Automatik greift erst, wenn ein betreffendes Gerät, Modul oder ein Front-/Rearport
-neu angelegt wird.
+### Moving multiple devices with NetBox Reorder Rack
 
-### Mehrere Geräte mit NetBox Reorder Rack verschieben
-
-Wenn `netbox-reorder-rack` in Version `1.1.4` installiert und aktiviert ist,
-erweitert NetBox Utilities dessen vorhandenen Speichervorgang automatisch.
-In der Drag-and-drop-Ansicht können mehrere Geräte verschoben oder miteinander
-getauscht und anschließend gemeinsam über **Save** gespeichert werden.
-Teilbreitengeräte werden dort ebenfalls nebeneinander angezeigt. Das
-12-spaltige Raster bildet volle, halbe, Drittel- und Viertelbreite exakt ab.
-Beim horizontalen Verschieben rastet ein Gerät auf einer für seine Breite
-gültigen Position ein; **Save** speichert Höhe, Rackseite und Breitenposition
-gemeinsam in derselben Transaktion. Die gewählte Rackbreite selbst wird in der
-Reorder-Ansicht nicht verändert und weiterhin auf der Geräte-Neu- oder
-Bearbeitungsseite gepflegt.
-
-Die optionale Abhängigkeit wird separat installiert und für spätere NetBox-
-Updates in `/opt/netbox/local_requirements.txt` aufgenommen:
+With `netbox-reorder-rack` `1.1.4` installed and enabled, NetBox Utilities
+extends its save action: several devices can be moved or swapped in the
+drag-and-drop view and saved together via **Save**. Partial-width devices are
+shown side by side on a 12-column grid and snap to valid positions; height,
+face and width position are saved in one transaction.
 
 ```bash
 /opt/netbox/venv/bin/pip install "netbox-reorder-rack==1.1.4"
 echo "netbox-reorder-rack==1.1.4" | sudo tee -a /opt/netbox/local_requirements.txt
 ```
-
-Beide Plugins müssen in NetBox aktiviert sein; ihre Reihenfolge ist beliebig:
 
 ```python
 PLUGINS = [
@@ -510,150 +332,100 @@ PLUGINS = [
 ]
 ```
 
-NetBox Utilities verändert keine Dateien des Reorder-Plugins. Stattdessen wird
-dessen Oberfläche und API beim Start kompatibel erweitert. Beim Speichern
-werden alle betroffenen Geräte und das Rack gesperrt, die alten Positionen gemeinsam
-freigegeben und danach sämtliche Zielpositionen mit der normalen
-NetBox-Modellvalidierung geprüft. Der Vorgang läuft in einer Transaktion: Bei
-einem Platz-, Validierungs- oder Berechtigungsfehler bleibt das gesamte Rack
-unverändert. Für jedes tatsächlich verschobene Gerät entsteht weiterhin ein
-normaler NetBox-Änderungseintrag.
+Reorder Rack's files are not modified; its UI and API are extended at startup.
+On save, all affected devices and the rack are locked and validated with the
+normal NetBox model validation. If any placement, validation or permission
+error occurs, the whole rack stays unchanged. Every moved device still gets a
+normal changelog entry. Versions other than `1.1.4` are left untouched and only
+produce a log message.
 
-Die Integration kann mit
-`reorder_rack_bulk_save_enabled = False` in `PLUGINS_CONFIG` deaktiviert werden.
-Andere Versionen als `1.1.4` werden aus Sicherheitsgründen nicht automatisch
-verändert und erzeugen lediglich einen Hinweis im NetBox-Log. Das
-Reorder-Projekt selbst weist derzeit offiziell nur Kompatibilität bis NetBox
-4.5 aus; die Erweiterung in diesem Plugin ist gezielt für die hier unterstützte
-NetBox-Versionen 4.6.5 bis 4.6.7 umgesetzt und getestet.
+### Uploading multiple images
 
-### Mehrere Bilder hochladen
+In the **Images** tab of supported objects, the single upload is replaced by
+**Upload multiple images**. Up to 50 images can be selected at once, with
+previews before saving. Each file is validated by NetBox; if one is invalid,
+none are saved. An optional shared description can be applied; the original
+file name is kept as the display name. Requires permission to add image
+attachments and to view the target object.
 
-Im **Bilder**-Tab eines unterstützten NetBox-Objekts wird der bisherige
-Einzel-Upload durch **Mehrere Bilder hochladen** ersetzt. Im Dateidialog können
-bis zu 50 Bilder gemeinsam ausgewählt werden. Vor dem Speichern zeigt das
-Plugin Vorschaubilder und die jeweiligen Dateinamen an.
+### Installing multiple modules
 
-Jede Datei wird genau einmal mit NetBox' eigener Bildvalidierung geprüft. Ist
-eine Datei ungültig, wird kein Bild aus dieser Auswahl gespeichert. Eine
-optionale gemeinsame Beschreibung kann auf alle Bilder angewendet werden; als
-Anzeigename bleibt der jeweilige ursprüngliche Dateiname erhalten. Benötigt
-werden weiterhin die NetBox-Berechtigung zum Hinzufügen von Bildanhängen und
-eine Leseberechtigung für das Zielobjekt.
+Under **Plugins > NetBox Utilities > Install multiple modules** (or via the
+button on device pages with free module bays), choose a device, a module type
+and several free module bays — or enter a **Quantity (1–x)** to use the first
+free bays in natural order. All modules get the same type, status and
+description; component replication from the module type templates is optional.
+The operation is atomic: if a bay is taken meanwhile or a naming conflict
+occurs, nothing is saved. Requires the permission to add modules; object
+permissions still apply.
 
-### Module mehrfach einbauen
+### Personalised navigation
 
-Unter **Plugins > NetBox Utilities > Module mehrfach einbauen** kann ein
-Benutzer ein Gerät, einen Modultyp und mehrere freie Modulschächte auswählen.
-Auf Geräteseiten mit freien Modulschächten steht dieselbe Funktion zusätzlich
-über die Schaltfläche **Module mehrfach einbauen** zur Verfügung; das Gerät ist
-dort bereits vorausgewählt. Das funktioniert sowohl für modulare Patchpanels
-als auch für andere NetBox-Geräte mit Modulschächten.
+Under **Plugins > NetBox Utilities > Customize navigation** users see every menu
+they have access to. Arrow buttons change the order; a toggle hides a menu.
 
-Der Benutzer kann entweder bestimmte freie Modulschächte auswählen oder über
-**Anzahl (1–x)** eine Menge eingeben. Bei der Mengenangabe verwendet das Plugin
-die ersten freien Modulschächte in der natürlichen NetBox-Reihenfolge. Beide
-Eingabearten können nicht miteinander kombiniert werden.
+The desktop sidebar can be resized between 216 and 408 px by dragging its right
+edge. A small handle collapses it into an **icon mode** where menus open as a
+flyout (closed on selection, outside click or Escape). **Reset** restores order,
+visibility and the default width of 288 px.
 
-Alle gewählten Schächte erhalten denselben Modultyp, Status und dieselbe
-Beschreibung. Optional werden die Komponenten aus den Vorlagen des Modultyps
-für jedes Modul repliziert. NetBox prüft dabei jeden Einbau mit derselben Logik
-wie beim einzelnen Modul. Der Vorgang ist atomar: Ist ein Schacht inzwischen
-belegt oder entsteht ein Komponenten-/Namenskonflikt, wird keines der Module
-gespeichert. Individuelle Seriennummern und Asset-Tags werden anschließend an
-den einzelnen Modulen gepflegt.
+### Global tenant and tenant-group filter
 
-Benötigt wird die NetBox-Berechtigung zum Hinzufügen von Modulen. Geräte,
-Modultypen und Modulschächte werden zusätzlich durch die bestehenden
-NetBox-Objektberechtigungen des Benutzers eingeschränkt.
+The building icon in the header opens the selection of tenants and tenant
+groups the user may see. A tenant group includes tenants of its child groups.
+**All tenants** removes the filter.
 
-### Navigation personalisieren
+The filter:
 
-Unter **Plugins > NetBox Utilities > Navigation personalisieren** sieht der
-Benutzer alle Menüs, für die er aktuell Berechtigungen besitzt. Die Pfeiltasten
-ändern die Reihenfolge; der Schalter blendet ein Menü aus.
+- enforces `tenant_id` or `tenant_group_id` in supported NetBox lists;
+- restricts the tenant list itself;
+- restricts NetBox global search results;
+- applies to HTMX table updates and exports from filtered lists;
+- does **not** change REST or GraphQL requests.
 
-Zusätzlich kann jeder Benutzer die Desktop-Navigation direkt an der rechten
-Kante zwischen 216 und 408 Pixeln breiter oder schmaler ziehen. Ein kleiner
-Pfeilgriff in der Mitte dieser Kante klappt sie auf einen reinen **Icon-Modus**
-ein und wieder aus. Dafür gibt es kein zusätzliches Bedienmenü. Beim Ziehen
-wird die neue Breite nach dem Loslassen im Benutzerprofil gespeichert. Im
-Icon-Modus öffnen sich die Menüinhalte als seitliches Flyout; auf kleinen
-beziehungsweise mobilen Ansichten bleibt das normale NetBox-Menü erhalten.
-Das Flyout schließt sich bei Auswahl eines Eintrags, bei erneutem Klick auf
-das aktive Icon, bei einem Klick außerhalb und mit der Escape-Taste. Nach
-einem Seitenwechsel oder Neuladen startet es immer geschlossen.
+Superusers can disable it at runtime under **Plugins > NetBox Utilities > Settings**;
+`tenant_filter_enabled = False` disables it permanently and takes precedence.
 
-**Zurücksetzen** stellt neben Reihenfolge und Sichtbarkeit auch die normale
-ausgeklappte Breite von 288 Pixeln wieder her.
+### Mandatory tenant assignment
 
-Die Funktion kann installationsweit über `navigation_customization_enabled = False` in `PLUGINS_CONFIG` abgeschaltet werden.
+Enabled by default under **Plugins > NetBox Utilities > Settings**. For all
+object types with a `tenant` field, the field becomes required — in forms, CSV
+imports, the REST API and `Model.save()` calls from scripts. Existing objects
+without a tenant remain until they are next saved. Global reference models
+without a `tenant` field are not affected.
 
-### Globaler Mandanten- und Gruppenfilter
+When a form opens, missing values are pre-filled carefully: first from a
+recognisable parent object (rack, site, device, cluster, …), otherwise from the
+global tenant filter. Existing values are never overwritten. For cables, both
+cable ends are evaluated; the tenant is only set if it is unambiguous. If an
+automatically set tenant is saved unchanged, the browser asks for an explicit
+confirmation.
 
-Das Gebäude-Symbol in der Kopfleiste öffnet die Auswahl. Zur Auswahl stehen
-Mandanten und Mandantengruppen, die der angemeldete Benutzer gemäß
-NetBox-Objektberechtigungen sehen darf. Eine Mandantengruppe umfasst auch die
-Mandanten ihrer untergeordneten Gruppen. **Alle Mandanten** hebt den Filter auf.
+`tenant_required = False` disables the feature permanently and takes precedence
+over the UI setting.
 
-Der Filter:
+## Important semantics
 
-- erzwingt je nach Auswahl `tenant_id` oder `tenant_group_id` in unterstützten NetBox-Listen;
-- beschränkt die Mandantenliste auf den gewählten Mandanten beziehungsweise die gewählte Gruppe;
-- beschränkt Ergebnisse der globalen NetBox-Suche;
-- gilt auch für HTMX-Tabellenupdates und Exporte aus einer gefilterten Liste;
-- verändert keine REST- oder GraphQL-Anfrage.
+The tenant filter is a **view filter, not access control**. Direct object URLs
+are not blocked; NetBox object permissions remain the security boundary. The
+mandatory tenant assignment, however, is server-side data validation.
 
-Superuser können die Funktion unter **Plugins > NetBox Utilities > Einstellungen** zur Laufzeit deaktivieren. Zusätzlich kann `tenant_filter_enabled = False` in `PLUGINS_CONFIG` sie hart abschalten; diese Konfiguration hat Vorrang vor der Einstellung in der Oberfläche.
+Only models with a tenant relation are filtered. Global reference data such as
+manufacturers, roles or platforms stays visible.
 
-### Verpflichtende Mandantenzuordnung
+The sidebar personalisation uses NetBox's official global
+`PluginTemplateExtension` and reorders the already rendered core menus in the
+browser. It changes neither core templates nor NetBox files.
 
-Standardmäßig ist unter **Plugins > NetBox Utilities > Einstellungen** die
-verpflichtende Mandantenzuordnung aktiviert. Bei allen Objekttypen, die in
-NetBox ein `tenant`-Feld besitzen, wird dieses Feld als Pflichtfeld behandelt.
-Die Prüfung greift in Formularen, CSV-Importen, der REST-API und bei normalen
-Aufrufen von `Model.save()` aus Skripten.
+## Development and tests
 
-Bestehende Objekte ohne Mandant bleiben nach Aktivierung zunächst bestehen.
-Beim nächsten Speichern eines solchen Objekts muss ein Mandant ergänzt werden.
-Globale Referenzmodelle ohne `tenant`-Feld sind nicht betroffen.
-
-Beim Öffnen eines NetBox-Formulars versucht das Plugin, fehlende Zuordnungen
-vorsichtig vorzubelegen. Vorrang hat ein bereits erkennbares Elternobjekt, zum
-Beispiel Rack, Standort, Gerät oder Cluster. Ist dort keine Zuordnung
-erkennbar, wird der global ausgewählte Mandant verwendet. Felder für eine
-Mandantengruppe werden aus dem erkannten Mandanten oder der global ausgewählten
-Mandantengruppe vorbelegt. Bereits vorhandene Werte werden nicht überschrieben.
-
-Bei Kabeln werden die ausgewählten Anschlüsse beider Kabelenden ausgewertet.
-Gehören die Anschlüsse beziehungsweise ihre Geräte, Stromverteiler oder
-Schaltkreise eindeutig zu demselben Mandanten, übernimmt das Kabel diesen
-Mandanten automatisch. Ist nur an einem Ende eine Zuordnung herleitbar, wird
-diese verwendet. Bei widersprüchlichen Mandanten an den beiden Enden nimmt das
-Plugin keine automatische Zuordnung vor.
-
-Bleibt ein automatisch gesetzter Mandant bis zum Speichern unverändert, fragt
-der Browser unmittelbar nach dem Klick auf **Speichern** noch einmal nach einer
-ausdrücklichen Bestätigung. Wird der Mandant manuell geändert, entfällt diese
-zusätzliche Rückfrage.
-
-Die Einstellung kann durch einen Superuser deaktiviert werden. Mit
-`tenant_required = False` in `PLUGINS_CONFIG` wird sie installationsweit fest
-deaktiviert; diese Konfiguration hat Vorrang vor der Admin-Oberfläche.
-
-## Wichtige Semantik
-
-Der Mandantenfilter ist ein **Ansichtsfilter und keine Zugriffskontrolle**. Direkte Objekt-URLs werden nicht gesperrt. NetBox-Objektberechtigungen bleiben die maßgebliche Sicherheitsgrenze. Die verpflichtende Mandantenzuordnung ist dagegen eine serverseitige Datenvalidierung.
-
-Nur Modelle mit einer Mandantenzuordnung werden eingeschränkt. Globale Referenzdaten wie Hersteller, Rollen oder Plattformen bleiben sichtbar, weil sie keinem Mandanten gehören und für die Darstellung bzw. Bearbeitung mandantengebundener Objekte benötigt werden.
-
-Die Seitenleisten-Personalisierung nutzt NetBox' offizielle globale `PluginTemplateExtension`, ordnet aber bereits gerenderte Core-Menüs im Browser neu. Sie ändert weder Core-Templates noch NetBox-Dateien.
-
-## Entwicklung und Tests
-
-In einer NetBox-4.6.5-Entwicklungsumgebung:
+In a NetBox development environment:
 
 ```bash
-pip install -e /pfad/zu/Netbox-Utilities
+pip install -e /path/to/Netbox-Utilities
 python netbox/manage.py test netbox_utilities
 ```
+
+## License
+
+See [LICENSE](LICENSE).
