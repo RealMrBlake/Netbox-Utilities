@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from io import BytesIO
+
 from dcim.models import Device, Module, Rack
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -50,6 +53,24 @@ def _safe_return_url(request, default_name="home"):
     return reverse(default_name)
 
 
+# NetBox limits Pillow to 25 MP (bomb error above 50 MP), which rejects
+# current 50 MP smartphone photos such as Google Pixel images (8160x6144).
+BULK_IMAGE_MAX_PIXELS = 100_000_000
+
+
+@contextmanager
+def raised_image_pixel_limit():
+    from PIL import Image
+
+    original_limit = Image.MAX_IMAGE_PIXELS
+    if original_limit is not None and original_limit < BULK_IMAGE_MAX_PIXELS:
+        Image.MAX_IMAGE_PIXELS = BULK_IMAGE_MAX_PIXELS
+    try:
+        yield
+    finally:
+        Image.MAX_IMAGE_PIXELS = original_limit
+
+
 class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
     template_name = "netbox_utilities/bulk_image_upload.html"
 
@@ -65,31 +86,41 @@ class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
         parent = self._get_parent(request, request.POST)
         form = BulkImageUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            image_forms = self._build_image_forms(parent, form.cleaned_data)
-            invalid = [image_form for image_form in image_forms if not image_form.is_valid()]
-            if invalid:
-                for image_form in invalid:
-                    filename = getattr(image_form.files.get("image"), "name", "Bild")
-                    for errors in image_form.errors.values():
-                        for error in errors:
-                            form.add_error("images", f"{filename}: {error}")
-            else:
-                created = []
-                try:
-                    with transaction.atomic():
-                        for image_form in image_forms:
-                            created.append(image_form.save())
-                except (DatabaseError, OSError, SuspiciousFileOperation, ValidationError, ValueError) as error:
+            with raised_image_pixel_limit():
+                return self._process_upload(request, form, parent)
+        return self._render(request, form, parent)
+
+    def _process_upload(self, request, form, parent):
+        image_forms = self._build_image_forms(parent, form.cleaned_data)
+        invalid = [image_form for image_form in image_forms if not image_form.is_valid()]
+        if invalid:
+            for image_form in invalid:
+                image = image_form.files.get("image")
+                reason = self._image_error_reason(image)
+                if reason:
+                    form.add_error("images", f"{getattr(image, 'name', 'Bild')}: Pillow meldet: {reason}")
+            for image_form in invalid:
+                filename = getattr(image_form.files.get("image"), "name", "Bild")
+                for errors in image_form.errors.values():
+                    for error in errors:
+                        form.add_error("images", f"{filename}: {error}")
+        else:
+            created = []
+            try:
+                with transaction.atomic():
                     for image_form in image_forms:
-                        image_file = image_form.instance.image
-                        if image_file.name and image_file._committed:
-                            image_file.delete(save=False)
-                    form.add_error("images", f"Die Bilder konnten nicht gespeichert werden: {error}")
-                else:
-                    count = len(created)
-                    noun = "Bild wurde" if count == 1 else "Bilder wurden"
-                    messages.success(request, f"{count} {noun} gleichzeitig hochgeladen.")
-                    return redirect(self._return_url(request, parent))
+                        created.append(image_form.save())
+            except (DatabaseError, OSError, SuspiciousFileOperation, ValidationError, ValueError) as error:
+                for image_form in image_forms:
+                    image_file = image_form.instance.image
+                    if image_file.name and image_file._committed:
+                        image_file.delete(save=False)
+                form.add_error("images", f"Die Bilder konnten nicht gespeichert werden: {error}")
+            else:
+                count = len(created)
+                noun = "Bild wurde" if count == 1 else "Bilder wurden"
+                messages.success(request, f"{count} {noun} gleichzeitig hochgeladen.")
+                return redirect(self._return_url(request, parent))
         return self._render(request, form, parent)
 
     @staticmethod
@@ -108,6 +139,26 @@ class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
         if hasattr(queryset, "restrict"):
             queryset = queryset.restrict(request.user, "view")
         return get_object_or_404(queryset, pk=object_id)
+
+    @staticmethod
+    def _image_error_reason(image):
+        """Return the underlying Pillow error, which Django hides behind a generic message."""
+        from PIL import Image
+
+        try:
+            if hasattr(image, "temporary_file_path"):
+                source = image.temporary_file_path()
+            else:
+                image.seek(0)
+                source = BytesIO(image.read())
+            with Image.open(source) as opened:
+                opened.verify()
+        except Exception as error:  # noqa: BLE001 - surface any Pillow failure
+            return f"{type(error).__name__}: {error}"
+        finally:
+            if hasattr(image, "seek"):
+                image.seek(0)
+        return None
 
     @staticmethod
     def _build_image_forms(parent, cleaned_data):

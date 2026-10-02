@@ -541,6 +541,12 @@ Anzeigename bleibt der jeweilige ursprüngliche Dateiname erhalten. Benötigt
 werden weiterhin die NetBox-Berechtigung zum Hinzufügen von Bildanhängen und
 eine Leseberechtigung für das Zielobjekt.
 
+NetBox begrenzt Pillow global auf 25 Megapixel und lehnt Bilder ab 50
+Megapixeln ab. Damit aktuelle 50-MP-Smartphone-Fotos (z. B. Google Pixel,
+8160×6144) hochgeladen werden können, hebt der Mehrfach-Upload dieses Limit
+während der Verarbeitung auf 100 Megapixel an. Wird ein Bild abgelehnt, zeigt
+das Formular zusätzlich die genaue Fehlermeldung von Pillow an.
+
 ### Module mehrfach einbauen
 
 Unter **Plugins > NetBox Utilities > Module mehrfach einbauen** kann ein
