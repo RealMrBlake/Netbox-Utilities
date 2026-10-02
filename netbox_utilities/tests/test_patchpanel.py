@@ -36,6 +36,14 @@ class PatchpanelPairingTest(SimpleTestCase):
         synchronize.assert_called_once_with(42)
 
     @patch("netbox_utilities.patchpanel.synchronize_patchpanel")
+    def test_raw_component_imports_do_not_trigger_automation(self, synchronize):
+        component = SimpleNamespace(device_id=42)
+
+        _component_saved(None, component, created=True, raw=True)
+
+        synchronize.assert_not_called()
+
+    @patch("netbox_utilities.patchpanel.synchronize_patchpanel")
     def test_existing_device_save_does_not_trigger_automation(self, synchronize):
         class Container:
             def __init__(self, adding):
@@ -88,6 +96,14 @@ class PatchpanelPairingTest(SimpleTestCase):
         self.assertEqual(port_identifier(port(1, "F01")), (1,))
         self.assertEqual(port_identifier(port(2, "Rear Port 1")), (1,))
         self.assertEqual(port_identifier(port(3, "FrontPort01")), (1,))
+
+    def test_pairs_plain_numeric_port_names_one_to_one(self):
+        front_ports = [port(24, "24"), port(1, "1"), port(2, "2")]
+        rear_ports = [port(102, "2"), port(124, "24"), port(101, "1")]
+
+        pairs = pair_ports(front_ports, rear_ports)
+
+        self.assertEqual([(front.pk, rear.pk) for front, rear in pairs], [(1, 101), (2, 102), (24, 124)])
 
     def test_does_not_pair_different_identifiers(self):
         pairs = pair_ports([port(1, "Front 1")], [port(102, "Rear 2")])
