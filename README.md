@@ -348,6 +348,12 @@ none are saved. An optional shared description can be applied; the original
 file name is kept as the display name. Requires permission to add image
 attachments and to view the target object.
 
+NetBox caps Pillow at 25 megapixels, which breaks current 50 MP smartphone
+photos (e.g. Google Pixel, 8160×6144) and their thumbnails. The bulk upload
+therefore scales larger images down to NetBox' limit (EXIF orientation is
+applied) before saving. If an image is rejected, the form also shows Pillow's
+exact error message.
+
 ### Installing multiple modules
 
 Under **Plugins > NetBox Utilities > Install multiple modules** (or via the
@@ -359,17 +365,7 @@ The operation is atomic: if a bay is taken meanwhile or a naming conflict
 occurs, nothing is saved. Requires the permission to add modules; object
 permissions still apply.
 
-<<<<<<< HEAD
-NetBox begrenzt Pillow global auf 25 Megapixel und lehnt Bilder ab 50
-Megapixeln ab. Damit aktuelle 50-MP-Smartphone-Fotos (z. B. Google Pixel,
-8160×6144) hochgeladen werden können, hebt der Mehrfach-Upload dieses Limit
-während der Verarbeitung auf 100 Megapixel an. Wird ein Bild abgelehnt, zeigt
-das Formular zusätzlich die genaue Fehlermeldung von Pillow an.
-
-### Module mehrfach einbauen
-=======
 ### Personalised navigation
->>>>>>> a85e4d6375a673a333d601fa8867e00a96423fec
 
 Under **Plugins > NetBox Utilities > Customize navigation** users see every menu
 they have access to. Arrow buttons change the order; a toggle hides a menu.

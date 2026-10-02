@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -66,9 +67,43 @@ def raised_image_pixel_limit():
     if original_limit is not None and original_limit < BULK_IMAGE_MAX_PIXELS:
         Image.MAX_IMAGE_PIXELS = BULK_IMAGE_MAX_PIXELS
     try:
-        yield
+        yield original_limit
     finally:
         Image.MAX_IMAGE_PIXELS = original_limit
+
+
+def downscale_image(upload, max_pixels):
+    """Shrink an upload to NetBox' pixel limit so NetBox can render thumbnails later.
+
+    Returns the original upload when it is small enough or cannot be processed;
+    NetBox' own validation reports broken files afterwards.
+    """
+    from PIL import Image, ImageOps
+
+    if not max_pixels:
+        return upload
+    try:
+        upload.seek(0)
+        with Image.open(upload) as image:
+            width, height = image.size
+            if width * height <= max_pixels:
+                return upload
+            image_format = image.format
+            image = ImageOps.exif_transpose(image)
+            scale = (max_pixels / (width * height)) ** 0.5
+            size = (max(1, int(image.width * scale)), max(1, int(image.height * scale)))
+            image = image.resize(size, Image.Resampling.LANCZOS)
+            if image_format == "JPEG" and image.mode not in ("RGB", "L"):
+                image = image.convert("RGB")
+            content = BytesIO()
+            save_options = {"quality": 90} if image_format in ("JPEG", "WEBP") else {}
+            image.save(content, format=image_format, **save_options)
+    except Exception:  # noqa: BLE001 - leave validation to NetBox
+        return upload
+    finally:
+        if hasattr(upload, "seek"):
+            upload.seek(0)
+    return SimpleUploadedFile(upload.name, content.getvalue(), content_type=getattr(upload, "content_type", None))
 
 
 class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
@@ -86,12 +121,12 @@ class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
         parent = self._get_parent(request, request.POST)
         form = BulkImageUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            with raised_image_pixel_limit():
-                return self._process_upload(request, form, parent)
+            with raised_image_pixel_limit() as netbox_pixel_limit:
+                return self._process_upload(request, form, parent, netbox_pixel_limit)
         return self._render(request, form, parent)
 
-    def _process_upload(self, request, form, parent):
-        image_forms = self._build_image_forms(parent, form.cleaned_data)
+    def _process_upload(self, request, form, parent, max_pixels):
+        image_forms = self._build_image_forms(parent, form.cleaned_data, max_pixels)
         invalid = [image_form for image_form in image_forms if not image_form.is_valid()]
         if invalid:
             for image_form in invalid:
@@ -161,9 +196,10 @@ class BulkImageUploadView(ContentTypePermissionRequiredMixin, View):
         return None
 
     @staticmethod
-    def _build_image_forms(parent, cleaned_data):
+    def _build_image_forms(parent, cleaned_data, max_pixels=None):
         image_forms = []
         for image in cleaned_data["images"]:
+            image = downscale_image(image, max_pixels)
             if hasattr(image, "seek"):
                 image.seek(0)
             image_forms.append(
