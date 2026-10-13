@@ -37,6 +37,9 @@ class _Form(forms.Form):
 
 
 class ConnectionScopeFieldTest(SimpleTestCase):
+    # Pre-filling the tenant also looks up the tenant group (read-only query).
+    databases = {"default"}
+
     def test_filter_fields_are_optional_and_chained(self):
         fields = build_filter_fields()
 

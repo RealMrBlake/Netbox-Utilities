@@ -8,6 +8,7 @@ from django.test import RequestFactory, SimpleTestCase
 from django.urls import resolve, reverse
 from rest_framework.exceptions import PermissionDenied
 
+import netbox_utilities
 from netbox_utilities.reorder_rack import (
     RackLayoutError,
     apply_rack_layout,
@@ -449,7 +450,7 @@ class ReorderRackFrontendTest(SimpleTestCase):
         self.assertEqual(template_name, "netbox_utilities/reorder_rack.html")
         self.assertEqual(context["reorder_devices"][0]["label"], "LEO-Fritzbox")
         self.assertEqual(context["reorder_devices"][0]["grid_width"], 6)
-        self.assertEqual(context["asset_version"], "0.10.4")
+        self.assertEqual(context["asset_version"], netbox_utilities.__version__)
         self.assertIs(context["reorder_rack_width_data"], get_width_data.return_value)
         get_width_data.assert_called_once()
         self.assertIs(get_width_data.call_args.kwargs["rack"], rack)

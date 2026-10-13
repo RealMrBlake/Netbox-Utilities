@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
+import netbox_utilities
 from netbox_utilities.topology_views import (
     _apply_topology_widths_to_device_tags,
     _inject_topology_widths,
@@ -246,7 +247,7 @@ class TopologyViewsRackWidthTest(SimpleTestCase):
         self.assertIn('id="netbox-utilities-topology-rack-width-styles"', html)
         self.assertIn('.rack-device[href="/dcim/devices/334/"]', html)
         self.assertIn("left: calc(50% + 3px) !important", html)
-        self.assertIn("netbox_utilities/topology-rack-width.js?v=0.10.4", html)
+        self.assertIn(f"netbox_utilities/topology-rack-width.js?v={netbox_utilities.__version__}", html)
         self.assertIn("left:calc(0% + 3px)!important", html)
         self.assertIn("left:calc(50% + 3px)!important", html)
         self.assertIn("width:calc(50% - 6px)!important", html)

@@ -72,11 +72,13 @@ class SitePrefixTest(SimpleTestCase):
     def test_device_and_rack_tables_offer_prefix_column(self):
         from dcim.tables import DeviceTable, RackTable
 
-        self.assertIn(COLUMN_NAME, DeviceTable.base_columns)
-        self.assertIn(COLUMN_NAME, RackTable.base_columns)
+        from netbox.registry import registry
+
+        # register_table_column() stores columns in the registry; NetBox adds them when a table is instantiated.
         for table in (DeviceTable, RackTable):
-            column = table.base_columns[COLUMN_NAME]
-            self.assertTrue(column.orderable)
+            self.assertIn(COLUMN_NAME, registry["tables"][table])
+            column = registry["tables"][table][COLUMN_NAME]
+            self.assertIsNot(column.orderable, False)  # None means the table default (sortable)
             self.assertEqual(tuple(column.order_by), ("site__name",))
         self.assertEqual(DeviceTable.Meta.default_columns[:2], ("pk", COLUMN_NAME))
         self.assertEqual(RackTable.Meta.default_columns[:2], ("pk", COLUMN_NAME))
