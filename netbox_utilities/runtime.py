@@ -1,5 +1,5 @@
 from django.core.cache import cache
-from django.db import OperationalError, ProgrammingError
+from django.db import OperationalError, ProgrammingError, transaction
 from netbox.plugins import get_plugin_config
 
 from .models import UtilitiesSettings
@@ -37,11 +37,14 @@ def _get_database_settings():
     runtime_settings = cache.get(SETTINGS_CACHE_KEY)
     if runtime_settings is None:
         try:
-            runtime_settings = (
-                UtilitiesSettings.objects.filter(singleton_id=1)
-                .values("tenant_filter_enabled", "tenant_required")
-                .first()
-            )
+            # The savepoint keeps an outer transaction (e.g. a running migration)
+            # usable on PostgreSQL if the settings table does not exist yet.
+            with transaction.atomic():
+                runtime_settings = (
+                    UtilitiesSettings.objects.filter(singleton_id=1)
+                    .values("tenant_filter_enabled", "tenant_required")
+                    .first()
+                )
         except (OperationalError, ProgrammingError):
             # The middleware can be imported before the first plugin migration.
             runtime_settings = None
