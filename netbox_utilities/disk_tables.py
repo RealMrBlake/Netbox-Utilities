@@ -155,10 +155,10 @@ class RAIDGroupTable(NetBoxTable):
 
     def render_state(self, record):
         if record.is_degraded:
-            return format_html('<span class="badge text-bg-danger">Degradiert</span>')
+            return format_html('<span class="badge text-bg-{}">{}</span>', "danger", "Degradiert")
         if record.capacity[2]:
-            return format_html('<span class="badge text-bg-warning">Unvollständig</span>')
-        return format_html('<span class="badge text-bg-success">OK</span>')
+            return format_html('<span class="badge text-bg-{}">{}</span>', "warning", "Unvollständig")
+        return format_html('<span class="badge text-bg-{}">{}</span>', "success", "OK")
 
 
 class DiskBayTemplateTable(NetBoxTable):
