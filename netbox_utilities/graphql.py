@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from dcim.graphql.types import DeviceType, DeviceTypeType
     from tenancy.graphql.types import TenantType
 
-LAYOUT_FIELDS = ["id", "slot_count", "rows", "first_slot", "numbering", "form_factor"]
+LAYOUT_FIELDS = ["id", "name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor"]
 
 
 @strawberry_django.type(RAIDGroup, fields=["id", "name", "level", "spans", "description"])
@@ -53,6 +53,7 @@ class NetBoxUtilitiesDiskType(NetBoxObjectType):
     device: Annotated["DeviceType", strawberry.lazy("dcim.graphql.types")]
     tenant: Annotated["TenantType", strawberry.lazy("tenancy.graphql.types")] | None
     raid_group: Annotated["NetBoxUtilitiesRAIDGroupType", strawberry.lazy("netbox_utilities.graphql")] | None
+    bay: Annotated["NetBoxUtilitiesDiskBayLayoutType", strawberry.lazy("netbox_utilities.graphql")] | None
 
     @strawberry_django.field
     def warnings(self) -> list[str]:

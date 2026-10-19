@@ -17,6 +17,7 @@ from utilities.forms.widgets import DatePicker
 
 from . import disks
 from .models import (
+    BAY_LAYOUT_FIELDS,
     Disk,
     DiskBayLayout,
     DiskBayTemplate,
@@ -28,7 +29,7 @@ from .models import (
     RAIDLevelChoices,
 )
 
-LAYOUT_FIELDS = ("slot_count", "rows", "first_slot", "numbering", "form_factor")
+LAYOUT_FIELDS = BAY_LAYOUT_FIELDS
 
 
 class CapacityField(forms.CharField):
@@ -59,6 +60,13 @@ def _date_field(label, **kwargs):
 
 class DiskForm(NetBoxModelForm):
     device = DynamicModelChoiceField(label="Gerät", queryset=Device.objects.all(), selector=True)
+    bay = DynamicModelChoiceField(
+        label="Bereich",
+        queryset=DiskBayLayout.objects.all(),
+        required=False,
+        query_params={"device_id": "$device"},
+        help_text="z. B. Front oder PCIe-Karte",
+    )
     capacity_gb = CapacityField()
     raid_group = DynamicModelChoiceField(
         label="RAID-Gruppe",
@@ -69,7 +77,7 @@ class DiskForm(NetBoxModelForm):
     comments = CommentField()
 
     fieldsets = (
-        FieldSet("device", "slot", "status", "raid_group", name="Einbauort"),
+        FieldSet("device", "bay", "slot", "status", "raid_group", name="Einbauort"),
         FieldSet(
             "disk_type",
             "interface",
@@ -89,6 +97,7 @@ class DiskForm(NetBoxModelForm):
         model = Disk
         fields = (
             "device",
+            "bay",
             "slot",
             "status",
             "raid_group",
@@ -122,23 +131,25 @@ class DiskForm(NetBoxModelForm):
 
 
 class DiskBayLayoutForm(forms.ModelForm):
-    """The wizard which asks for the number of slots on the first visit of the tab."""
+    """The wizard for a slot area: asks for the number of slots on the first visit of the tab."""
 
     save_as_template = forms.BooleanField(
         label="Als Vorlage für den Gerätetyp speichern",
         required=False,
         initial=True,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        help_text="Weitere Geräte dieses Typs übernehmen das Layout dann mit einem Klick.",
+        help_text="Weitere Geräte dieses Typs übernehmen die Bereiche dann mit einem Klick.",
     )
 
     class Meta:
         model = DiskBayLayout
         fields = LAYOUT_FIELDS
         widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "list": "nbu-disk-bay-names"}),
+            "weight": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "slot_count": forms.NumberInput(attrs={"class": "form-control", "autofocus": True, "min": 1}),
             "rows": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
-            "first_slot": forms.Select(choices=((0, "0"), (1, "1")), attrs={"class": "form-select"}),
+            "first_slot": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "numbering": forms.Select(attrs={"class": "form-select"}),
             "form_factor": forms.Select(attrs={"class": "form-select"}),
         }
@@ -149,6 +160,12 @@ class DiskBayLayoutForm(forms.ModelForm):
         slot_count, rows = cleaned_data.get("slot_count"), cleaned_data.get("rows")
         if slot_count and rows and rows > slot_count:
             self.add_error("rows", "Es kann nicht mehr Reihen als Steckplätze geben.")
+        # "device" is not a form field, so Django skips the unique (device, name) constraint here.
+        name = cleaned_data.get("name")
+        if name and self.instance.device_id:
+            duplicate = DiskBayLayout.objects.filter(device_id=self.instance.device_id, name__iexact=name)
+            if duplicate.exclude(pk=self.instance.pk).exists():
+                self.add_error("name", f"Das Gerät hat bereits einen Bereich „{name}“.")
         return cleaned_data
 
 
@@ -178,9 +195,10 @@ class DiskBulkFillForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, device, free_slots, **kwargs):
+    def __init__(self, *args, bay, free_slots, **kwargs):
         super().__init__(*args, **kwargs)
-        self.device = device
+        self.bay = bay
+        self.device = device = bay.device
         self.fields["slots"].choices = [(slot, f"Slot {slot}") for slot in free_slots]
         self.fields["raid_group"].queryset = RAIDGroup.objects.filter(device=device)
         for name, field in self.fields.items():
@@ -205,7 +223,7 @@ class DiskBulkFillForm(forms.Form):
         existing = (
             list(
                 Disk.objects.filter(serial__in=serials, status__in=disks.SLOT_OCCUPYING_STATUSES)
-                .select_related("device")
+                .select_related("device", "bay")
                 .order_by("serial")
             )
             if serials
@@ -215,7 +233,7 @@ class DiskBulkFillForm(forms.Form):
             self.add_error(
                 "serials",
                 "Bereits eingebaut: "
-                + ", ".join(f"{disk.serial} ({disk.device}, Slot {disk.slot})" for disk in existing),
+                + ", ".join(f"{disk.serial} ({disk.device}, {disk.slot_label})" for disk in existing),
             )
         cleaned_data["serial_list"] = serials
         return cleaned_data
@@ -240,6 +258,7 @@ class DiskBulkFillForm(forms.Form):
         return [
             Disk(
                 device=self.device,
+                bay=self.bay,
                 slot=slot,
                 serial=serials[index] if index < len(serials) else "",
                 manufacture_date=data.get("manufacture_date"),
@@ -360,6 +379,11 @@ class DiskImportForm(NetBoxModelImportForm):
     interface = CSVChoiceField(label="Schnittstelle", choices=DiskInterfaceChoices, required=False)
     form_factor = CSVChoiceField(label="Bauform", choices=DiskFormFactorChoices, required=False)
     capacity = CapacityField(help_text="z. B. 960 GB oder 4 TB")
+    bay = forms.CharField(
+        label="Bereich",
+        required=False,
+        help_text="Name des Bereichs, z. B. Front; leer, wenn das Gerät nur einen Bereich hat",
+    )
     raid_group = forms.CharField(
         label="RAID-Gruppe",
         required=False,
@@ -370,6 +394,7 @@ class DiskImportForm(NetBoxModelImportForm):
         model = Disk
         fields = (
             "device",
+            "bay",
             "slot",
             "status",
             "disk_type",
@@ -393,6 +418,9 @@ class DiskImportForm(NetBoxModelImportForm):
     def clean_raid_group(self):
         return self.cleaned_data.get("raid_group") or ""
 
+    def clean_bay(self):
+        return self.cleaned_data.get("bay") or ""
+
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
@@ -401,8 +429,20 @@ class DiskImportForm(NetBoxModelImportForm):
             self.instance.status = disks.STATUS_ACTIVE
         if (capacity := cleaned_data.get("capacity")) is not None:
             self.instance.capacity_gb = capacity
-        group_name = cleaned_data.get("raid_group")
         device = cleaned_data.get("device")
+        bay_name = cleaned_data.get("bay")
+        cleaned_data["bay"] = None
+        if device:
+            bays = list(DiskBayLayout.objects.filter(device=device))
+            if bay_name:
+                matches = [bay for bay in bays if bay.name.casefold() == bay_name.casefold()]
+                if matches:
+                    cleaned_data["bay"] = matches[0]
+                else:
+                    self.add_error("bay", f"Das Gerät {device} hat keinen Bereich „{bay_name}“.")
+            elif len(bays) == 1:
+                cleaned_data["bay"] = bays[0]
+        group_name = cleaned_data.get("raid_group")
         if group_name and device:
             group = RAIDGroup.objects.filter(device=device, name=group_name).first()
             if group is None:

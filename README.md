@@ -226,25 +226,43 @@ Devices whose role is one of `disk_device_roles` (default `Server`, `NAS`,
 `SAN`, `MSA`) get a **Disks** tab. The tab badge shows the number of
 installed disks. Devices with other roles do not show the tab.
 
-**First visit.** A wizard asks for the number of slots, the number of rows on
-the device front, the number of the first slot (0 or 1, as printed by the
-vendor), row- or column-wise numbering and the default form factor. With
-**Save as template for the device type** the layout is stored for the device
-type; the next device of the same type offers **Apply template** and needs
-a single click. Templates are managed under **Disks > Disk templates** in the main menu.
-The layout can be changed later with **Change layout**; slots that still hold a
-disk cannot be removed.
+**First visit.** A wizard asks for the first slot area (default name *Front*):
+the number of slots, the number of rows, the number of the first slot (usually
+0 or 1, as printed by the vendor), row- or column-wise numbering and the default
+form factor.
 
-**Slot grid.** The slots are drawn like the device front and coloured by
+**Slot areas.** A device can have several slot areas, each with its own name,
+slot count, numbering and grid, for example:
+
+| Area | Slots | Grid |
+|---|---|---|
+| Front | 16 × 2.5″ | 2 × 8 |
+| Rear | 2 × 2.5″ | 1 × 2 |
+| BOSS card (M.2) | 2 | 1 × 2 |
+| PCIe | 2 × NVMe | 1 × 2 |
+
+Use **Add area** on the tab for disks that are not in the front bays, such as
+NVMe SSDs on a PCIe card. The pencil button of an area changes its name, order,
+size or numbering; slots that still hold a disk cannot be removed, and only an
+empty area can be deleted. Slot numbers are unique per area, so the PCIe area
+can start at slot 0 again.
+
+**Templates.** With **Save as template for the device type** an area is stored
+for the device type. The next device of the same type offers **Apply
+template**, which creates all stored areas with one click; on a device that
+already has areas, the button adds the missing ones. Templates are managed under
+**Disks > Disk templates** in the main menu.
+
+**Slot grid.** Each area is drawn as its own grid and coloured by
 status (active, hot spare, failed, planned). A warning icon marks disks with
 expired or expiring warranty, old age or a failure. Clicking a free slot opens
 the disk form with device and slot pre-filled; clicking an occupied slot opens
 the disk. Users with `netbox_utilities.change_disk` can drag a disk onto a free
-slot to move it, or onto an occupied slot to swap both disks; the change is
-saved immediately and recorded in the changelog.
+slot to move it, or onto an occupied slot to swap both disks, also between
+areas; the change is saved immediately and recorded in the changelog.
 
-**Filling many slots at once.** Tick several free slots (or **Select all
-free**) and choose **Fill selected**. All selected slots get the same
+**Filling many slots at once.** Tick several free slots of an area (or **Select
+all free**) and choose **Fill selected**. All selected slots get the same
 manufacturer, model, size, type, interface, dates and RAID group. Serial numbers
 go into a text field, one per line, in slot order. A barcode scanner can scan
 them one after another; the page counts the entries and flags duplicates live.
@@ -298,7 +316,8 @@ device and slot. The device list offers an optional **Disks** column
 per row, so enable it only where needed.
 
 **CSV import.** **Disks > Disks > Import** accepts CSV, JSON or YAML
-with these columns: `device` (device name), `slot`, `status`, `disk_type`,
+with these columns: `device` (device name), `bay` (area name, may be empty when
+the device has only one area), `slot`, `status`, `disk_type`,
 `interface`, `form_factor`, `manufacturer`, `model`, `capacity` (e.g. `4 TB`),
 `serial`, `firmware`, `manufacture_date`, `install_date`, `removal_date`,
 `warranty_end`, `raid_group` (name of an existing group of that device),
@@ -308,9 +327,10 @@ example `active`, `spare`, `failed`, `planned`, `replaced`, `hdd`, `ssd`, `nvme`
 mapped to these column names first.
 
 ```csv
-device,slot,status,disk_type,interface,manufacturer,model,capacity,serial,warranty_end
-srv-01,0,active,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123456,2029-05-31
-srv-01,1,spare,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123457,2029-05-31
+device,bay,slot,status,disk_type,interface,manufacturer,model,capacity,serial,warranty_end
+srv-01,Front,0,active,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123456,2029-05-31
+srv-01,Front,1,spare,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123457,2029-05-31
+srv-01,PCIe,0,active,nvme,nvme,Samsung,PM9A3,3.84 TB,S64XNA0T654321,2030-01-31
 ```
 
 **REST API and GraphQL.**
@@ -319,8 +339,8 @@ srv-01,1,spare,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123457,2029-05-31
 |---|---|
 | `/api/plugins/utilities/disks/` | Disks, incl. read-only `tenant` and `warnings` |
 | `/api/plugins/utilities/raid-groups/` | RAID groups, incl. `usable_capacity_gb` and `is_degraded` |
-| `/api/plugins/utilities/disk-bay-layouts/` | Slot layout per device |
-| `/api/plugins/utilities/disk-bay-templates/` | Slot layout templates per device type |
+| `/api/plugins/utilities/disk-bay-layouts/` | Slot areas per device (`name`, `weight`, slot count, grid) |
+| `/api/plugins/utilities/disk-bay-templates/` | Slot area templates per device type |
 
 The disk endpoint supports the same filters as the list, e.g.
 `?device_id=12&status=failed`, `?serial=S4XXNA0R123456`, `?warranty=expiring` or

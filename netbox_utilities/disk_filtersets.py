@@ -41,6 +41,8 @@ class DiskFilterSet(NetBoxModelFilterSet):
     )
     tenant_id = django_filters.ModelMultipleChoiceFilter(queryset=Tenant.objects.all(), label="Mandant (ID)")
     raid_group_id = django_filters.ModelMultipleChoiceFilter(queryset=RAIDGroup.objects.all(), label="RAID-Gruppe (ID)")
+    bay_id = django_filters.ModelMultipleChoiceFilter(queryset=DiskBayLayout.objects.all(), label="Bereich (ID)")
+    bay = django_filters.CharFilter(field_name="bay__name", lookup_expr="iexact", label="Bereich (Name)")
     status = django_filters.MultipleChoiceFilter(choices=DiskStatusChoices)
     disk_type = django_filters.MultipleChoiceFilter(choices=DiskTypeChoices)
     interface = django_filters.MultipleChoiceFilter(choices=DiskInterfaceChoices)
@@ -120,10 +122,12 @@ class DiskBayLayoutFilterSet(NetBoxModelFilterSet):
 
     class Meta:
         model = DiskBayLayout
-        fields = ("id", "slot_count", "rows", "first_slot", "numbering", "form_factor")
+        fields = ("id", "name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
 
     def search(self, queryset, name, value):
-        return queryset.filter(device__name__icontains=value) if value.strip() else queryset
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(device__name__icontains=value) | Q(name__icontains=value))
 
 
 class DiskBayTemplateFilterSet(NetBoxModelFilterSet):
@@ -131,7 +135,9 @@ class DiskBayTemplateFilterSet(NetBoxModelFilterSet):
 
     class Meta:
         model = DiskBayTemplate
-        fields = ("id", "slot_count", "rows", "first_slot", "numbering", "form_factor")
+        fields = ("id", "name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
 
     def search(self, queryset, name, value):
-        return queryset.filter(device_type__model__icontains=value) if value.strip() else queryset
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(device_type__model__icontains=value) | Q(name__icontains=value))

@@ -5,7 +5,7 @@ from tenancy.api.serializers import TenantSerializer
 
 from ..models import Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup
 
-LAYOUT_FIELDS = ("slot_count", "rows", "first_slot", "numbering", "form_factor")
+LAYOUT_FIELDS = ("name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
 
 
 class RAIDGroupSerializer(NetBoxModelSerializer):
@@ -39,6 +39,9 @@ class RAIDGroupSerializer(NetBoxModelSerializer):
 class DiskSerializer(NetBoxModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="plugins-api:netbox_utilities-api:disk-detail")
     device = DeviceSerializer(nested=True)
+    bay = serializers.PrimaryKeyRelatedField(
+        queryset=DiskBayLayout.objects.all(), required=False, allow_null=True, help_text="ID des Bereichs"
+    )
     raid_group = RAIDGroupSerializer(nested=True, required=False, allow_null=True)
     tenant = TenantSerializer(nested=True, read_only=True)
     warnings = serializers.SerializerMethodField()
@@ -51,6 +54,7 @@ class DiskSerializer(NetBoxModelSerializer):
             "display_url",
             "display",
             "device",
+            "bay",
             "slot",
             "status",
             "disk_type",
@@ -99,7 +103,7 @@ class DiskBayLayoutSerializer(NetBoxModelSerializer):
             "created",
             "last_updated",
         )
-        brief_fields = ("id", "url", "display", "device", "slot_count")
+        brief_fields = ("id", "url", "display", "device", "name", "slot_count")
 
 
 class DiskBayTemplateSerializer(NetBoxModelSerializer):
@@ -120,4 +124,4 @@ class DiskBayTemplateSerializer(NetBoxModelSerializer):
             "created",
             "last_updated",
         )
-        brief_fields = ("id", "url", "display", "device_type", "slot_count")
+        brief_fields = ("id", "url", "display", "device_type", "name", "slot_count")

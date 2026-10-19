@@ -74,6 +74,7 @@
       event.preventDefault();
       const body = new FormData();
       body.append("disk", dragged.dataset.nbuDisk);
+      body.append("bay", target.dataset.nbuBay);
       body.append("slot", target.dataset.nbuSlot);
       grid.classList.add("nbu-disk-busy");
       try {
@@ -129,12 +130,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    const grid = document.getElementById("nbu-disk-grid-form");
-    if (grid) {
-      initSlotGrid(grid);
-      const slots = grid.querySelector(".nbu-disk-grid");
-      if (slots) initDragAndDrop(slots);
-    }
+    for (const form of document.querySelectorAll("[data-nbu-grid-form]")) initSlotGrid(form);
+    const bays = document.getElementById("nbu-disk-bays");
+    if (bays) initDragAndDrop(bays);
     const fill = document.getElementById("nbu-disk-fill-form");
     if (fill) initFillForm(fill);
   });

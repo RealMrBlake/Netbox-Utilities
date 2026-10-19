@@ -130,6 +130,10 @@ class WirelessLinkVLANAssignment(models.Model):
         return f"VLANs für Funkverbindung {self.wireless_link}"
 
 
+DEFAULT_BAY_NAME = "Front"
+BAY_LAYOUT_FIELDS = ("name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
+
+
 class DiskStatusChoices(ChoiceSet):
     key = "Disk.status"
 
@@ -190,6 +194,15 @@ class RAIDLevelChoices(ChoiceSet):
 
 
 class DiskBayLayoutBase(NetBoxModel):
+    name = models.CharField(
+        "Bereich",
+        max_length=50,
+        default=DEFAULT_BAY_NAME,
+        help_text="z. B. Front, Rückseite, BOSS-Karte (M.2) oder PCIe",
+    )
+    weight = models.PositiveSmallIntegerField(
+        "Reihenfolge", default=100, help_text="Bereiche mit kleinerem Wert werden zuerst angezeigt."
+    )
     slot_count = models.PositiveSmallIntegerField(
         "Anzahl Steckplätze",
         validators=[MinValueValidator(1), MaxValueValidator(512)],
@@ -198,12 +211,12 @@ class DiskBayLayoutBase(NetBoxModel):
         "Reihen",
         default=1,
         validators=[MinValueValidator(1), MaxValueValidator(64)],
-        help_text="Wie viele Reihen die Gerätefront hat, z. B. 2 für 2 × 12 Einschübe.",
+        help_text="Wie viele Reihen der Bereich hat, z. B. 2 für 2 × 12 Einschübe.",
     )
     first_slot = models.PositiveSmallIntegerField(
         "Erster Steckplatz",
         default=0,
-        validators=[MaxValueValidator(1)],
+        validators=[MaxValueValidator(255)],
         help_text="Nummer des ersten Steckplatzes laut Hersteller (meist 0 oder 1).",
     )
     numbering = models.CharField(
@@ -221,59 +234,72 @@ class DiskBayLayoutBase(NetBoxModel):
     def last_slot(self):
         return self.first_slot + self.slot_count - 1
 
+    def layout_values(self):
+        return {name: getattr(self, name) for name in BAY_LAYOUT_FIELDS}
+
 
 class DiskBayTemplate(DiskBayLayoutBase):
-    """Remembers the slot layout of a device type so new devices skip the wizard."""
+    """Remembers the slot areas of a device type so new devices skip the wizard."""
 
-    device_type = models.OneToOneField(
+    device_type = models.ForeignKey(
         "dcim.DeviceType",
         on_delete=models.CASCADE,
-        related_name="netbox_utilities_disk_bay_template",
+        related_name="netbox_utilities_disk_bay_templates",
         verbose_name="Gerätetyp",
     )
 
     class Meta:
-        ordering = ("device_type",)
+        ordering = ("device_type", "weight", "name")
+        constraints = (
+            models.UniqueConstraint(
+                fields=("device_type", "name"), name="netbox_utilities_diskbaytemplate_unique_name"
+            ),
+        )
         verbose_name = "Datenträger-Vorlage"
         verbose_name_plural = "Datenträger-Vorlagen"
 
     def __str__(self):
-        return f"{self.device_type}: {self.slot_count} Steckplätze"
+        return f"{self.device_type}: {self.name} ({self.slot_count} Steckplätze)"
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_utilities:diskbaytemplate", args=[self.pk])
 
 
 class DiskBayLayout(DiskBayLayoutBase):
-    device = models.OneToOneField(
+    """One slot area of a device, e.g. the 16 front bays or a PCIe card with two NVMe SSDs."""
+
+    device = models.ForeignKey(
         "dcim.Device",
         on_delete=models.CASCADE,
-        related_name="netbox_utilities_disk_bay_layout",
+        related_name="netbox_utilities_disk_bays",
         verbose_name="Gerät",
     )
 
     class Meta:
-        ordering = ("device",)
-        verbose_name = "Steckplatz-Layout"
-        verbose_name_plural = "Steckplatz-Layouts"
+        ordering = ("device", "weight", "name")
+        constraints = (
+            models.UniqueConstraint(fields=("device", "name"), name="netbox_utilities_diskbaylayout_unique_name"),
+        )
+        verbose_name = "Steckplatz-Bereich"
+        verbose_name_plural = "Steckplatz-Bereiche"
 
     def __str__(self):
-        return f"{self.device}: {self.slot_count} Steckplätze"
+        return f"{self.device}: {self.name}"
 
     def get_absolute_url(self):
         return reverse("dcim:device_disks", kwargs={"pk": self.device_id})
 
     def clean(self):
         super().clean()
-        if self.pk and self.device_id and self.slot_count:
+        if self.pk and self.slot_count:
             outside = list(
-                Disk.objects.filter(device_id=self.device_id, status__in=disks.SLOT_OCCUPYING_STATUSES)
+                Disk.objects.filter(bay_id=self.pk, status__in=disks.SLOT_OCCUPYING_STATUSES)
                 .exclude(slot__range=(self.first_slot, self.last_slot))
                 .values_list("slot", flat=True)
             )
             if outside:
                 raise ValidationError(
-                    "Diese Steckplätze sind noch bestückt und lägen außerhalb des neuen Layouts: "
+                    "Diese Steckplätze sind noch bestückt und lägen außerhalb des Bereichs: "
                     + ", ".join(str(slot) for slot in sorted(outside))
                 )
 
@@ -342,6 +368,14 @@ class Disk(NetBoxModel):
         related_name="netbox_utilities_disks",
         verbose_name="Gerät",
     )
+    bay = models.ForeignKey(
+        DiskBayLayout,
+        on_delete=models.PROTECT,
+        related_name="disks",
+        blank=True,
+        null=True,
+        verbose_name="Bereich",
+    )
     slot = models.PositiveSmallIntegerField("Steckplatz")
     status = models.CharField("Status", max_length=20, choices=DiskStatusChoices, default=disks.STATUS_ACTIVE)
     disk_type = models.CharField("Typ", max_length=20, choices=DiskTypeChoices, blank=True)
@@ -378,6 +412,7 @@ class Disk(NetBoxModel):
 
     clone_fields = (
         "device",
+        "bay",
         "status",
         "disk_type",
         "interface",
@@ -393,10 +428,10 @@ class Disk(NetBoxModel):
     )
 
     class Meta:
-        ordering = ("device", "slot", "-install_date", "pk")
+        ordering = ("device", "bay__weight", "bay__name", "slot", "-install_date", "pk")
         constraints = (
             models.UniqueConstraint(
-                fields=("device", "slot"),
+                fields=("bay", "slot"),
                 condition=~models.Q(status=disks.STATUS_REPLACED),
                 name="netbox_utilities_disk_unique_occupied_slot",
                 violation_error_message="Dieser Steckplatz ist bereits bestückt.",
@@ -407,7 +442,7 @@ class Disk(NetBoxModel):
 
     def __str__(self):
         label = " ".join(part for part in (self.manufacturer, self.model) if part) or "Datenträger"
-        return f"{label} ({self.serial})" if self.serial else f"{label} – Slot {self.slot}"
+        return f"{label} ({self.serial})" if self.serial else f"{label} – {self.slot_label}"
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_utilities:disk", args=[self.pk])
@@ -418,6 +453,10 @@ class Disk(NetBoxModel):
     @property
     def capacity_display(self):
         return disks.format_capacity(self.capacity_gb)
+
+    @property
+    def slot_label(self):
+        return f"{self.bay.name} {self.slot}" if self.bay_id else f"Slot {self.slot}"
 
     @property
     def occupies_slot(self):
@@ -437,9 +476,13 @@ class Disk(NetBoxModel):
         super().clean()
         errors = {}
         if self.device_id:
-            layout = DiskBayLayout.objects.filter(device_id=self.device_id).first()
-            if layout and self.slot is not None and not layout.first_slot <= self.slot <= layout.last_slot:
-                errors["slot"] = f"Das Gerät hat nur die Steckplätze {layout.first_slot} bis {layout.last_slot}."
+            bay = self.bay if self.bay_id else None
+            if bay is None and DiskBayLayout.objects.filter(device_id=self.device_id).exists():
+                errors["bay"] = "Bitte den Bereich wählen, in dem der Datenträger steckt."
+            elif bay is not None and bay.device_id != self.device_id:
+                errors["bay"] = "Der Bereich gehört zu einem anderen Gerät."
+            elif bay is not None and self.slot is not None and not bay.first_slot <= self.slot <= bay.last_slot:
+                errors["slot"] = f"{bay.name} hat nur die Steckplätze {bay.first_slot} bis {bay.last_slot}."
             if self.raid_group_id and self.raid_group.device_id != self.device_id:
                 errors["raid_group"] = "Die RAID-Gruppe gehört zu einem anderen Gerät."
         if self.status == disks.STATUS_REPLACED and not self.removal_date:

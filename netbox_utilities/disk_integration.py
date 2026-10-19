@@ -20,14 +20,16 @@ class DeviceDisksColumn(tables.Column):
 
     @staticmethod
     def occupancy(record):
+        from django.db.models import Sum
+
         from . import disks
         from .models import Disk, DiskBayLayout
 
-        layout = DiskBayLayout.objects.filter(device=record).only("slot_count").first()
-        if layout is None:
+        slot_count = DiskBayLayout.objects.filter(device=record).aggregate(total=Sum("slot_count"))["total"]
+        if not slot_count:
             return None
         used = Disk.objects.filter(device=record, status__in=disks.SLOT_OCCUPYING_STATUSES).count()
-        return f"{used}/{layout.slot_count}"
+        return f"{used}/{slot_count}"
 
     def render(self, record):
         from django.urls import reverse

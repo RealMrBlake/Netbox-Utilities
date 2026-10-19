@@ -34,6 +34,7 @@ class DiskWarningsColumn(tables.Column):
 
 class DiskTable(NetBoxTable):
     device = tables.Column(linkify=True, verbose_name="Gerät")
+    bay = tables.Column(accessor=tables.A("bay__name"), verbose_name="Bereich")
     slot = tables.Column(linkify=True, verbose_name="Slot")
     status = columns.ChoiceFieldColumn(verbose_name="Status")
     disk_type = columns.ChoiceFieldColumn(verbose_name="Typ")
@@ -53,6 +54,7 @@ class DiskTable(NetBoxTable):
             "pk",
             "id",
             "device",
+            "bay",
             "slot",
             "status",
             "disk_type",
@@ -79,6 +81,7 @@ class DiskTable(NetBoxTable):
         default_columns = (
             "pk",
             "device",
+            "bay",
             "slot",
             "status",
             "disk_type",
@@ -95,6 +98,7 @@ class DiskTable(NetBoxTable):
 class DeviceDiskHistoryTable(NetBoxTable):
     """Removed and replaced disks on the device tab."""
 
+    bay = tables.Column(accessor=tables.A("bay__name"), verbose_name="Bereich")
     slot = tables.Column(verbose_name="Slot")
     serial = tables.Column(linkify=True, verbose_name="Seriennummer")
     capacity_gb = CapacityColumn(verbose_name="Größe")
@@ -103,6 +107,7 @@ class DeviceDiskHistoryTable(NetBoxTable):
     class Meta(NetBoxTable.Meta):
         model = Disk
         fields = (
+            "bay",
             "slot",
             "manufacturer",
             "model",
@@ -163,6 +168,7 @@ class RAIDGroupTable(NetBoxTable):
 
 class DiskBayTemplateTable(NetBoxTable):
     device_type = tables.Column(linkify=True, verbose_name="Gerätetyp")
+    name = tables.Column(linkify=True, verbose_name="Bereich")
     numbering = columns.ChoiceFieldColumn(verbose_name="Nummerierung")
     form_factor = columns.ChoiceFieldColumn(verbose_name="Bauform")
 
@@ -172,6 +178,8 @@ class DiskBayTemplateTable(NetBoxTable):
             "pk",
             "id",
             "device_type",
+            "name",
+            "weight",
             "slot_count",
             "rows",
             "first_slot",
@@ -180,4 +188,4 @@ class DiskBayTemplateTable(NetBoxTable):
             "created",
             "last_updated",
         )
-        default_columns = ("pk", "device_type", "slot_count", "rows", "first_slot", "numbering", "form_factor")
+        default_columns = ("pk", "device_type", "name", "slot_count", "rows", "first_slot", "numbering", "form_factor")

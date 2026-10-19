@@ -10,20 +10,23 @@
   </div>
 {% endif %}
 
-{% if not layout %}
+{% if not bays %}
   {# ---------- Wizard: first visit ---------- #}
   <div class="row">
     <div class="col col-lg-8 col-xl-6 offset-lg-2 offset-xl-3">
-      {% if device_type_template and perms.netbox_utilities.add_disk %}
+      {% if device_type_templates and perms.netbox_utilities.add_disk %}
         <div class="card mb-3 border-primary">
           <h2 class="card-header"><i class="mdi mdi-content-copy me-1" aria-hidden="true"></i>Vorlage für {{ object.device_type }}</h2>
           <div class="card-body">
-            <p class="mb-3">
-              Für diesen Gerätetyp ist bereits ein Layout gespeichert:
-              <strong>{{ device_type_template.slot_count }} Steckplätze</strong>
-              in {{ device_type_template.rows }} Reihe{{ device_type_template.rows|pluralize:"n" }},
-              beginnend bei Slot {{ device_type_template.first_slot }}{% if device_type_template.form_factor %}, Bauform {{ device_type_template.get_form_factor_display }}{% endif %}.
-            </p>
+            <p class="mb-2">Für diesen Gerätetyp sind bereits Bereiche gespeichert:</p>
+            <ul class="mb-3">
+              {% for template in device_type_templates %}
+                <li>
+                  <strong>{{ template.name }}</strong>: {{ template.slot_count }} Steckplätze
+                  in {{ template.rows }} Reihe{{ template.rows|pluralize:"n" }}, ab Slot {{ template.first_slot }}{% if template.form_factor %}, {{ template.get_form_factor_display }}{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
             <form method="post" action="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}">
               {% csrf_token %}
               <button type="submit" name="apply_template" value="1" class="btn btn-primary">
@@ -37,7 +40,10 @@
         <h2 class="card-header"><i class="mdi mdi-harddisk me-1" aria-hidden="true"></i>Datenträger einrichten</h2>
         <div class="card-body">
           {% if perms.netbox_utilities.add_disk %}
-            <p>Für <strong>{{ object }}</strong> wurden noch keine Datenträger erfasst. Wie viele Steckplätze hat das Gerät?</p>
+            <p>
+              Für <strong>{{ object }}</strong> wurden noch keine Datenträger erfasst. Wie viele Steckplätze hat der erste Bereich,
+              z. B. die Front? Weitere Bereiche wie eine PCIe-Karte mit NVMe-SSDs lassen sich danach hinzufügen.
+            </p>
             <form method="post" action="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}">
               {% csrf_token %}
               {% include 'netbox_utilities/inc/disk_layout_fields.html' with form=setup_form %}
@@ -91,77 +97,107 @@
     </div>
   </div>
 
-  {# ---------- Slot grid ---------- #}
-  <form method="get" action="{% url 'plugins:netbox_utilities:device_disk_fill' pk=object.pk %}" class="card mb-3" id="nbu-disk-grid-form">
-    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
-      <h2 class="card-title me-auto mb-0">Steckplätze</h2>
-      {% if perms.netbox_utilities.add_disk %}
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-nbu-select-free>
-          <i class="mdi mdi-checkbox-multiple-marked-outline" aria-hidden="true"></i> Alle freien wählen
-        </button>
-        <button type="submit" class="btn btn-sm btn-primary" data-nbu-fill-selected>
-          <i class="mdi mdi-tray-plus" aria-hidden="true"></i> Ausgewählte bestücken (<span data-nbu-selected-count>0</span>)
-        </button>
-        <a href="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}" class="btn btn-sm btn-outline-secondary">
-          <i class="mdi mdi-view-grid-outline" aria-hidden="true"></i> Layout ändern
-        </a>
-      {% endif %}
-      <a href="{% url 'plugins:netbox_utilities:disk_list' %}?device_id={{ object.pk }}" class="btn btn-sm btn-outline-secondary">
-        <i class="mdi mdi-table" aria-hidden="true"></i> Liste &amp; Export
+  {# ---------- Slot areas ---------- #}
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <h2 class="h3 me-auto mb-0">Steckplätze</h2>
+    {% if perms.netbox_utilities.add_disk %}
+      <a href="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}" class="btn btn-sm btn-primary">
+        <i class="mdi mdi-plus-thick" aria-hidden="true"></i> Bereich hinzufügen
       </a>
-    </div>
-    <div class="card-body">
-      <div class="nbu-disk-grid-wrapper">
-        <div class="nbu-disk-grid" style="--nbu-disk-columns: {{ grid.0|length }}"
-             {% if perms.netbox_utilities.change_disk %}data-nbu-move-url="{% url 'plugins:netbox_utilities:device_disk_move' pk=object.pk %}" data-nbu-csrf="{{ csrf_token }}"{% endif %}>
-          {% for row in grid %}{% for cell in row %}
-            {% if cell.number is None %}
-              <div class="nbu-disk-slot nbu-disk-slot-padding" aria-hidden="true"></div>
-            {% elif cell.disk %}
-              {% with disk=cell.disk %}
-              <a href="{{ disk.get_absolute_url }}" class="nbu-disk-slot nbu-disk-{{ disk.status }}"
-                 data-nbu-slot="{{ cell.number }}" data-nbu-disk="{{ disk.pk }}"{% if perms.netbox_utilities.change_disk %} draggable="true"{% endif %}
-                 title="{{ disk }} · {{ disk.get_status_display }}{% if disk.raid_group %} · {{ disk.raid_group.name }}{% endif %}{% for level, text in disk.warnings %} · {{ text }}{% endfor %}">
-                <span class="nbu-disk-slot-number">{{ cell.number }}</span>
-                {% if disk.warnings %}<i class="mdi mdi-alert nbu-disk-slot-warning" aria-label="Warnung"></i>{% endif %}
-                <span class="nbu-disk-slot-capacity">{{ disk.capacity_display }}</span>
-                <span class="nbu-disk-slot-meta">{{ disk.get_disk_type_display|default:"" }} {{ disk.get_interface_display|default:"" }}</span>
-                <span class="nbu-disk-slot-meta text-truncate">{{ disk.serial|default:"ohne S/N" }}</span>
-                {% if disk.raid_group %}<span class="nbu-disk-slot-raid text-truncate">{{ disk.raid_group.name }}</span>{% endif %}
-              </a>
-              {% endwith %}
-            {% else %}
-              <div class="nbu-disk-slot nbu-disk-empty" data-nbu-slot="{{ cell.number }}">
-                <span class="nbu-disk-slot-number">{{ cell.number }}</span>
-                {% if perms.netbox_utilities.add_disk %}
-                  <input type="checkbox" class="form-check-input nbu-disk-slot-check" name="slots" value="{{ cell.number }}" aria-label="Slot {{ cell.number }} auswählen">
-                  <a class="nbu-disk-slot-add stretched-link" href="{% url 'plugins:netbox_utilities:disk_add' %}?device={{ object.pk }}&slot={{ cell.number }}{% if layout.form_factor %}&form_factor={{ layout.form_factor }}{% endif %}&return_url={{ tab_url|urlencode }}">
-                    <i class="mdi mdi-plus" aria-hidden="true"></i><span class="visually-hidden">Slot {{ cell.number }} bestücken</span>
-                  </a>
-                {% else %}
-                  <span class="nbu-disk-slot-meta">frei</span>
-                {% endif %}
-              </div>
-            {% endif %}
-          {% endfor %}{% endfor %}
-        </div>
-      </div>
-      <div class="nbu-disk-legend mt-3 small text-muted">
-        <span><span class="nbu-disk-dot nbu-disk-active"></span>Aktiv</span>
-        <span><span class="nbu-disk-dot nbu-disk-spare"></span>Hot-Spare</span>
-        <span><span class="nbu-disk-dot nbu-disk-failed"></span>Defekt</span>
-        <span><span class="nbu-disk-dot nbu-disk-planned"></span>Geplant</span>
-        <span><span class="nbu-disk-dot nbu-disk-empty"></span>Frei</span>
-        <span>Klick auf einen Steckplatz öffnet bzw. bestückt ihn, Häkchen wählen mehrere freie Steckplätze aus.{% if perms.netbox_utilities.change_disk %} Datenträger per Drag &amp; Drop verschieben; auf einen belegten Steckplatz gezogen, tauschen beide die Plätze.{% endif %}</span>
-      </div>
-      {% if orphaned_disks %}
-        <div class="alert alert-warning mt-3 mb-0">
-          Außerhalb des Layouts:
-          {% for disk in orphaned_disks %}<a href="{{ disk.get_absolute_url }}">Slot {{ disk.slot }} – {{ disk }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
-        </div>
+      {% if device_type_templates %}
+        <form method="post" action="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" name="apply_template" value="1" class="btn btn-sm btn-outline-secondary" title="Fehlende Bereiche aus der Vorlage des Gerätetyps anlegen">
+            <i class="mdi mdi-content-copy" aria-hidden="true"></i> Vorlage übernehmen
+          </button>
+        </form>
       {% endif %}
+    {% endif %}
+    <a href="{% url 'plugins:netbox_utilities:disk_list' %}?device_id={{ object.pk }}" class="btn btn-sm btn-outline-secondary">
+      <i class="mdi mdi-table" aria-hidden="true"></i> Liste &amp; Export
+    </a>
+  </div>
+
+  <div id="nbu-disk-bays"
+       {% if perms.netbox_utilities.change_disk %}data-nbu-move-url="{% url 'plugins:netbox_utilities:device_disk_move' pk=object.pk %}" data-nbu-csrf="{{ csrf_token }}"{% endif %}>
+  {% for section in bay_sections %}
+    {% with bay=section.bay grid=section.grid %}
+    <form method="get" action="{% url 'plugins:netbox_utilities:device_disk_fill' pk=object.pk %}" class="card mb-3" data-nbu-grid-form>
+      <input type="hidden" name="bay" value="{{ bay.pk }}">
+      <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+        <h3 class="card-title me-auto mb-0">
+          {{ bay.name }}
+          <span class="text-muted small fw-normal ms-1">{{ section.used }} / {{ bay.slot_count }} belegt{% if bay.form_factor %} · {{ bay.get_form_factor_display }}{% endif %}</span>
+        </h3>
+        {% if perms.netbox_utilities.add_disk %}
+          {% if section.free %}
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-nbu-select-free>
+              <i class="mdi mdi-checkbox-multiple-marked-outline" aria-hidden="true"></i> Alle freien wählen
+            </button>
+            <button type="submit" class="btn btn-sm btn-primary" data-nbu-fill-selected>
+              <i class="mdi mdi-tray-plus" aria-hidden="true"></i> Ausgewählte bestücken (<span data-nbu-selected-count>0</span>)
+            </button>
+          {% endif %}
+          <a href="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}?bay={{ bay.pk }}" class="btn btn-sm btn-outline-secondary" title="Bereich bearbeiten">
+            <i class="mdi mdi-pencil" aria-hidden="true"></i><span class="visually-hidden">Bereich {{ bay.name }} bearbeiten</span>
+          </a>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div class="nbu-disk-grid-wrapper">
+          <div class="nbu-disk-grid" style="--nbu-disk-columns: {{ grid.0|length }}">
+            {% for row in grid %}{% for cell in row %}
+              {% if cell.number is None %}
+                <div class="nbu-disk-slot nbu-disk-slot-padding" aria-hidden="true"></div>
+              {% elif cell.disk %}
+                {% with disk=cell.disk %}
+                <a href="{{ disk.get_absolute_url }}" class="nbu-disk-slot nbu-disk-{{ disk.status }}"
+                   data-nbu-bay="{{ bay.pk }}" data-nbu-slot="{{ cell.number }}" data-nbu-disk="{{ disk.pk }}"{% if perms.netbox_utilities.change_disk %} draggable="true"{% endif %}
+                   title="{{ disk }} · {{ disk.get_status_display }}{% if disk.raid_group %} · {{ disk.raid_group.name }}{% endif %}{% for level, text in disk.warnings %} · {{ text }}{% endfor %}">
+                  <span class="nbu-disk-slot-number">{{ cell.number }}</span>
+                  {% if disk.warnings %}<i class="mdi mdi-alert nbu-disk-slot-warning" aria-label="Warnung"></i>{% endif %}
+                  <span class="nbu-disk-slot-capacity">{{ disk.capacity_display }}</span>
+                  <span class="nbu-disk-slot-meta">{{ disk.get_disk_type_display|default:"" }} {{ disk.get_interface_display|default:"" }}</span>
+                  <span class="nbu-disk-slot-meta text-truncate">{{ disk.serial|default:"ohne S/N" }}</span>
+                  {% if disk.raid_group %}<span class="nbu-disk-slot-raid text-truncate">{{ disk.raid_group.name }}</span>{% endif %}
+                </a>
+                {% endwith %}
+              {% else %}
+                <div class="nbu-disk-slot nbu-disk-empty" data-nbu-bay="{{ bay.pk }}" data-nbu-slot="{{ cell.number }}">
+                  <span class="nbu-disk-slot-number">{{ cell.number }}</span>
+                  {% if perms.netbox_utilities.add_disk %}
+                    <input type="checkbox" class="form-check-input nbu-disk-slot-check" name="slots" value="{{ cell.number }}" aria-label="{{ bay.name }} Slot {{ cell.number }} auswählen">
+                    <a class="nbu-disk-slot-add stretched-link" href="{% url 'plugins:netbox_utilities:disk_add' %}?device={{ object.pk }}&bay={{ bay.pk }}&slot={{ cell.number }}{% if bay.form_factor %}&form_factor={{ bay.form_factor }}{% endif %}&return_url={{ tab_url|urlencode }}">
+                      <i class="mdi mdi-plus" aria-hidden="true"></i><span class="visually-hidden">{{ bay.name }} Slot {{ cell.number }} bestücken</span>
+                    </a>
+                  {% else %}
+                    <span class="nbu-disk-slot-meta">frei</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}{% endfor %}
+          </div>
+        </div>
+      </div>
+    </form>
+    {% endwith %}
+  {% endfor %}
+  </div>
+
+  <div class="nbu-disk-legend mb-3 small text-muted">
+    <span><span class="nbu-disk-dot nbu-disk-active"></span>Aktiv</span>
+    <span><span class="nbu-disk-dot nbu-disk-spare"></span>Hot-Spare</span>
+    <span><span class="nbu-disk-dot nbu-disk-failed"></span>Defekt</span>
+    <span><span class="nbu-disk-dot nbu-disk-planned"></span>Geplant</span>
+    <span><span class="nbu-disk-dot nbu-disk-empty"></span>Frei</span>
+    <span>Klick auf einen Steckplatz öffnet bzw. bestückt ihn, Häkchen wählen mehrere freie Steckplätze aus.{% if perms.netbox_utilities.change_disk %} Datenträger per Drag &amp; Drop verschieben, auch zwischen Bereichen; auf einen belegten Steckplatz gezogen, tauschen beide die Plätze.{% endif %}</span>
+  </div>
+  {% if orphaned_disks %}
+    <div class="alert alert-warning">
+      Ohne Bereich oder außerhalb ihres Bereichs – bitte bearbeiten und einem Bereich zuordnen:
+      {% for disk in orphaned_disks %}<a href="{{ disk.get_absolute_url }}">{{ disk.slot_label }} – {{ disk }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
     </div>
-  </form>
+  {% endif %}
 
   <div class="row">
     {# ---------- RAID groups ---------- #}
@@ -185,8 +221,8 @@
                   <td><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></td>
                   <td>{{ group.get_level_display }}{% if group.spans > 1 %} ({{ group.spans }} Spans){% endif %}</td>
                   <td>
-                    {% for disk in group.members %}<span class="badge text-bg-secondary me-1">{{ disk.slot }}</span>{% empty %}—{% endfor %}
-                    {% for disk in group.hot_spares %}<span class="badge text-bg-info me-1" title="Hot-Spare">{{ disk.slot }} HS</span>{% endfor %}
+                    {% for disk in group.members %}<span class="badge text-bg-secondary me-1">{{ disk.slot_label }}</span>{% empty %}—{% endfor %}
+                    {% for disk in group.hot_spares %}<span class="badge text-bg-info me-1" title="Hot-Spare">{{ disk.slot_label }} HS</span>{% endfor %}
                   </td>
                   <td>
                     {% if capacity.2 %}<span class="text-warning">{{ capacity.2 }}</span>
@@ -218,7 +254,7 @@
           <ul class="list-group list-group-flush">
             {% for disk, warnings in disk_warnings %}
               <li class="list-group-item">
-                <a href="{{ disk.get_absolute_url }}">Slot {{ disk.slot }} – {{ disk }}</a>
+                <a href="{{ disk.get_absolute_url }}">{{ disk.slot_label }} – {{ disk }}</a>
                 <div>{% for level, text in warnings %}<span class="badge text-bg-{{ level }} me-1">{{ text }}</span>{% endfor %}</div>
               </li>
             {% endfor %}
