@@ -27,4 +27,5 @@ urlpatterns = [
     path("disk-templates/<int:pk>/", include(get_model_urls("netbox_utilities", "diskbaytemplate"))),
     path("devices/<int:pk>/disks/setup/", disk_views.DeviceDiskSetupView.as_view(), name="device_disk_setup"),
     path("devices/<int:pk>/disks/fill/", disk_views.DeviceDiskBulkFillView.as_view(), name="device_disk_fill"),
+    path("devices/<int:pk>/disks/move/", disk_views.DeviceDiskMoveView.as_view(), name="device_disk_move"),
 ]

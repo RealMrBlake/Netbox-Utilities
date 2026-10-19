@@ -4,6 +4,7 @@ from dcim.models import Device
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -196,6 +197,62 @@ class DeviceDiskBulkFillView(_DeviceDiskActionView):
             self.template_name,
             {"object": device, "form": form, "free_slots": free, "return_url": self.tab_url(device)},
         )
+
+
+# Parking slot while two disks swap places; the unique (device, slot) constraint
+# would otherwise reject the intermediate state.
+SWAP_PARKING_SLOT = 32767
+
+
+class DeviceDiskMoveView(ContentTypePermissionRequiredMixin, View):
+    """Drag and drop on the slot grid: move a disk to a free slot or swap two disks."""
+
+    http_method_names = ["post"]
+
+    def get_required_permission(self):
+        return "netbox_utilities.change_disk"
+
+    def post(self, request, pk):
+        device = get_object_or_404(Device.objects.restrict(request.user, "view"), pk=pk)
+        layout = get_object_or_404(DiskBayLayout, device=device)
+        installed = Disk.objects.restrict(request.user, "change").filter(
+            device=device, status__in=disks.SLOT_OCCUPYING_STATUSES
+        )
+        try:
+            disk = installed.get(pk=int(request.POST.get("disk", "")))
+            target_slot = int(request.POST.get("slot", ""))
+        except (ValueError, Disk.DoesNotExist):
+            return JsonResponse({"error": "Unbekannter Datenträger oder Steckplatz."}, status=400)
+        if not layout.first_slot <= target_slot <= layout.last_slot:
+            return JsonResponse({"error": f"Steckplatz {target_slot} existiert nicht."}, status=400)
+        if target_slot == disk.slot:
+            return JsonResponse({"moved": []})
+
+        source_slot = disk.slot
+        with transaction.atomic():
+            other = (
+                Disk.objects.select_for_update()
+                .filter(device=device, slot=target_slot, status__in=disks.SLOT_OCCUPYING_STATUSES)
+                .first()
+            )
+            if other is not None and not installed.filter(pk=other.pk).exists():
+                return JsonResponse({"error": "Keine Berechtigung für den Datenträger im Ziel."}, status=403)
+
+            disk.snapshot()
+            if other is not None:
+                other.snapshot()
+                disk.slot = SWAP_PARKING_SLOT
+                disk.save()
+                other.slot = source_slot
+                other.save()
+            disk.slot = target_slot
+            disk.save()
+
+        if other is None:
+            messages.success(request, f"{disk} wurde von Slot {source_slot} nach Slot {target_slot} verschoben.")
+        else:
+            messages.success(request, f"Slot {source_slot} und Slot {target_slot} wurden getauscht.")
+        return JsonResponse({"moved": [disk.pk] + ([other.pk] if other else [])})
 
 
 class DiskReplaceView(ContentTypePermissionRequiredMixin, View):

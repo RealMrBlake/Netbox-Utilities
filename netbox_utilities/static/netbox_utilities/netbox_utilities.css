@@ -362,3 +362,22 @@ a.nbu-disk-slot:hover,
 .nbu-disk-fill-slot input {
   margin-right: 0.25rem;
 }
+
+a.nbu-disk-slot[draggable="true"] {
+  cursor: grab;
+}
+
+.nbu-disk-dragging {
+  opacity: 0.4;
+}
+
+.nbu-disk-drop-target {
+  outline: 2px dashed var(--tblr-primary);
+  outline-offset: 2px;
+  background: rgba(var(--tblr-primary-rgb), 0.08);
+}
+
+.nbu-disk-busy {
+  pointer-events: none;
+  opacity: 0.6;
+}

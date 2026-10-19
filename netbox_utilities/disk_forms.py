@@ -144,7 +144,8 @@ class DiskBayLayoutForm(forms.ModelForm):
         }
 
     def clean(self):
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
         slot_count, rows = cleaned_data.get("slot_count"), cleaned_data.get("rows")
         if slot_count and rows and rows > slot_count:
             self.add_error("rows", "Es kann nicht mehr Reihen als Steckplätze geben.")
@@ -190,7 +191,8 @@ class DiskBulkFillForm(forms.Form):
             widget.attrs["class"] = f"{css} {widget.attrs.get('class', '')}".strip()
 
     def clean(self):
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
         slots = cleaned_data.get("slots") or []
         serials = disks.parse_serials(cleaned_data.get("serials"))
         if len(serials) > len(slots):
@@ -275,7 +277,8 @@ class RAIDGroupForm(NetBoxModelForm):
             self.initial["members"] = list(self.instance.disks.values_list("pk", flat=True))
 
     def clean(self):
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
         device = cleaned_data.get("device")
         foreign = [disk for disk in cleaned_data.get("members") or () if device and disk.device_id != device.pk]
         if foreign:
@@ -391,7 +394,8 @@ class DiskImportForm(NetBoxModelImportForm):
         return self.cleaned_data.get("raid_group") or ""
 
     def clean(self):
-        cleaned_data = super().clean()
+        super().clean()
+        cleaned_data = self.cleaned_data
         if cleaned_data.get("status") in (None, ""):
             cleaned_data["status"] = disks.STATUS_ACTIVE
             self.instance.status = disks.STATUS_ACTIVE

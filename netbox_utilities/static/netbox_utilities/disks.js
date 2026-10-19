@@ -30,6 +30,70 @@
     update();
   }
 
+  function initDragAndDrop(grid) {
+    const moveUrl = grid.dataset.nbuMoveUrl;
+    if (!moveUrl) return;
+    let dragged = null;
+
+    const targetOf = (event) => {
+      const slot = event.target.closest("[data-nbu-slot]");
+      return slot && grid.contains(slot) && slot !== dragged ? slot : null;
+    };
+    const clearTargets = () => {
+      for (const slot of grid.querySelectorAll(".nbu-disk-drop-target")) {
+        slot.classList.remove("nbu-disk-drop-target");
+      }
+    };
+
+    grid.addEventListener("dragstart", (event) => {
+      dragged = event.target.closest("[data-nbu-disk]");
+      if (!dragged) return;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", dragged.dataset.nbuDisk);
+      dragged.classList.add("nbu-disk-dragging");
+    });
+    grid.addEventListener("dragend", () => {
+      if (dragged) dragged.classList.remove("nbu-disk-dragging");
+      dragged = null;
+      clearTargets();
+    });
+    grid.addEventListener("dragover", (event) => {
+      const target = dragged && targetOf(event);
+      if (!target) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      clearTargets();
+      target.classList.add("nbu-disk-drop-target");
+    });
+    grid.addEventListener("dragleave", (event) => {
+      if (!grid.contains(event.relatedTarget)) clearTargets();
+    });
+    grid.addEventListener("drop", async (event) => {
+      const target = dragged && targetOf(event);
+      if (!target) return;
+      event.preventDefault();
+      const body = new FormData();
+      body.append("disk", dragged.dataset.nbuDisk);
+      body.append("slot", target.dataset.nbuSlot);
+      grid.classList.add("nbu-disk-busy");
+      try {
+        const response = await fetch(moveUrl, {
+          method: "POST",
+          body,
+          headers: { "X-CSRFToken": grid.dataset.nbuCsrf },
+          credentials: "same-origin",
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        window.location.reload();
+      } catch (error) {
+        grid.classList.remove("nbu-disk-busy");
+        clearTargets();
+        window.alert(`Verschieben fehlgeschlagen: ${error.message}`);
+      }
+    });
+  }
+
   function initFillForm(form) {
     const textarea = form.querySelector("textarea[name='serials']");
     const status = form.querySelector("[data-nbu-serial-status]");
@@ -66,7 +130,11 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const grid = document.getElementById("nbu-disk-grid-form");
-    if (grid) initSlotGrid(grid);
+    if (grid) {
+      initSlotGrid(grid);
+      const slots = grid.querySelector(".nbu-disk-grid");
+      if (slots) initDragAndDrop(slots);
+    }
     const fill = document.getElementById("nbu-disk-fill-form");
     if (fill) initFillForm(fill);
   });

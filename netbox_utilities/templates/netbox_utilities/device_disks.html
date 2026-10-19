@@ -112,13 +112,15 @@
     </div>
     <div class="card-body">
       <div class="nbu-disk-grid-wrapper">
-        <div class="nbu-disk-grid" style="--nbu-disk-columns: {{ grid.0|length }}">
+        <div class="nbu-disk-grid" style="--nbu-disk-columns: {{ grid.0|length }}"
+             {% if perms.netbox_utilities.change_disk %}data-nbu-move-url="{% url 'plugins:netbox_utilities:device_disk_move' pk=object.pk %}" data-nbu-csrf="{{ csrf_token }}"{% endif %}>
           {% for row in grid %}{% for cell in row %}
             {% if cell.number is None %}
               <div class="nbu-disk-slot nbu-disk-slot-padding" aria-hidden="true"></div>
             {% elif cell.disk %}
               {% with disk=cell.disk %}
               <a href="{{ disk.get_absolute_url }}" class="nbu-disk-slot nbu-disk-{{ disk.status }}"
+                 data-nbu-slot="{{ cell.number }}" data-nbu-disk="{{ disk.pk }}"{% if perms.netbox_utilities.change_disk %} draggable="true"{% endif %}
                  title="{{ disk }} · {{ disk.get_status_display }}{% if disk.raid_group %} · {{ disk.raid_group.name }}{% endif %}{% for level, text in disk.warnings %} · {{ text }}{% endfor %}">
                 <span class="nbu-disk-slot-number">{{ cell.number }}</span>
                 {% if disk.warnings %}<i class="mdi mdi-alert nbu-disk-slot-warning" aria-label="Warnung"></i>{% endif %}
@@ -129,7 +131,7 @@
               </a>
               {% endwith %}
             {% else %}
-              <div class="nbu-disk-slot nbu-disk-empty">
+              <div class="nbu-disk-slot nbu-disk-empty" data-nbu-slot="{{ cell.number }}">
                 <span class="nbu-disk-slot-number">{{ cell.number }}</span>
                 {% if perms.netbox_utilities.add_disk %}
                   <input type="checkbox" class="form-check-input nbu-disk-slot-check" name="slots" value="{{ cell.number }}" aria-label="Slot {{ cell.number }} auswählen">
@@ -150,7 +152,7 @@
         <span><span class="nbu-disk-dot nbu-disk-failed"></span>Defekt</span>
         <span><span class="nbu-disk-dot nbu-disk-planned"></span>Geplant</span>
         <span><span class="nbu-disk-dot nbu-disk-empty"></span>Frei</span>
-        <span>Klick auf einen Steckplatz öffnet bzw. bestückt ihn, Häkchen wählen mehrere freie Steckplätze aus.</span>
+        <span>Klick auf einen Steckplatz öffnet bzw. bestückt ihn, Häkchen wählen mehrere freie Steckplätze aus.{% if perms.netbox_utilities.change_disk %} Datenträger per Drag &amp; Drop verschieben; auf einen belegten Steckplatz gezogen, tauschen beide die Plätze.{% endif %}</span>
       </div>
       {% if orphaned_disks %}
         <div class="alert alert-warning mt-3 mb-0">
