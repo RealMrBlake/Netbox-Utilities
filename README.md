@@ -28,7 +28,7 @@ uploads and more.
 - Cables and wireless links can be assigned to one or more VLANs.
 - The B-side device selection of a cable can be pre-filtered by tenant group, tenant and site.
 - A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
-- A **Datenträger** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, REST API and GraphQL.
+- A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, REST API and GraphQL.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -196,8 +196,8 @@ sudo systemctl restart netbox netbox-rq
 | `tenant_filter_enabled` | `True` | Global tenant / tenant-group filter (overrides the UI setting) |
 | `tenant_required` | `True` | Mandatory tenant assignment (overrides the UI setting) |
 | `site_prefix_column_enabled` | `True` | Prefix column in device and rack lists |
-| `disks_enabled` | `True` | **Datenträger** tab, device list column and tenant synchronisation |
-| `disk_device_roles` | `["Server", "NAS", "SAN", "MSA"]` | Device role names (case-insensitive) that get the **Datenträger** tab |
+| `disks_enabled` | `True` | **Disks** tab, device list column and tenant synchronisation |
+| `disk_device_roles` | `["Server", "NAS", "SAN", "MSA"]` | Device role names (case-insensitive) that get the **Disks** tab |
 | `disk_age_warning_years` | `5` | Warn about disks older than this (manufacture date, otherwise install date) |
 | `disk_warranty_warning_days` | `90` | Warn this many days before the warranty ends |
 
@@ -220,19 +220,19 @@ case-insensitive and only matches the first word: `DC01` matches
 `/dcim/devices/?site_prefix=DC01` or
 `/api/dcim/racks/?site_prefix=Berlin&site_prefix=DC01`.
 
-### Disks (Datenträger)
+### Disks
 
 Devices whose role is one of `disk_device_roles` (default `Server`, `NAS`,
-`SAN`, `MSA`) get a **Datenträger** tab. The tab badge shows the number of
+`SAN`, `MSA`) get a **Disks** tab. The tab badge shows the number of
 installed disks. Devices with other roles do not show the tab.
 
 **First visit.** A wizard asks for the number of slots, the number of rows on
 the device front, the number of the first slot (0 or 1, as printed by the
 vendor), row- or column-wise numbering and the default form factor. With
-**Als Vorlage für den Gerätetyp speichern** the layout is stored for the device
-type; the next device of the same type offers **Vorlage übernehmen** and needs
-a single click. Templates are managed under **Plugins → Datenträger-Vorlagen**.
-The layout can be changed later with **Layout ändern**; slots that still hold a
+**Save as template for the device type** the layout is stored for the device
+type; the next device of the same type offers **Apply template** and needs
+a single click. Templates are managed under **Plugins > NetBox Utilities > Disk templates**.
+The layout can be changed later with **Change layout**; slots that still hold a
 disk cannot be removed.
 
 **Slot grid.** The slots are drawn like the device front and coloured by
@@ -243,8 +243,8 @@ the disk. Users with `netbox_utilities.change_disk` can drag a disk onto a free
 slot to move it, or onto an occupied slot to swap both disks; the change is
 saved immediately and recorded in the changelog.
 
-**Filling many slots at once.** Tick several free slots (or **Alle freien
-wählen**) and choose **Ausgewählte bestücken**. All selected slots get the same
+**Filling many slots at once.** Tick several free slots (or **Select all
+free**) and choose **Fill selected**. All selected slots get the same
 manufacturer, model, size, type, interface, dates and RAID group. Serial numbers
 go into a text field, one per line, in slot order. A barcode scanner can scan
 them one after another; the page counts the entries and flags duplicates live.
@@ -261,32 +261,32 @@ follows the device when its tenant changes.
 **RAID groups.** A RAID group belongs to one device and has a level (RAID 0,
 1, 5, 6, 10, 50, 60, RAID-Z1/Z2/Z3, JBOD) and, for RAID 50/60, the number of
 spans. Members are selected in the group form or per disk. Disks with status
-**Hot-Spare** in a group count as its spares. The tab shows the usable capacity
+**Hot spare** in a group count as its spares. The tab shows the usable capacity
 (limited to the smallest member, as controllers do), the number of tolerated
-failures, and marks groups as **Degradiert** when a member is failed or
-**Unvollständig** when there are too few members for the level.
+failures, and marks groups as **Degraded** when a member is failed or
+**Incomplete** when there are too few members for the level.
 
-**Replacing a disk.** **Ersetzen** on a disk marks it as *Ausgebaut / ersetzt*
+**Replacing a disk.** **Replace** on a disk marks it as *Removed / replaced*
 with today's removal date and opens the form for the successor with slot,
 model, size and RAID group pre-filled. Removed disks stay in the database: the
-tab lists them under **Verlauf**, and every disk shows the history of its slot.
+tab lists them under **History**, and every disk shows the history of its slot.
 
 **Summary and warnings.** Above the grid the tab shows used/free slots, the raw
 capacity, the usable RAID capacity, spares and failed disks. The warnings panel
 lists failed disks, expired warranties, warranties ending within
 `disk_warranty_warning_days` and disks older than `disk_age_warning_years`.
 
-**Lists, search and export.** **Plugins → Datenträger** lists all disks of all
+**Lists, search and export.** **Plugins > NetBox Utilities > Disks** lists all disks of all
 devices with filters for device, tenant, RAID group, status, type, interface,
 form factor, manufacturer, warranty (expired / expiring / valid), *older than
 N years* and *with warnings*. The global tenant filter applies to this list.
 Export works through NetBox' standard **Export** button. The NetBox global search
 finds disks by serial number, model, manufacturer and firmware and shows the
-device and slot. The device list offers an optional **Datenträger** column
+device and slot. The device list offers an optional **Disks** column
 (used/total, linked to the tab) under **Configure Table**; it runs two queries
 per row, so enable it only where needed.
 
-**CSV import.** **Plugins → Datenträger → Importieren** accepts CSV, JSON or YAML
+**CSV import.** **Plugins > NetBox Utilities > Disks > Import** accepts CSV, JSON or YAML
 with these columns: `device` (device name), `slot`, `status`, `disk_type`,
 `interface`, `form_factor`, `manufacturer`, `model`, `capacity` (e.g. `4 TB`),
 `serial`, `firmware`, `manufacture_date`, `install_date`, `removal_date`,
