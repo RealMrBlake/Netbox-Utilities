@@ -18,17 +18,16 @@ LAYOUT_FIELDS = disk_forms.LAYOUT_FIELDS
 
 
 def disk_tab_badge(device):
-    """Badge for the device tab; None hides the tab for roles without disks."""
+    """Number of installed disks; None hides the tab for roles without disks.
+
+    The count is returned as a string so that "0" still shows the tab (hide_if_empty).
+    """
     if not get_plugin_config("netbox_utilities", "disks_enabled") or not disks.supports_disks(device):
         return None
-    layout = DiskBayLayout.objects.filter(device=device).only("slot_count").first()
-    if layout is None:
-        return "neu"
-    used = Disk.objects.filter(device=device, status__in=disks.SLOT_OCCUPYING_STATUSES).count()
-    return f"{used}/{layout.slot_count}"
+    return str(Disk.objects.filter(device=device, status__in=disks.SLOT_OCCUPYING_STATUSES).count())
 
 
-def device_disk_context(device, user=None):
+def device_disk_context(device):
     layout = DiskBayLayout.objects.filter(device=device).first()
     device_disks = list(
         Disk.objects.filter(device=device).select_related("raid_group").order_by("slot", "-removal_date", "pk")
@@ -40,7 +39,7 @@ def device_disk_context(device, user=None):
         "supported": disks.supports_disks(device),
         "layout": layout,
         "raid_groups": raid_groups,
-        "history_table": disk_tables.DeviceDiskHistoryTable(history, user=user, orderable=False),
+        "history_table": disk_tables.DeviceDiskHistoryTable(history, orderable=False),
         "history_count": len(history),
         "disk_warnings": [(disk, disk.warnings) for disk in installed if disk.warnings],
     }
@@ -90,7 +89,7 @@ class DeviceDisksView(generic.ObjectView):
     )
 
     def get_extra_context(self, request, instance):
-        return device_disk_context(instance, request.user)
+        return device_disk_context(instance)
 
 
 class _DeviceDiskActionView(ContentTypePermissionRequiredMixin, View):
@@ -317,9 +316,7 @@ class RAIDGroupView(generic.ObjectView):
     def get_extra_context(self, request, instance):
         usable, tolerated, error = instance.capacity
         return {
-            "members_table": disk_tables.DiskTable(
-                instance.disks.select_related("device", "tenant"), user=request.user, orderable=False
-            ),
+            "members_table": disk_tables.DiskTable(instance.disks.select_related("device", "tenant"), orderable=False),
             "usable_capacity": disks.format_capacity(usable) if usable else None,
             "tolerated_failures": tolerated,
             "capacity_error": error,

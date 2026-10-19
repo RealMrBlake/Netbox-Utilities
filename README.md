@@ -223,9 +223,8 @@ case-insensitive and only matches the first word: `DC01` matches
 ### Disks (Datenträger)
 
 Devices whose role is one of `disk_device_roles` (default `Server`, `NAS`,
-`SAN`, `MSA`) get a **Datenträger** tab. The tab badge shows used/total slots,
-or `neu` while nothing has been set up yet. Devices with other roles do not
-show the tab.
+`SAN`, `MSA`) get a **Datenträger** tab. The tab badge shows the number of
+installed disks. Devices with other roles do not show the tab.
 
 **First visit.** A wizard asks for the number of slots, the number of rows on
 the device front, the number of the first slot (0 or 1, as printed by the
