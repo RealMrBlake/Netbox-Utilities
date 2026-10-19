@@ -1,0 +1,129 @@
+{% extends 'base/layout.html' %}
+{% load helpers %}
+
+{% block title %}Datenträger{% endblock %}
+
+{% block controls %}
+  <div class="btn-list">
+    <a href="{% url 'plugins:netbox_utilities:disk_list' %}{% if query %}?{{ query }}{% endif %}" class="btn btn-outline-secondary">
+      <i class="mdi mdi-table" aria-hidden="true"></i> Tabellenansicht &amp; Export
+    </a>
+    {% if perms.netbox_utilities.add_disk %}
+      <a href="{% url 'plugins:netbox_utilities:disk_bulk_import' %}" class="btn btn-cyan">
+        <i class="mdi mdi-upload" aria-hidden="true"></i> Importieren
+      </a>
+    {% endif %}
+  </div>
+{% endblock controls %}
+
+{% block content %}
+  <form method="get" class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+      <input type="search" name="q" value="{{ q }}" class="form-control w-auto flex-grow-1"
+             placeholder="Seriennummer, Modell, Hersteller oder Gerät" aria-label="Suche">
+      <label class="form-check form-switch mb-0">
+        <input type="checkbox" class="form-check-input" name="has_warnings" value="true"{% if warnings_only %} checked{% endif %}>
+        <span class="form-check-label">Nur mit Warnungen</span>
+      </label>
+      <label class="form-check form-switch mb-0">
+        <input type="checkbox" class="form-check-input" name="removed" value="1"{% if show_removed %} checked{% endif %}>
+        <span class="form-check-label">Ausgebaute anzeigen</span>
+      </label>
+      <button type="submit" class="btn btn-primary"><i class="mdi mdi-magnify" aria-hidden="true"></i> Suchen</button>
+      {% if query %}<a href="{% url 'plugins:netbox_utilities:disk_by_device' %}" class="btn btn-outline-secondary">Zurücksetzen</a>{% endif %}
+    </div>
+  </form>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <span class="text-muted me-auto">{{ disk_count }} Datenträger in {{ device_count }} Gerät{{ device_count|pluralize:"en" }}</span>
+    {% if groups %}
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-nbu-collapse="show">
+        <i class="mdi mdi-unfold-more-horizontal" aria-hidden="true"></i> Alle aufklappen
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-nbu-collapse="hide">
+        <i class="mdi mdi-unfold-less-horizontal" aria-hidden="true"></i> Alle zuklappen
+      </button>
+    {% endif %}
+  </div>
+
+  {% for group in groups %}
+    {% with device=group.device %}
+    <div class="card mb-2">
+      <div class="card-header nbu-disk-group-header" role="button" data-bs-toggle="collapse"
+           data-bs-target="#nbu-disk-group-{{ device.pk }}" aria-expanded="{{ expand_all|yesno:'true,false' }}"
+           aria-controls="nbu-disk-group-{{ device.pk }}">
+        <i class="mdi mdi-chevron-right nbu-disk-group-chevron" aria-hidden="true"></i>
+        <span class="fw-bold me-2">{{ device }}</span>
+        {% if device.role %}<span class="badge text-bg-secondary me-2">{{ device.role }}</span>{% endif %}
+        <span class="text-muted small me-auto">{% if device.site %}{{ device.site }}{% endif %}{% if device.tenant %} · {{ device.tenant }}{% endif %}</span>
+        <span class="badge text-bg-blue me-1">{{ group.count }} Datenträger</span>
+        <span class="badge text-bg-secondary me-1">{{ group.raw_capacity }}</span>
+        {% if group.failed %}<span class="badge text-bg-danger me-1">{{ group.failed }} defekt</span>{% endif %}
+        {% if group.warning_count %}<span class="badge text-bg-warning me-1"><i class="mdi mdi-alert" aria-hidden="true"></i> {{ group.warning_count }}</span>{% endif %}
+        <a href="{% url 'dcim:device_disks' pk=device.pk %}" class="btn btn-sm btn-outline-primary ms-2" title="Datenträger-Tab des Geräts öffnen">
+          <i class="mdi mdi-open-in-app" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div id="nbu-disk-group-{{ device.pk }}" class="collapse{% if expand_all %} show{% endif %}">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Slot</th><th>Status</th><th>Typ</th><th>Hersteller / Modell</th><th>Größe</th>
+                <th>Seriennummer</th><th>RAID-Gruppe</th><th>Garantie bis</th><th>Warnungen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for disk in group.disks %}
+                <tr>
+                  <td><a href="{{ disk.get_absolute_url }}">{{ disk.slot }}</a></td>
+                  <td>{% badge disk.get_status_display bg_color=disk.get_status_color %}</td>
+                  <td>{{ disk.get_disk_type_display|placeholder }}{% if disk.interface %} <span class="text-muted">{{ disk.get_interface_display }}</span>{% endif %}</td>
+                  <td>{{ disk.manufacturer }} {{ disk.model }}</td>
+                  <td>{{ disk.capacity_display }}</td>
+                  <td><a href="{{ disk.get_absolute_url }}" class="font-monospace">{{ disk.serial|placeholder }}</a></td>
+                  <td>{{ disk.raid_group|linkify:"name"|placeholder }}</td>
+                  <td>{{ disk.warranty_end|isodate|placeholder }}</td>
+                  <td>{% for level, text in disk.warnings %}<span class="badge text-bg-{{ level }} me-1">{{ text }}</span>{% empty %}{{ ""|placeholder }}{% endfor %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+  {% empty %}
+    <div class="card"><div class="card-body text-muted">Keine Datenträger gefunden.</div></div>
+  {% endfor %}
+
+  {% if page.has_other_pages %}
+    <nav class="mt-3" aria-label="Seiten">
+      <ul class="pagination">
+        {% if page.has_previous %}
+          <li class="page-item"><a class="page-link" href="?{% if query %}{{ query }}&{% endif %}page={{ page.previous_page_number }}">Zurück</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Seite {{ page.number }} von {{ page.paginator.num_pages }}</span></li>
+        {% if page.has_next %}
+          <li class="page-item"><a class="page-link" href="?{% if query %}{{ query }}&{% endif %}page={{ page.next_page_number }}">Weiter</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      for (const button of document.querySelectorAll("[data-nbu-collapse]")) {
+        button.addEventListener("click", () => {
+          for (const element of document.querySelectorAll("[id^='nbu-disk-group-']")) {
+            const collapse = window.bootstrap?.Collapse?.getOrCreateInstance(element, { toggle: false });
+            if (collapse) collapse[button.dataset.nbuCollapse]();
+            else element.classList.toggle("show", button.dataset.nbuCollapse === "show");
+            const header = document.querySelector(`[data-bs-target="#${element.id}"]`);
+            if (header) header.setAttribute("aria-expanded", String(button.dataset.nbuCollapse === "show"));
+          }
+        });
+      }
+    });
+  </script>
+{% endblock content %}

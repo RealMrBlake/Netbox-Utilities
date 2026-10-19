@@ -1,8 +1,10 @@
+from itertools import groupby
 from urllib.parse import urlencode
 
 from dcim.models import Device
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -292,6 +294,64 @@ class DiskReplaceView(ContentTypePermissionRequiredMixin, View):
 #
 # Disks
 #
+
+
+class DiskByDeviceView(ContentTypePermissionRequiredMixin, View):
+    """All disks grouped by device in collapsible sections; the flat list stays available."""
+
+    template_name = "netbox_utilities/disk_by_device.html"
+    # Read by the global tenant filter middleware, which injects tenant_id for this filterset.
+    filterset = disk_filtersets.DiskFilterSet
+    devices_per_page = 50
+
+    def get_required_permission(self):
+        return "netbox_utilities.view_disk"
+
+    def get(self, request):
+        queryset = Disk.objects.restrict(request.user, "view").select_related(
+            "device", "device__role", "device__tenant", "device__site", "raid_group"
+        )
+        params = request.GET.copy()
+        params.pop("page", None)
+        show_removed = params.get("removed") == "1"
+        if not show_removed and not params.getlist("status"):
+            queryset = queryset.filter(status__in=disks.SLOT_OCCUPYING_STATUSES)
+        filterset = self.filterset(params, queryset)
+        queryset = filterset.qs.order_by("device__name", "device_id", "slot", "pk")
+
+        groups = []
+        for device, device_disks in groupby(queryset, key=lambda disk: disk.device):
+            device_disks = list(device_disks)
+            installed = [disk for disk in device_disks if disk.occupies_slot]
+            summary = disks.disk_summary(installed, 0)
+            groups.append(
+                {
+                    "device": device,
+                    "disks": device_disks,
+                    "count": len(installed),
+                    "raw_capacity": disks.format_capacity(summary["raw_capacity_gb"]),
+                    "failed": summary["failed"],
+                    "warning_count": sum(1 for disk in installed if disk.warnings),
+                }
+            )
+
+        page = Paginator(groups, self.devices_per_page).get_page(request.GET.get("page"))
+        query = params.urlencode()
+        return render(
+            request,
+            self.template_name,
+            {
+                "page": page,
+                "groups": page.object_list,
+                "device_count": len(groups),
+                "disk_count": sum(group["count"] for group in groups),
+                "q": params.get("q", ""),
+                "show_removed": show_removed,
+                "warnings_only": params.get("has_warnings") == "true",
+                "query": query,
+                "expand_all": len(page.object_list) == 1,
+            },
+        )
 
 
 @register_model_view(Disk, "list", path="", detail=False)

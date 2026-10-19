@@ -231,7 +231,7 @@ the device front, the number of the first slot (0 or 1, as printed by the
 vendor), row- or column-wise numbering and the default form factor. With
 **Save as template for the device type** the layout is stored for the device
 type; the next device of the same type offers **Apply template** and needs
-a single click. Templates are managed under **Plugins > NetBox Utilities > Disk templates**.
+a single click. Templates are managed under **Disks > Disk templates** in the main menu.
 The layout can be changed later with **Change layout**; slots that still hold a
 disk cannot be removed.
 
@@ -276,17 +276,28 @@ capacity, the usable RAID capacity, spares and failed disks. The warnings panel
 lists failed disks, expired warranties, warranties ending within
 `disk_warranty_warning_days` and disks older than `disk_age_warning_years`.
 
-**Lists, search and export.** **Plugins > NetBox Utilities > Disks** lists all disks of all
-devices with filters for device, tenant, RAID group, status, type, interface,
-form factor, manufacturer, warranty (expired / expiring / valid), *older than
-N years* and *with warnings*. The global tenant filter applies to this list.
-Export works through NetBox' standard **Export** button. The NetBox global search
+**Main menu.** The plugin adds its own **Disks** menu with the entries
+**Disks**, **RAID groups** and **Disk templates**.
+
+**Disks grouped by device.** **Disks > Disks** shows all disks grouped by device.
+Each device is a collapsible section whose header shows the device, role, site,
+tenant, number of disks, raw capacity, failed disks and warnings, plus a link to
+the device's **Disks** tab. The page offers a search (serial number, model,
+manufacturer, device), **Only with warnings**, **Show removed** and **Expand
+all** / **Collapse all**; the global tenant filter applies here as well.
+
+**Lists, search and export.** **Table view & export** on that page opens the flat
+list of all disks with filters for device, tenant, RAID group, status, type,
+interface, form factor, manufacturer, warranty (expired / expiring / valid),
+*older than N years* and *with warnings*. The global tenant filter applies to
+this list. Export, bulk edit and bulk delete work through NetBox' standard
+buttons. The NetBox global search
 finds disks by serial number, model, manufacturer and firmware and shows the
 device and slot. The device list offers an optional **Disks** column
 (used/total, linked to the tab) under **Configure Table**; it runs two queries
 per row, so enable it only where needed.
 
-**CSV import.** **Plugins > NetBox Utilities > Disks > Import** accepts CSV, JSON or YAML
+**CSV import.** **Disks > Disks > Import** accepts CSV, JSON or YAML
 with these columns: `device` (device name), `slot`, `status`, `disk_type`,
 `interface`, `form_factor`, `manufacturer`, `model`, `capacity` (e.g. `4 TB`),
 `serial`, `firmware`, `manufacture_date`, `install_date`, `removal_date`,

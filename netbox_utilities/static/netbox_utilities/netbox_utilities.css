@@ -381,3 +381,22 @@ a.nbu-disk-slot[draggable="true"] {
   pointer-events: none;
   opacity: 0.6;
 }
+
+/* Datenträger grouped by device */
+.nbu-disk-group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nbu-disk-group-chevron {
+  margin-right: 0.25rem;
+  transition: transform 0.15s ease-in-out;
+}
+
+.nbu-disk-group-header[aria-expanded="true"] .nbu-disk-group-chevron {
+  transform: rotate(90deg);
+}
