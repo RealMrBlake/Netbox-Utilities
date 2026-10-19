@@ -239,7 +239,9 @@ disk cannot be removed.
 status (active, hot spare, failed, planned). A warning icon marks disks with
 expired or expiring warranty, old age or a failure. Clicking a free slot opens
 the disk form with device and slot pre-filled; clicking an occupied slot opens
-the disk.
+the disk. Users with `netbox_utilities.change_disk` can drag a disk onto a free
+slot to move it, or onto an occupied slot to swap both disks; the change is
+saved immediately and recorded in the changelog.
 
 **Filling many slots at once.** Tick several free slots (or **Alle freien
 wählen**) and choose **Ausgewählte bestücken**. All selected slots get the same
