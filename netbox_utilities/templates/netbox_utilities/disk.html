@@ -1,0 +1,83 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item"><a href="{% url 'dcim:device_disks' pk=object.device_id %}">{{ object.device }} – Datenträger</a></li>
+{% endblock %}
+
+{% block extra_controls %}
+  {% if object.occupies_slot and perms.netbox_utilities.change_disk %}
+    <form method="post" action="{% url 'plugins:netbox_utilities:disk_replace' pk=object.pk %}" class="d-inline"
+          onsubmit="return confirm('Datenträger als ausgebaut markieren und den Nachfolger erfassen?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-warning">
+        <i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Ersetzen
+      </button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Datenträger</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Gerät</th><td>{{ object.device|linkify }}</td></tr>
+        <tr><th scope="row">Steckplatz</th><td>{{ object.slot }}</td></tr>
+        <tr><th scope="row">Status</th><td>{% badge object.get_status_display bg_color=object.get_status_color %}</td></tr>
+        <tr><th scope="row">Mandant</th><td>{{ object.tenant|linkify|placeholder }}</td></tr>
+        <tr><th scope="row">RAID-Gruppe</th><td>{{ object.raid_group|linkify|placeholder }}</td></tr>
+        <tr><th scope="row">Typ</th><td>{{ object.get_disk_type_display|placeholder }}</td></tr>
+        <tr><th scope="row">Schnittstelle</th><td>{{ object.get_interface_display|placeholder }}</td></tr>
+        <tr><th scope="row">Bauform</th><td>{{ object.get_form_factor_display|placeholder }}</td></tr>
+        <tr><th scope="row">Hersteller</th><td>{{ object.manufacturer|placeholder }}</td></tr>
+        <tr><th scope="row">Modell</th><td>{{ object.model|placeholder }}</td></tr>
+        <tr><th scope="row">Größe</th><td>{{ object.capacity_display }}</td></tr>
+        <tr><th scope="row">Seriennummer</th><td><span class="font-monospace">{{ object.serial|placeholder }}</span></td></tr>
+        <tr><th scope="row">Firmware</th><td>{{ object.firmware|placeholder }}</td></tr>
+        <tr><th scope="row">Beschreibung</th><td>{{ object.description|placeholder }}</td></tr>
+      </table>
+    </div>
+    {% include 'inc/panels/tags.html' %}
+    {% include 'inc/panels/custom_fields.html' %}
+  </div>
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Lebenszyklus</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Herstellungsdatum</th><td>{{ object.manufacture_date|isodate|placeholder }}</td></tr>
+        <tr><th scope="row">Einbaudatum</th><td>{{ object.install_date|isodate|placeholder }}</td></tr>
+        <tr><th scope="row">Ausbaudatum</th><td>{{ object.removal_date|isodate|placeholder }}</td></tr>
+        <tr><th scope="row">Garantie bis</th><td>{{ object.warranty_end|isodate|placeholder }}</td></tr>
+        <tr>
+          <th scope="row">Warnungen</th>
+          <td>{% for level, text in object.warnings %}<span class="badge text-bg-{{ level }} me-1">{{ text }}</span>{% empty %}{{ ""|placeholder }}{% endfor %}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2 class="card-header">Verlauf von Steckplatz {{ object.slot }}</h2>
+      {% if slot_history %}
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Datenträger</th><th>Status</th><th>Eingebaut</th><th>Ausgebaut</th></tr></thead>
+          <tbody>
+            {% for disk in slot_history %}
+              <tr>
+                <td>{{ disk|linkify }}</td>
+                <td>{% badge disk.get_status_display bg_color=disk.get_status_color %}</td>
+                <td>{{ disk.install_date|isodate|placeholder }}</td>
+                <td>{{ disk.removal_date|isodate|placeholder }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="card-body text-muted">Keine früheren Datenträger in diesem Steckplatz.</div>
+      {% endif %}
+    </div>
+    {% include 'inc/panels/comments.html' %}
+  </div>
+</div>
+{% endblock content %}

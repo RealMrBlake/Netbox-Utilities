@@ -1,0 +1,28 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Steckplätze – {{ object }}{% endblock %}
+
+{% block content %}
+  <div class="row mb-3">
+    <div class="col col-lg-8 col-xl-6 offset-lg-2 offset-xl-3">
+      <div class="card">
+        <h2 class="card-header"><i class="mdi mdi-view-grid-outline me-1" aria-hidden="true"></i>Steckplatz-Layout für {{ object }}</h2>
+        <div class="card-body">
+          {% if layout %}
+            <div class="alert alert-info">
+              Bestückte Steckplätze bleiben erhalten. Ein Layout kann nur verkleinert werden, wenn die wegfallenden Steckplätze leer sind.
+            </div>
+          {% endif %}
+          <form method="post">
+            {% csrf_token %}
+            {% include 'netbox_utilities/inc/disk_layout_fields.html' %}
+            <div class="text-end">
+              <a href="{% url 'dcim:device_disks' pk=object.pk %}" class="btn btn-outline-secondary">Abbrechen</a>
+              <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
