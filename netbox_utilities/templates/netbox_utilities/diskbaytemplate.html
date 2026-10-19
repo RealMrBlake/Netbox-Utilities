@@ -1,0 +1,20 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Datenträger-Vorlage</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Gerätetyp</th><td>{{ object.device_type|linkify }}</td></tr>
+        <tr><th scope="row">Steckplätze</th><td>{{ object.slot_count }} ({{ object.first_slot }}–{{ object.last_slot }})</td></tr>
+        <tr><th scope="row">Reihen</th><td>{{ object.rows }}</td></tr>
+        <tr><th scope="row">Nummerierung</th><td>{{ object.get_numbering_display }}</td></tr>
+        <tr><th scope="row">Bauform</th><td>{{ object.get_form_factor_display|placeholder }}</td></tr>
+      </table>
+    </div>
+    {% include 'inc/panels/tags.html' %}
+  </div>
+</div>
+{% endblock content %}

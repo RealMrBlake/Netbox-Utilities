@@ -1,0 +1,244 @@
+{% extends 'dcim/device/base.html' %}
+{% load static %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+{% url 'dcim:device_disks' pk=object.pk as tab_url %}
+{% if not supported %}
+  <div class="alert alert-info">
+    Datenträger werden nur für Geräte mit den konfigurierten Rollen (z. B. Server, NAS, SAN, MSA) gepflegt.
+  </div>
+{% endif %}
+
+{% if not layout %}
+  {# ---------- Wizard: first visit ---------- #}
+  <div class="row">
+    <div class="col col-lg-8 col-xl-6 offset-lg-2 offset-xl-3">
+      {% if device_type_template and perms.netbox_utilities.add_disk %}
+        <div class="card mb-3 border-primary">
+          <h2 class="card-header"><i class="mdi mdi-content-copy me-1" aria-hidden="true"></i>Vorlage für {{ object.device_type }}</h2>
+          <div class="card-body">
+            <p class="mb-3">
+              Für diesen Gerätetyp ist bereits ein Layout gespeichert:
+              <strong>{{ device_type_template.slot_count }} Steckplätze</strong>
+              in {{ device_type_template.rows }} Reihe{{ device_type_template.rows|pluralize:"n" }},
+              beginnend bei Slot {{ device_type_template.first_slot }}{% if device_type_template.form_factor %}, Bauform {{ device_type_template.get_form_factor_display }}{% endif %}.
+            </p>
+            <form method="post" action="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" name="apply_template" value="1" class="btn btn-primary">
+                <i class="mdi mdi-check" aria-hidden="true"></i> Vorlage übernehmen
+              </button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+      <div class="card">
+        <h2 class="card-header"><i class="mdi mdi-harddisk me-1" aria-hidden="true"></i>Datenträger einrichten</h2>
+        <div class="card-body">
+          {% if perms.netbox_utilities.add_disk %}
+            <p>Für <strong>{{ object }}</strong> wurden noch keine Datenträger erfasst. Wie viele Steckplätze hat das Gerät?</p>
+            <form method="post" action="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}">
+              {% csrf_token %}
+              {% include 'netbox_utilities/inc/disk_layout_fields.html' with form=setup_form %}
+              <button type="submit" class="btn btn-primary">Steckplätze anlegen</button>
+            </form>
+          {% else %}
+            <p class="text-muted mb-0">Für dieses Gerät wurden noch keine Steckplätze angelegt.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  {# ---------- Summary ---------- #}
+  <div class="row row-cards mb-3">
+    <div class="col-6 col-md-3">
+      <div class="card card-sm"><div class="card-body">
+        <div class="text-muted small">Steckplätze belegt</div>
+        <div class="h2 mb-1">{{ summary.used }} / {{ summary.slot_count }}</div>
+        <div class="progress progress-sm"><div class="progress-bar" style="width: {% widthratio summary.used summary.slot_count 100 %}%"></div></div>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card card-sm"><div class="card-body">
+        <div class="text-muted small">Bruttokapazität</div>
+        <div class="h2 mb-0">{{ summary.raw_capacity }}</div>
+        <div class="text-muted small">{{ summary.free }} Steckplätze frei</div>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card card-sm"><div class="card-body">
+        <div class="text-muted small">Nutzkapazität (RAID)</div>
+        <div class="h2 mb-0">{{ summary.usable_capacity|default:"—" }}</div>
+        <div class="text-muted small">{{ raid_groups|length }} RAID-Gruppe{{ raid_groups|length|pluralize:"n" }}{% if summary.spares %}, {{ summary.spares }} Hot-Spare{{ summary.spares|pluralize }}{% endif %}</div>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card card-sm"><div class="card-body">
+        <div class="text-muted small">Zustand</div>
+        {% if summary.failed or summary.degraded_groups %}
+          <div class="h2 mb-0 text-danger"><i class="mdi mdi-alert-octagon" aria-hidden="true"></i> {{ summary.failed }} defekt</div>
+          <div class="small text-danger">{{ summary.degraded_groups }} RAID-Gruppe{{ summary.degraded_groups|pluralize:"n" }} degradiert</div>
+        {% elif warning_count %}
+          <div class="h2 mb-0 text-warning"><i class="mdi mdi-alert" aria-hidden="true"></i> {{ warning_count }} Warnung{{ warning_count|pluralize:"en" }}</div>
+          <div class="text-muted small">Garantie oder Alter prüfen</div>
+        {% else %}
+          <div class="h2 mb-0 text-success"><i class="mdi mdi-check-circle" aria-hidden="true"></i> OK</div>
+          <div class="text-muted small">Keine Auffälligkeiten</div>
+        {% endif %}
+      </div></div>
+    </div>
+  </div>
+
+  {# ---------- Slot grid ---------- #}
+  <form method="get" action="{% url 'plugins:netbox_utilities:device_disk_fill' pk=object.pk %}" class="card mb-3" id="nbu-disk-grid-form">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+      <h2 class="card-title me-auto mb-0">Steckplätze</h2>
+      {% if perms.netbox_utilities.add_disk %}
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-nbu-select-free>
+          <i class="mdi mdi-checkbox-multiple-marked-outline" aria-hidden="true"></i> Alle freien wählen
+        </button>
+        <button type="submit" class="btn btn-sm btn-primary" data-nbu-fill-selected>
+          <i class="mdi mdi-tray-plus" aria-hidden="true"></i> Ausgewählte bestücken (<span data-nbu-selected-count>0</span>)
+        </button>
+        <a href="{% url 'plugins:netbox_utilities:device_disk_setup' pk=object.pk %}" class="btn btn-sm btn-outline-secondary">
+          <i class="mdi mdi-view-grid-outline" aria-hidden="true"></i> Layout ändern
+        </a>
+      {% endif %}
+      <a href="{% url 'plugins:netbox_utilities:disk_list' %}?device_id={{ object.pk }}" class="btn btn-sm btn-outline-secondary">
+        <i class="mdi mdi-table" aria-hidden="true"></i> Liste &amp; Export
+      </a>
+    </div>
+    <div class="card-body">
+      <div class="nbu-disk-grid-wrapper">
+        <div class="nbu-disk-grid" style="--nbu-disk-columns: {{ grid.0|length }}"
+             {% if perms.netbox_utilities.change_disk %}data-nbu-move-url="{% url 'plugins:netbox_utilities:device_disk_move' pk=object.pk %}" data-nbu-csrf="{{ csrf_token }}"{% endif %}>
+          {% for row in grid %}{% for cell in row %}
+            {% if cell.number is None %}
+              <div class="nbu-disk-slot nbu-disk-slot-padding" aria-hidden="true"></div>
+            {% elif cell.disk %}
+              {% with disk=cell.disk %}
+              <a href="{{ disk.get_absolute_url }}" class="nbu-disk-slot nbu-disk-{{ disk.status }}"
+                 data-nbu-slot="{{ cell.number }}" data-nbu-disk="{{ disk.pk }}"{% if perms.netbox_utilities.change_disk %} draggable="true"{% endif %}
+                 title="{{ disk }} · {{ disk.get_status_display }}{% if disk.raid_group %} · {{ disk.raid_group.name }}{% endif %}{% for level, text in disk.warnings %} · {{ text }}{% endfor %}">
+                <span class="nbu-disk-slot-number">{{ cell.number }}</span>
+                {% if disk.warnings %}<i class="mdi mdi-alert nbu-disk-slot-warning" aria-label="Warnung"></i>{% endif %}
+                <span class="nbu-disk-slot-capacity">{{ disk.capacity_display }}</span>
+                <span class="nbu-disk-slot-meta">{{ disk.get_disk_type_display|default:"" }} {{ disk.get_interface_display|default:"" }}</span>
+                <span class="nbu-disk-slot-meta text-truncate">{{ disk.serial|default:"ohne S/N" }}</span>
+                {% if disk.raid_group %}<span class="nbu-disk-slot-raid text-truncate">{{ disk.raid_group.name }}</span>{% endif %}
+              </a>
+              {% endwith %}
+            {% else %}
+              <div class="nbu-disk-slot nbu-disk-empty" data-nbu-slot="{{ cell.number }}">
+                <span class="nbu-disk-slot-number">{{ cell.number }}</span>
+                {% if perms.netbox_utilities.add_disk %}
+                  <input type="checkbox" class="form-check-input nbu-disk-slot-check" name="slots" value="{{ cell.number }}" aria-label="Slot {{ cell.number }} auswählen">
+                  <a class="nbu-disk-slot-add stretched-link" href="{% url 'plugins:netbox_utilities:disk_add' %}?device={{ object.pk }}&slot={{ cell.number }}{% if layout.form_factor %}&form_factor={{ layout.form_factor }}{% endif %}&return_url={{ tab_url|urlencode }}">
+                    <i class="mdi mdi-plus" aria-hidden="true"></i><span class="visually-hidden">Slot {{ cell.number }} bestücken</span>
+                  </a>
+                {% else %}
+                  <span class="nbu-disk-slot-meta">frei</span>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}{% endfor %}
+        </div>
+      </div>
+      <div class="nbu-disk-legend mt-3 small text-muted">
+        <span><span class="nbu-disk-dot nbu-disk-active"></span>Aktiv</span>
+        <span><span class="nbu-disk-dot nbu-disk-spare"></span>Hot-Spare</span>
+        <span><span class="nbu-disk-dot nbu-disk-failed"></span>Defekt</span>
+        <span><span class="nbu-disk-dot nbu-disk-planned"></span>Geplant</span>
+        <span><span class="nbu-disk-dot nbu-disk-empty"></span>Frei</span>
+        <span>Klick auf einen Steckplatz öffnet bzw. bestückt ihn, Häkchen wählen mehrere freie Steckplätze aus.{% if perms.netbox_utilities.change_disk %} Datenträger per Drag &amp; Drop verschieben; auf einen belegten Steckplatz gezogen, tauschen beide die Plätze.{% endif %}</span>
+      </div>
+      {% if orphaned_disks %}
+        <div class="alert alert-warning mt-3 mb-0">
+          Außerhalb des Layouts:
+          {% for disk in orphaned_disks %}<a href="{{ disk.get_absolute_url }}">Slot {{ disk.slot }} – {{ disk }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="row">
+    {# ---------- RAID groups ---------- #}
+    <div class="col col-12 col-xl-6">
+      <div class="card mb-3">
+        <div class="card-header d-flex align-items-center">
+          <h2 class="card-title me-auto mb-0">RAID-Gruppen</h2>
+          {% if perms.netbox_utilities.add_raidgroup %}
+            <a href="{% url 'plugins:netbox_utilities:raidgroup_add' %}?device={{ object.pk }}&return_url={{ tab_url|urlencode }}" class="btn btn-sm btn-primary">
+              <i class="mdi mdi-plus-thick" aria-hidden="true"></i> RAID-Gruppe
+            </a>
+          {% endif %}
+        </div>
+        {% if raid_groups %}
+          <table class="table table-hover mb-0">
+            <thead><tr><th>Name</th><th>Level</th><th>Mitglieder</th><th>Nutzkapazität</th><th>Zustand</th></tr></thead>
+            <tbody>
+              {% for group in raid_groups %}
+                {% with capacity=group.capacity %}
+                <tr>
+                  <td><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></td>
+                  <td>{{ group.get_level_display }}{% if group.spans > 1 %} ({{ group.spans }} Spans){% endif %}</td>
+                  <td>
+                    {% for disk in group.members %}<span class="badge text-bg-secondary me-1">{{ disk.slot }}</span>{% empty %}—{% endfor %}
+                    {% for disk in group.hot_spares %}<span class="badge text-bg-info me-1" title="Hot-Spare">{{ disk.slot }} HS</span>{% endfor %}
+                  </td>
+                  <td>
+                    {% if capacity.2 %}<span class="text-warning">{{ capacity.2 }}</span>
+                    {% else %}{{ group.usable_capacity_display }}{% if capacity.1 is not None %}<div class="small text-muted">verkraftet {{ capacity.1 }} {% if capacity.1 == 1 %}Ausfall{% else %}Ausfälle{% endif %}</div>{% endif %}{% endif %}
+                  </td>
+                  <td>
+                    {% if group.is_degraded %}<span class="badge text-bg-danger">Degradiert</span>
+                    {% elif capacity.2 %}<span class="badge text-bg-warning">Unvollständig</span>
+                    {% else %}<span class="badge text-bg-success">OK</span>{% endif %}
+                  </td>
+                </tr>
+                {% endwith %}
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="card-body text-muted">
+            Noch keine RAID-Gruppe. Legen Sie eine an und wählen Sie deren Datenträger aus; die Nutzkapazität wird automatisch berechnet.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ---------- Warnings ---------- #}
+    <div class="col col-12 col-xl-6">
+      <div class="card mb-3">
+        <h2 class="card-header">Warnungen</h2>
+        {% if disk_warnings %}
+          <ul class="list-group list-group-flush">
+            {% for disk, warnings in disk_warnings %}
+              <li class="list-group-item">
+                <a href="{{ disk.get_absolute_url }}">Slot {{ disk.slot }} – {{ disk }}</a>
+                <div>{% for level, text in warnings %}<span class="badge text-bg-{{ level }} me-1">{{ text }}</span>{% endfor %}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="card-body text-muted">Keine abgelaufenen Garantien, alten oder defekten Datenträger.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ---------- History ---------- #}
+  <div class="card mb-3">
+    <h2 class="card-header">Verlauf: ausgebaute Datenträger <span class="badge text-bg-secondary">{{ history_count }}</span></h2>
+    {% if history_count %}
+      <div class="table-responsive">{% render_table history_table 'inc/table.html' %}</div>
+    {% else %}
+      <div class="card-body text-muted">Noch kein Datenträger wurde ausgebaut oder ersetzt.</div>
+    {% endif %}
+  </div>
+  <script src="{% static 'netbox_utilities/disks.js' %}" defer></script>
+{% endif %}
+{% endblock content %}

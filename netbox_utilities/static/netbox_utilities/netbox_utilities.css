@@ -236,3 +236,148 @@
     transition: none;
   }
 }
+
+/* Datenträger: slot grid on the device tab */
+.nbu-disk-grid-wrapper {
+  overflow-x: auto;
+}
+
+.nbu-disk-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--nbu-disk-columns, 12), minmax(6.5rem, 1fr));
+  gap: 0.5rem;
+  min-width: min-content;
+}
+
+.nbu-disk-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: 6rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--tblr-border-color);
+  border-left-width: 0.35rem;
+  border-radius: var(--tblr-border-radius);
+  background: var(--tblr-bg-surface);
+  color: var(--tblr-body-color);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+a.nbu-disk-slot:hover,
+.nbu-disk-empty:hover {
+  box-shadow: var(--tblr-box-shadow);
+  text-decoration: none;
+}
+
+.nbu-disk-slot-padding {
+  visibility: hidden;
+}
+
+.nbu-disk-slot-number {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.nbu-disk-slot-capacity {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.nbu-disk-slot-meta {
+  color: var(--tblr-secondary-color, var(--tblr-muted));
+}
+
+.nbu-disk-slot-raid {
+  margin-top: auto;
+  font-weight: 600;
+}
+
+.nbu-disk-slot-warning {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.4rem;
+  color: var(--tblr-warning);
+}
+
+.nbu-disk-slot-check {
+  position: absolute;
+  z-index: 2;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
+.nbu-disk-slot-add {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--tblr-secondary-color, var(--tblr-muted));
+  font-size: 1.5rem;
+}
+
+.nbu-disk-empty {
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: var(--tblr-border-color);
+  background: transparent;
+}
+
+.nbu-disk-selected {
+  outline: 2px solid var(--tblr-primary);
+  outline-offset: 1px;
+}
+
+.nbu-disk-active { border-left-color: var(--tblr-green); }
+.nbu-disk-spare { border-left-color: var(--tblr-cyan); }
+.nbu-disk-failed { border-left-color: var(--tblr-red); background: rgba(var(--tblr-red-rgb), 0.08); }
+.nbu-disk-planned { border-left-color: var(--tblr-blue); border-style: dashed; }
+
+.nbu-disk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+
+.nbu-disk-dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.3rem;
+  vertical-align: -0.1rem;
+  border: 1px solid var(--tblr-border-color);
+  border-left-width: 0.35rem;
+  border-radius: 0.15rem;
+}
+
+.nbu-disk-fill-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.nbu-disk-fill-slot input {
+  margin-right: 0.25rem;
+}
+
+a.nbu-disk-slot[draggable="true"] {
+  cursor: grab;
+}
+
+.nbu-disk-dragging {
+  opacity: 0.4;
+}
+
+.nbu-disk-drop-target {
+  outline: 2px dashed var(--tblr-primary);
+  outline-offset: 2px;
+  background: rgba(var(--tblr-primary-rgb), 0.08);
+}
+
+.nbu-disk-busy {
+  pointer-events: none;
+  opacity: 0.6;
+}

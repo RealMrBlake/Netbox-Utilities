@@ -1,0 +1,55 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load render_table from django_tables2 %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item"><a href="{% url 'dcim:device_disks' pk=object.device_id %}">{{ object.device }} – Datenträger</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">RAID-Gruppe</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Gerät</th><td>{{ object.device|linkify }}</td></tr>
+        <tr><th scope="row">Name</th><td>{{ object.name }}</td></tr>
+        <tr><th scope="row">RAID-Level</th><td>{{ object.get_level_display }}{% if object.spans > 1 %} ({{ object.spans }} Spans){% endif %}</td></tr>
+        <tr><th scope="row">Beschreibung</th><td>{{ object.description|placeholder }}</td></tr>
+      </table>
+    </div>
+    {% include 'inc/panels/tags.html' %}
+    {% include 'inc/panels/custom_fields.html' %}
+  </div>
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Kapazität</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Mitglieder</th><td>{{ object.members|length }}</td></tr>
+        <tr><th scope="row">Hot-Spares</th><td>{{ object.hot_spares|length }}</td></tr>
+        <tr>
+          <th scope="row">Nutzkapazität</th>
+          <td>{% if capacity_error %}<span class="text-warning">{{ capacity_error }}</span>{% else %}{{ usable_capacity|placeholder }}{% endif %}</td>
+        </tr>
+        <tr><th scope="row">Ausfalltoleranz</th><td>{% if tolerated_failures is not None %}{{ tolerated_failures }} Datenträger{% else %}{{ ""|placeholder }}{% endif %}</td></tr>
+        <tr>
+          <th scope="row">Zustand</th>
+          <td>
+            {% if object.is_degraded %}<span class="badge text-bg-danger">Degradiert</span>
+            {% elif capacity_error %}<span class="badge text-bg-warning">Unvollständig</span>
+            {% else %}<span class="badge text-bg-success">OK</span>{% endif %}
+          </td>
+        </tr>
+      </table>
+      <div class="card-footer small text-muted">
+        Bei unterschiedlich großen Datenträgern rechnet die Kapazität – wie ein RAID-Controller – mit dem kleinsten Mitglied.
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h2 class="card-header">Datenträger</h2>
+  <div class="table-responsive">{% render_table members_table 'inc/table.html' %}</div>
+</div>
+{% endblock content %}

@@ -1,0 +1,73 @@
+{% extends 'base/layout.html' %}
+{% load static %}
+
+{% block title %}Datenträger bestücken – {{ object }}{% endblock %}
+
+{% block content %}
+  <form method="post" id="nbu-disk-fill-form">
+    {% csrf_token %}
+    <div class="row mb-3">
+      <div class="col col-xl-10 offset-xl-1">
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="card mb-3">
+          <h2 class="card-header"><i class="mdi mdi-tray-plus me-1" aria-hidden="true"></i>Mehrere Steckplätze von {{ object }} bestücken</h2>
+          <div class="card-body">
+            {% if not free_slots %}
+              <div class="alert alert-warning mb-0">Alle Steckplätze sind bereits bestückt.</div>
+            {% else %}
+              <label class="form-label required">Steckplätze</label>
+              <div class="nbu-disk-fill-slots mb-1">
+                {% for checkbox in form.slots %}
+                  <label class="btn btn-sm btn-outline-primary nbu-disk-fill-slot">
+                    {{ checkbox.tag }} {{ checkbox.choice_label }}
+                  </label>
+                {% endfor %}
+              </div>
+              {% for error in form.slots.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+              <div class="form-text mb-3">Alle gewählten Steckplätze erhalten dieselben Angaben, nur die Seriennummern unterscheiden sich.</div>
+            {% endif %}
+          </div>
+        </div>
+        {% if free_slots %}
+        <div class="row">
+          <div class="col-12 col-lg-7">
+            <div class="card mb-3">
+              <h2 class="card-header">Gemeinsame Angaben</h2>
+              <div class="card-body">
+                <div class="row g-3">
+                  {% for field in form %}
+                    {% if field.name != "slots" and field.name != "serials" %}
+                      <div class="col-12 col-md-6">
+                        <label class="form-label{% if field.field.required %} required{% endif %}" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                      </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-5">
+            <div class="card mb-3">
+              <h2 class="card-header"><i class="mdi mdi-barcode-scan me-1" aria-hidden="true"></i>Seriennummern</h2>
+              <div class="card-body">
+                {{ form.serials }}
+                <div class="form-text">{{ form.serials.help_text }}</div>
+                <div class="small mt-2" data-nbu-serial-status></div>
+                {% for error in form.serials.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        <div class="text-end">
+          <a href="{{ return_url }}" class="btn btn-outline-secondary">Abbrechen</a>
+          {% if free_slots %}<button type="submit" class="btn btn-primary">Datenträger einbauen</button>{% endif %}
+        </div>
+      </div>
+    </div>
+  </form>
+  <script src="{% static 'netbox_utilities/disks.js' %}" defer></script>
+{% endblock content %}
