@@ -415,11 +415,13 @@ class DiskImportForm(NetBoxModelImportForm):
             "tags",
         )
 
+    # bay and raid_group arrive as names. The field cleaners keep the name aside and leave None behind,
+    # so the model instance never receives a string, even if clean() stops early on another error.
     def clean_raid_group(self):
-        return self.cleaned_data.get("raid_group") or ""
+        self._raid_group_name = (self.cleaned_data.get("raid_group") or "").strip()
 
     def clean_bay(self):
-        return self.cleaned_data.get("bay") or ""
+        self._bay_name = (self.cleaned_data.get("bay") or "").strip()
 
     def clean(self):
         super().clean()
@@ -430,7 +432,7 @@ class DiskImportForm(NetBoxModelImportForm):
         if (capacity := cleaned_data.get("capacity")) is not None:
             self.instance.capacity_gb = capacity
         device = cleaned_data.get("device")
-        bay_name = cleaned_data.get("bay")
+        bay_name = getattr(self, "_bay_name", "")
         cleaned_data["bay"] = None
         if device:
             bays = list(DiskBayLayout.objects.filter(device=device))
@@ -442,15 +444,14 @@ class DiskImportForm(NetBoxModelImportForm):
                     self.add_error("bay", f"Das Gerät {device} hat keinen Bereich „{bay_name}“.")
             elif len(bays) == 1:
                 cleaned_data["bay"] = bays[0]
-        group_name = cleaned_data.get("raid_group")
+        group_name = getattr(self, "_raid_group_name", "")
+        cleaned_data["raid_group"] = None
         if group_name and device:
             group = RAIDGroup.objects.filter(device=device, name=group_name).first()
             if group is None:
                 self.add_error("raid_group", f"Das Gerät {device} hat keine RAID-Gruppe „{group_name}“.")
             else:
                 cleaned_data["raid_group"] = group
-        else:
-            cleaned_data["raid_group"] = None
         return cleaned_data
 
 
