@@ -1,21 +1,55 @@
-"""Pure helpers for importing the disk export of an HPE MSA (Pools → Disks → "Export to CSV")."""
+"""Pure helpers for importing CSV exports of an HPE MSA: the disk list and the disk group list.
+
+Column names are matched loosely: case, spaces and punctuation are ignored and common
+alternative names are accepted, so slightly different firmware versions or re-saved
+files (Excel with semicolons, other encodings) still work.
+"""
 
 import csv
 import io
+import re
 from dataclasses import dataclass, field
 
 from . import disks
 
-# Header names of the MSA export, casefolded.
-COLUMN_LOCATION = "location"
-REQUIRED_COLUMNS = (COLUMN_LOCATION,)
+KIND_DISKS = "disks"
+KIND_GROUPS = "groups"
+
+# Normalised header names (see _key) accepted for each value.
+DISK_COLUMNS = {
+    "location": ("location", "position", "pos", "disklocation", "drivelocation", "encslot", "enclosureslot"),
+    "enclosure": ("enclosure", "enclosureid", "encl", "shelf", "shelfid", "enclosurenumber"),
+    "slot": ("slot", "slotnumber", "slotid", "bay", "baynumber", "drivebay"),
+    "serial": ("serialnumber", "serial", "sn", "serialno", "diskserialnumber"),
+    "size": ("size", "capacity", "totalsize", "disksize"),
+    "type": ("type", "disktype", "drivetype", "interface", "mediatype"),
+    "usage": ("usage", "role", "diskusage"),
+    "disk_group": ("diskgroup", "diskgroupname", "group", "vdisk", "vdiskname"),
+    "health": ("health", "healthstatus"),
+    "manufacturer": ("manufacturer", "vendor", "make"),
+    "model": ("model", "modelnumber", "productid", "partnumber"),
+    "firmware": ("revision", "firmware", "firmwarerevision", "fwrevision", "fw", "firmwareversion"),
+    "rpm": ("rmin", "rpm", "speed", "rotationalspeed", "speedrpm"),
+    "power_on_hours": ("poweronhours", "poh", "poweronhrs", "hourspoweredon"),
+}
+GROUP_COLUMNS = {
+    "name": ("name", "diskgroup", "diskgroupname", "vdisk", "vdiskname", "groupname"),
+    "level": ("raidlevel", "raid", "level", "raidtype"),
+    "pool": ("pool", "poolname"),
+    "size": ("totalsize", "size", "capacity"),
+    "disks": ("disks", "diskcount", "numberofdisks", "numdisks", "drives"),
+    "health": ("health", "healthstatus"),
+    "disk_type": ("disktype", "type"),
+}
 
 # Usage values of hot spares; "dedicated" spares belong to one disk group.
-SPARE_USAGES = ("global sp", "dedicated sp", "spare")
+SPARE_USAGES = ("globalsp", "dedicatedsp", "spare", "globalspare", "dedicatedspare", "hotspare")
 # Health values which mean the disk has failed.
-FAILED_HEALTH = ("fault", "failed")
+FAILED_HEALTH = ("fault", "failed", "error")
 # Disk group values without a real group.
-NO_GROUP = ("", "-", "n/a")
+NO_GROUP = ("", "-", "n/a", "none")
+
+_LOCATION_PATTERN = re.compile(r"(\d+)\D+(\d+)")
 
 
 @dataclass
@@ -37,8 +71,30 @@ class MSADisk:
 
 
 @dataclass
+class MSAGroup:
+    name: str
+    level: str
+    level_text: str = ""
+    pool: str = ""
+    size: str = ""
+    disk_count: int | None = None
+    health: str = ""
+
+    @property
+    def description(self):
+        parts = [
+            f"Pool {self.pool}" if self.pool else "",
+            self.size,
+            f"{self.disk_count} Datenträger" if self.disk_count else "",
+        ]
+        return ", ".join(part for part in parts if part)
+
+
+@dataclass
 class MSAExport:
+    kind: str = KIND_DISKS
     disks: list = field(default_factory=list)
+    groups: list = field(default_factory=list)
     errors: list = field(default_factory=list)
 
     @property
@@ -49,9 +105,17 @@ class MSAExport:
             result.setdefault(disk.enclosure, []).append(disk)
         return result
 
+    @property
+    def is_empty(self):
+        return not self.disks and not self.groups
+
 
 def _natural(value):
     return (0, int(value), "") if str(value).isdigit() else (1, 0, str(value))
+
+
+def _key(text):
+    return re.sub(r"[^a-z0-9]", "", (text or "").casefold())
 
 
 def decode(data):
@@ -71,17 +135,55 @@ def _int(value):
         return None
 
 
+def _read(text):
+    """Return (rows, header lookup) for CSV text with ',', ';' or tab as delimiter."""
+    try:
+        dialect = csv.Sniffer().sniff(text.splitlines()[0], delimiters=",;\t")
+    except csv.Error:
+        dialect = csv.excel
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    return reader, {_key(name): name for name in (reader.fieldnames or []) if name}
+
+
+def _resolve(headers, columns):
+    """Map each value name to the header present in the file, or None."""
+    return {
+        name: next((headers[alias] for alias in aliases if alias in headers), None) for name, aliases in columns.items()
+    }
+
+
+def detect_kind(text):
+    """KIND_DISKS, KIND_GROUPS or None, judged from the header line only."""
+    text = decode(text).strip()
+    if not text:
+        return None
+    _, headers = _read(text.splitlines()[0])
+    disk_columns = _resolve(headers, DISK_COLUMNS)
+    if disk_columns["location"] or (disk_columns["enclosure"] and disk_columns["slot"]):
+        return KIND_DISKS
+    group_columns = _resolve(headers, GROUP_COLUMNS)
+    if group_columns["name"] and group_columns["level"]:
+        return KIND_GROUPS
+    return None
+
+
 def looks_like_export(text):
-    """True if the first line carries the MSA columns "Location" and "Serial Number"."""
-    first_line = (text or "").lstrip("\ufeff").split("\n", 1)[0].casefold()
-    return COLUMN_LOCATION in first_line and "serial number" in first_line
+    return detect_kind(text) is not None
+
+
+def parse_location(text):
+    """'1.4', '1:4', '1/4', '1-4' or 'Enclosure 1 Slot 4' → ('1', 4); None if unreadable."""
+    match = _LOCATION_PATTERN.search(text or "")
+    if not match:
+        return None
+    return str(int(match.group(1))), int(match.group(2))
 
 
 def map_type(value, rpm=""):
     """Translate the MSA "Type" column, e.g. "SSD SAS", "SAS", "SAS MDL" or "SATA", into (type, interface)."""
     text = (value or "").upper()
     interface = "sata" if "SATA" in text else "sas" if "SAS" in text else "nvme" if "NVME" in text else ""
-    if "SSD" in text or "NVME" in text:
+    if "SSD" in text or "NVME" in text or text.startswith("SSAS"):
         disk_type = "ssd" if interface != "nvme" else "nvme"
     elif text or (rpm and rpm.strip().lower() not in ("0k", "0")):
         disk_type = "hdd"
@@ -91,78 +193,131 @@ def map_type(value, rpm=""):
 
 
 def map_status(usage, health):
-    if (health or "").strip().casefold() in FAILED_HEALTH:
+    if _key(health) in FAILED_HEALTH:
         return disks.STATUS_FAILED
-    if (usage or "").strip().casefold() in SPARE_USAGES:
+    if _key(usage) in SPARE_USAGES:
         return disks.STATUS_SPARE
     return disks.STATUS_ACTIVE
 
 
+def map_raid_level(text):
+    """'RAID10', 'RAID-5', 'raid 6', 'R5', 'NRAID' or 'ADAPT' → a RAID_LEVELS key ("other" if unknown)."""
+    key = _key(text)
+    if re.fullmatch(r"r\d+", key):
+        key = "raid" + key[1:]
+    if key in ("nraid", "jbod", "none", "single"):
+        return "jbod"
+    if key == "raid1e":
+        return "raid1"
+    return key if key in disks.RAID_LEVELS else "other"
+
+
 def parse_export(data):
-    """Parse the CSV export into an MSAExport; rows that cannot be read end up in errors."""
+    """Parse a disk or disk group export; rows that cannot be read end up in errors."""
     text = decode(data).strip()
     export = MSAExport()
     if not text:
         export.errors.append("Die Datei ist leer.")
         return export
-    try:
-        dialect = csv.Sniffer().sniff(text.splitlines()[0], delimiters=",;\t")
-    except csv.Error:
-        dialect = csv.excel
-    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-    headers = {name.strip().casefold(): name for name in (reader.fieldnames or [])}
-    missing = [name for name in REQUIRED_COLUMNS if name not in headers]
-    if missing:
-        export.errors.append("Das ist kein HPE-MSA-Datenträger-Export: die Spalte „Location“ fehlt.")
-        return export
+    kind = detect_kind(text)
+    if kind == KIND_GROUPS:
+        export.kind = KIND_GROUPS
+        _parse_groups(text, export)
+    elif kind == KIND_DISKS:
+        _parse_disks(text, export)
+    else:
+        export.errors.append(
+            "Unbekanntes Format. Erwartet wird der Datenträger-Export (Spalte „Location“ bzw. „Enclosure“ und "
+            "„Slot“) oder der Disk-Group-Export (Spalten „Name“ und „RAID Level“) einer HPE MSA."
+        )
+    if export.is_empty and not export.errors:
+        export.errors.append("Die Datei enthält keine Einträge.")
+    return export
+
+
+def _parse_disks(text, export):
+    reader, headers = _read(text)
+    columns = _resolve(headers, DISK_COLUMNS)
 
     def column(row, name):
-        key = headers.get(name)
+        key = columns[name]
         return (row.get(key) or "").strip() if key else ""
 
     seen = set()
     for line, row in enumerate(reader, start=2):
-        location = column(row, COLUMN_LOCATION)
+        if columns["location"]:
+            location = column(row, "location")
+        else:
+            location = f"{column(row, 'enclosure')}.{column(row, 'slot')}".strip(".")
         if not location:
             continue
-        enclosure, _, slot_text = location.partition(".")
-        slot = _int(slot_text)
-        if not enclosure or slot is None:
+        position = parse_location(location)
+        if position is None:
             export.errors.append(f"Zeile {line}: ungültige Position {location!r} (erwartet z. B. 1.4).")
             continue
-        if (enclosure, slot) in seen:
+        if position in seen:
             export.errors.append(f"Zeile {line}: Position {location} kommt mehrfach vor.")
             continue
-        seen.add((enclosure, slot))
+        seen.add(position)
 
         try:
             capacity = disks.parse_capacity(column(row, "size")) if column(row, "size") else None
         except ValueError:
             capacity = None
-        disk_type, interface = map_type(column(row, "type"), column(row, "r/min"))
-        group = column(row, "disk group")
+        disk_type, interface = map_type(column(row, "type"), column(row, "rpm"))
+        group = column(row, "disk_group")
         usage, health = column(row, "usage"), column(row, "health")
+        hours = column(row, "power_on_hours")
         export.disks.append(
             MSADisk(
-                enclosure=enclosure,
-                slot=slot,
+                enclosure=position[0],
+                slot=position[1],
                 status=map_status(usage, health),
                 disk_type=disk_type,
                 interface=interface,
                 capacity_gb=capacity,
                 disk_group="" if group.casefold() in NO_GROUP else group,
-                serial=column(row, "serial number"),
+                serial=column(row, "serial"),
                 manufacturer=column(row, "manufacturer"),
                 model=column(row, "model"),
-                firmware=column(row, "revision"),
-                power_on_hours=_int(column(row, "power on hours")) if column(row, "power on hours") else None,
+                firmware=column(row, "firmware"),
+                power_on_hours=_int(hours) if hours else None,
                 usage=usage,
                 health=health,
             )
         )
-    if not export.disks and not export.errors:
-        export.errors.append("Die Datei enthält keine Datenträger.")
-    return export
+
+
+def _parse_groups(text, export):
+    reader, headers = _read(text)
+    columns = _resolve(headers, GROUP_COLUMNS)
+
+    def column(row, name):
+        key = columns[name]
+        return (row.get(key) or "").strip() if key else ""
+
+    seen = set()
+    for line, row in enumerate(reader, start=2):
+        name = column(row, "name")
+        if not name:
+            continue
+        if name.casefold() in seen:
+            export.errors.append(f"Zeile {line}: Disk Group {name} kommt mehrfach vor.")
+            continue
+        seen.add(name.casefold())
+        level_text = column(row, "level")
+        count = column(row, "disks")
+        export.groups.append(
+            MSAGroup(
+                name=name,
+                level=map_raid_level(level_text),
+                level_text=level_text,
+                pool=column(row, "pool"),
+                size=column(row, "size"),
+                disk_count=_int(count) if count else None,
+                health=column(row, "health"),
+            )
+        )
 
 
 def suggest_slot_count(highest_slot):

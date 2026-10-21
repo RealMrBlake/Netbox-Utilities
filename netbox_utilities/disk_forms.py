@@ -511,7 +511,7 @@ class MSAUploadForm(forms.Form):
         if not data or not str(data).strip():
             raise ValidationError("Bitte eine CSV-Datei hochladen oder den Inhalt einfügen.")
         export = msa_import.parse_export(data)
-        if not export.disks:
+        if export.is_empty:
             raise ValidationError(export.errors)
         cleaned_data["export"] = export
         cleaned_data["raw"] = data if isinstance(data, str) else msa_import.decode(data)
@@ -575,3 +575,19 @@ class MSAAssignForm(forms.Form):
             seen[device.pk] = enclosure
         cleaned_data["assigned"] = assigned
         return cleaned_data
+
+
+class MSAGroupAssignForm(forms.Form):
+    """Disk group export: which devices get the RAID levels of the listed disk groups."""
+
+    devices = DynamicModelMultipleChoiceField(
+        label="Geräte",
+        queryset=Device.objects.all(),
+        help_text="Alle Shelfs der MSA, deren Datenträger zu diesen Disk Groups gehören.",
+    )
+    create_missing = forms.BooleanField(
+        label="Fehlende RAID-Gruppen anlegen",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Sonst werden nur vorhandene Gruppen mit gleichem Namen aktualisiert.",
+    )

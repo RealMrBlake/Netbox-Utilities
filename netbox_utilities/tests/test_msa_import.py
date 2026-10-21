@@ -82,3 +82,51 @@ class DetectionTest(SimpleTestCase):
         self.assertTrue(msa_import.looks_like_export(EXPORT))
         self.assertTrue(msa_import.looks_like_export("\ufeffLocation;Serial Number\n1.1;X"))
         self.assertFalse(msa_import.looks_like_export("device,slot,serial\nsrv-01,0,ABC"))
+
+
+GROUP_EXPORT = """Name,Health,Pool,RAID Level,Class,Disk Type,Total Size,Free,Status,Disks,Serial Number,Sector Format
+dgA01,OK,A,RAID10,Virtual,sSAS,1596.5GB,63.9GB,FTOL,4,00c0ff3c47f90000e1892b5b00000000,512e
+dgA02,OK,A,RAID5,Virtual,SAS,14.3TB,221.0GB,FTOL,9,00c0ff3c47f90000bf8a2b5b00000000,512e
+"""
+
+
+class GroupExportTest(SimpleTestCase):
+    def test_detects_and_parses_disk_group_export(self):
+        self.assertEqual(msa_import.detect_kind(GROUP_EXPORT), msa_import.KIND_GROUPS)
+        export = msa_import.parse_export(GROUP_EXPORT)
+        self.assertEqual(export.errors, [])
+        first, second = export.groups
+        self.assertEqual((first.name, first.level, first.pool, first.disk_count), ("dgA01", "raid10", "A", 4))
+        self.assertEqual(second.level, "raid5")
+        self.assertEqual(second.description, "Pool A, 14.3TB, 9 Datenträger")
+
+    def test_raid_level_spellings(self):
+        cases = {
+            "RAID10": "raid10",
+            "raid-6": "raid6",
+            "R5": "raid5",
+            "NRAID": "jbod",
+            "ADAPT": "other",
+            "RAID 1": "raid1",
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(msa_import.map_raid_level(text), expected)
+
+
+class LooseHeaderTest(SimpleTestCase):
+    def test_alternative_column_names_and_split_position(self):
+        text = "Enclosure ID;Slot;Serial;Capacity;Drive Type;Vendor;Firmware\n2;7;ABC;4TB;SATA;WD;81.00\n"
+        self.assertEqual(msa_import.detect_kind(text), msa_import.KIND_DISKS)
+        disk = msa_import.parse_export(text).disks[0]
+        self.assertEqual((disk.enclosure, disk.slot, disk.serial, disk.capacity_gb), ("2", 7, "ABC", 4000))
+        self.assertEqual((disk.interface, disk.manufacturer, disk.firmware), ("sata", "WD", "81.00"))
+
+    def test_location_spellings(self):
+        for text in ("1.4", "1:4", "1/4", "Enclosure 1, Slot 4", "01.04"):
+            with self.subTest(text=text):
+                self.assertEqual(msa_import.parse_location(text), ("1", 4))
+        self.assertIsNone(msa_import.parse_location("x"))
+
+    def test_unknown_files_are_not_detected(self):
+        self.assertIsNone(msa_import.detect_kind("device,slot,serial\nsrv-01,0,ABC"))

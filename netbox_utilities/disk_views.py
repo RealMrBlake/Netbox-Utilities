@@ -484,10 +484,9 @@ class DiskBulkImportView(generic.BulkImportView):
             raw = request.POST.get("data", "")
         if msa_import.looks_like_export(raw):
             export = msa_import.parse_export(raw)
-            if export.disks:
+            if not export.is_empty:
                 messages.info(request, "Die Datei ist ein HPE-MSA-Export und wird mit dem MSA-Import eingelesen.")
-                view = MSADiskImportView()
-                return view._render_assign(request, raw, export, view._assign_form(request, export))
+                return MSADiskImportView().start(request, raw, export)
         return super().post(request)
 
 
@@ -597,6 +596,7 @@ class DiskBayTemplateBulkDeleteView(generic.BulkDeleteView):
 # HPE MSA import
 #
 
+MSA_GROUP_DESCRIPTION = "Aus HPE MSA importiert"
 IMPORTING_ACTIONS = (msa_import.ACTION_NEW, msa_import.ACTION_UPDATE, msa_import.ACTION_REPLACE)
 
 
@@ -620,9 +620,7 @@ class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
             upload_form = disk_forms.MSAUploadForm(request.POST, request.FILES)
             if not upload_form.is_valid():
                 return self._render(request, "upload", upload_form=upload_form)
-            raw = upload_form.cleaned_data["raw"]
-            export = upload_form.cleaned_data["export"]
-            return self._render_assign(request, raw, export, self._assign_form(request, export))
+            return self.start(request, upload_form.cleaned_data["raw"], upload_form.cleaned_data["export"])
 
         try:
             raw = base64.b64decode(request.POST["export_data"]).decode("utf-8")
@@ -630,6 +628,8 @@ class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
             messages.error(request, "Die Importdaten waren beschädigt. Bitte die Datei erneut hochladen.")
             return redirect("plugins:netbox_utilities:disk_msa_import")
         export = msa_import.parse_export(raw)
+        if export.kind == msa_import.KIND_GROUPS:
+            return self._post_groups(request, raw, export)
         assign_form = self._assign_form(request, export, data=request.POST)
         if step == "back" or not assign_form.is_valid():
             return self._render_assign(request, raw, export, assign_form)
@@ -666,6 +666,12 @@ class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
             plans=plans,
             parse_errors=export.errors,
         )
+
+    def start(self, request, raw, export):
+        """First page after reading a file: shelf assignment for disks, device choice for disk groups."""
+        if export.kind == msa_import.KIND_GROUPS:
+            return self._render_groups(request, raw, export, self._group_form(request, export))
+        return self._render_assign(request, raw, export, self._assign_form(request, export))
 
     @staticmethod
     def _encode(raw):
@@ -843,7 +849,7 @@ class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
                     for name in plan["groups"]:
                         if name.casefold() not in groups:
                             group = RAIDGroup(
-                                device=device, name=name, level="other", description="Aus HPE MSA importiert"
+                                device=device, name=name, level="other", description=MSA_GROUP_DESCRIPTION
                             )
                             group.full_clean()
                             group.save()
@@ -896,6 +902,81 @@ class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
         if totals["groups"]:
             text += f" {totals['groups']} RAID-Gruppe(n) angelegt – bitte das RAID-Level prüfen."
         return text
+
+    #
+    # Disk group export
+    #
+
+    def _group_form(self, request, export, data=None):
+        form = disk_forms.MSAGroupAssignForm(data)
+        devices = Device.objects.restrict(request.user, "view")
+        form.fields["devices"].queryset = devices
+        if data is None:
+            # Pre-select the devices which already have groups of these names, e.g. from the disk import.
+            names = [group.name for group in export.groups]
+            form.initial["devices"] = list(
+                devices.filter(netbox_utilities_raid_groups__name__in=names).distinct().values_list("pk", flat=True)
+            )
+        return form
+
+    def _render_groups(self, request, raw, export, group_form):
+        names = [group.name for group in export.groups]
+        existing = {}
+        for group in RAIDGroup.objects.filter(name__in=names).select_related("device"):
+            existing.setdefault(group.name.casefold(), []).append(group)
+        rows = [
+            {
+                "group": group,
+                "level_label": disks.RAID_LEVELS[group.level],
+                "existing": existing.get(group.name.casefold(), []),
+            }
+            for group in export.groups
+        ]
+        return self._render(
+            request,
+            "groups",
+            export_data=self._encode(raw),
+            group_form=group_form,
+            rows=rows,
+            parse_errors=export.errors,
+        )
+
+    def _post_groups(self, request, raw, export):
+        group_form = self._group_form(request, export, data=request.POST)
+        if not group_form.is_valid():
+            return self._render_groups(request, raw, export, group_form)
+        create = group_form.cleaned_data["create_missing"] and request.user.has_perm("netbox_utilities.add_raidgroup")
+        if not request.user.has_perm("netbox_utilities.change_raidgroup"):
+            messages.error(request, "Zum Aktualisieren von RAID-Gruppen fehlt die Berechtigung.")
+            return self._render_groups(request, raw, export, group_form)
+
+        updated = created = 0
+        devices = list(group_form.cleaned_data["devices"])
+        with transaction.atomic():
+            for device in devices:
+                for item in export.groups:
+                    group = RAIDGroup.objects.filter(device=device, name__iexact=item.name).first()
+                    if group is None:
+                        if not create:
+                            continue
+                        group = RAIDGroup(device=device, name=item.name)
+                        created += 1
+                    else:
+                        group.snapshot()
+                        updated += 1
+                    group.level = item.level
+                    if not group.description or group.description == MSA_GROUP_DESCRIPTION:
+                        group.description = item.description or MSA_GROUP_DESCRIPTION
+                    group.full_clean()
+                    group.save()
+
+        messages.success(request, f"Disk Groups übernommen: {updated} RAID-Gruppe(n) aktualisiert, {created} angelegt.")
+        if len(devices) == 1:
+            return redirect("dcim:device_disks", pk=devices[0].pk)
+        return redirect(
+            f"{reverse('plugins:netbox_utilities:raidgroup_list')}?"
+            + urlencode([("device_id", device.pk) for device in devices])
+        )
 
     def _render(self, request, step, **context):
         return render(request, self.template_name, {"step": step, **context})

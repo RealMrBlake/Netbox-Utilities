@@ -347,6 +347,21 @@ from the device type template or from the export (12 or 24 bays). `Type`,
 missing RAID groups are created from `Disk Group` (level *Other*) and the install
 date is estimated from `Power On Hours`.
 
+The import also accepts the **disk group export** (*Pools → Disk Groups*,
+export to CSV). It sets the RAID level (`RAID10`, `RAID-5`, `R6`, `NRAID` → JBOD;
+unknown levels such as ADAPT become *Other*) and a description with pool, size
+and disk count on the RAID groups of the same name on the selected devices;
+devices that already have such groups are pre-selected. Import the disk export
+first, then the disk group export. Missing groups are only created on request.
+
+Column names are matched loosely: case, spaces and punctuation are ignored and
+common alternatives are accepted (e.g. `Serial`/`SN`, `Capacity`, `Vendor`,
+`Firmware`, separate `Enclosure` and `Slot` columns). Positions may be written
+as `1.4`, `1:4`, `1/4` or `Enclosure 1, Slot 4`. Comma, semicolon and tab
+separated files in UTF-8 or Windows-1252 work. Both MSA exports are also
+recognised when uploaded in the regular disk CSV import and handed over to the
+MSA import automatically.
+
 **REST API and GraphQL.**
 
 | Endpoint | Content |
