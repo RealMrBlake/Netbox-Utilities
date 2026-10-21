@@ -75,3 +75,10 @@ class ClassifyTest(SimpleTestCase):
         self.assertEqual(
             msa_import.classify(self.disk, 1, 24, serial_elsewhere="MSA2 – Front 7")[0], msa_import.ACTION_CONFLICT
         )
+
+
+class DetectionTest(SimpleTestCase):
+    def test_recognises_msa_header_only(self):
+        self.assertTrue(msa_import.looks_like_export(EXPORT))
+        self.assertTrue(msa_import.looks_like_export("\ufeffLocation;Serial Number\n1.1;X"))
+        self.assertFalse(msa_import.looks_like_export("device,slot,serial\nsrv-01,0,ABC"))

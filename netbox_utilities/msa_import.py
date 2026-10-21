@@ -54,7 +54,7 @@ def _natural(value):
     return (0, int(value), "") if str(value).isdigit() else (1, 0, str(value))
 
 
-def _decode(data):
+def decode(data):
     if isinstance(data, bytes):
         for encoding in ("utf-8-sig", "cp1252"):
             try:
@@ -69,6 +69,12 @@ def _int(value):
         return int(str(value).strip().replace(".", "").replace(",", ""))
     except ValueError:
         return None
+
+
+def looks_like_export(text):
+    """True if the first line carries the MSA columns "Location" and "Serial Number"."""
+    first_line = (text or "").lstrip("\ufeff").split("\n", 1)[0].casefold()
+    return COLUMN_LOCATION in first_line and "serial number" in first_line
 
 
 def map_type(value, rpm=""):
@@ -94,7 +100,7 @@ def map_status(usage, health):
 
 def parse_export(data):
     """Parse the CSV export into an MSAExport; rows that cannot be read end up in errors."""
-    text = _decode(data).strip()
+    text = decode(data).strip()
     export = MSAExport()
     if not text:
         export.errors.append("Die Datei ist leer.")

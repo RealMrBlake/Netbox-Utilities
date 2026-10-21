@@ -514,7 +514,7 @@ class MSAUploadForm(forms.Form):
         if not export.disks:
             raise ValidationError(export.errors)
         cleaned_data["export"] = export
-        cleaned_data["raw"] = data if isinstance(data, str) else msa_import._decode(data)
+        cleaned_data["raw"] = data if isinstance(data, str) else msa_import.decode(data)
         return cleaned_data
 
 

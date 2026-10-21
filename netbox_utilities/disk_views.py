@@ -474,6 +474,22 @@ class DiskBulkImportView(generic.BulkImportView):
     queryset = Disk.objects.all()
     model_form = disk_forms.DiskImportForm
 
+    def post(self, request):
+        # An HPE MSA export pasted or uploaded here goes straight to the MSA wizard.
+        upload = request.FILES.get("upload_file")
+        if upload is not None:
+            raw = msa_import.decode(upload.read())
+            upload.seek(0)
+        else:
+            raw = request.POST.get("data", "")
+        if msa_import.looks_like_export(raw):
+            export = msa_import.parse_export(raw)
+            if export.disks:
+                messages.info(request, "Die Datei ist ein HPE-MSA-Export und wird mit dem MSA-Import eingelesen.")
+                view = MSADiskImportView()
+                return view._render_assign(request, raw, export, view._assign_form(request, export))
+        return super().post(request)
+
 
 @register_model_view(Disk, "bulk_edit", path="edit", detail=False)
 class DiskBulkEditView(generic.BulkEditView):
