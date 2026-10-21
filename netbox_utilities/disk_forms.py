@@ -15,7 +15,7 @@ from utilities.forms.fields import (
 from utilities.forms.rendering import FieldSet
 from utilities.forms.widgets import DatePicker
 
-from . import disks
+from . import disks, msa_import
 from .models import (
     BAY_LAYOUT_FIELDS,
     Disk,
@@ -487,3 +487,90 @@ class DiskBulkEditForm(NetBoxModelBulkEditForm):
         "description",
         "comments",
     )
+
+
+class MSAUploadForm(forms.Form):
+    """Step 1 of the HPE MSA import: the CSV export from Pools → Disks."""
+
+    export_file = forms.FileField(
+        label="CSV-Datei",
+        required=False,
+        widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".csv,text/csv"}),
+    )
+    export_text = forms.CharField(
+        label="… oder Inhalt einfügen",
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control font-monospace", "rows": 8}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        upload = cleaned_data.get("export_file")
+        data = upload.read() if upload else cleaned_data.get("export_text", "")
+        if not data or not str(data).strip():
+            raise ValidationError("Bitte eine CSV-Datei hochladen oder den Inhalt einfügen.")
+        export = msa_import.parse_export(data)
+        if not export.disks:
+            raise ValidationError(export.errors)
+        cleaned_data["export"] = export
+        cleaned_data["raw"] = data if isinstance(data, str) else msa_import._decode(data)
+        return cleaned_data
+
+
+class MSAAssignForm(forms.Form):
+    """Step 2: which NetBox device is which MSA enclosure (shelf)."""
+
+    create_raid_groups = forms.BooleanField(
+        label="RAID-Gruppen aus „Disk Group“ anlegen",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Fehlende Gruppen werden mit RAID-Level „Sonstiges“ angelegt; das Level bitte danach prüfen.",
+    )
+    replace_existing = forms.BooleanField(
+        label="Belegte Steckplätze ersetzen",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Steckt in NetBox ein anderer Datenträger im Steckplatz, wird er als ausgebaut markiert.",
+    )
+    estimate_install_date = forms.BooleanField(
+        label="Einbaudatum aus Betriebsstunden schätzen",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Nur für neue Datenträger; damit greift die Alterswarnung.",
+    )
+
+    def __init__(self, *args, enclosures=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enclosures = list(enclosures)
+        for enclosure in self.enclosures:
+            self.fields[f"device_{enclosure}"] = DynamicModelChoiceField(
+                label=f"Shelf {enclosure}",
+                queryset=Device.objects.all(),
+                required=False,
+                selector=True,
+            )
+
+    def device_fields(self):
+        return [(enclosure, self[f"device_{enclosure}"]) for enclosure in self.enclosures]
+
+    def option_fields(self):
+        return [self[name] for name in ("create_raid_groups", "replace_existing", "estimate_install_date")]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        assigned = {
+            enclosure: cleaned_data.get(f"device_{enclosure}")
+            for enclosure in self.enclosures
+            if cleaned_data.get(f"device_{enclosure}")
+        }
+        if not assigned:
+            raise ValidationError("Bitte mindestens einem Shelf ein Gerät zuweisen.")
+        seen = {}
+        for enclosure, device in assigned.items():
+            if device.pk in seen:
+                self.add_error(f"device_{enclosure}", f"{device} ist bereits Shelf {seen[device.pk]} zugewiesen.")
+            seen[device.pk] = enclosure
+        cleaned_data["assigned"] = assigned
+        return cleaned_data

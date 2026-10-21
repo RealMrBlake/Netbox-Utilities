@@ -116,6 +116,11 @@
     <a href="{% url 'plugins:netbox_utilities:disk_list' %}?device_id={{ object.pk }}" class="btn btn-sm btn-outline-secondary">
       <i class="mdi mdi-table" aria-hidden="true"></i> Liste &amp; Export
     </a>
+    {% if perms.netbox_utilities.add_disk %}
+      <a href="{% url 'plugins:netbox_utilities:disk_msa_import' %}" class="btn btn-sm btn-outline-secondary" title="Datenträger-Export einer HPE MSA importieren">
+        <i class="mdi mdi-database-import" aria-hidden="true"></i> MSA-Import
+      </a>
+    {% endif %}
   </div>
 
   <div id="nbu-disk-bays"

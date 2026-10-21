@@ -28,7 +28,7 @@ uploads and more.
 - Cables and wireless links can be assigned to one or more VLANs.
 - The B-side device selection of a cable can be pre-filtered by tenant group, tenant and site.
 - A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
-- A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, REST API and GraphQL.
+- A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, HPE MSA disk export import, REST API and GraphQL.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -333,6 +333,20 @@ srv-01,Front,1,spare,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123457,2029-05-31
 srv-01,PCIe,0,active,nvme,nvme,Samsung,PM9A3,3.84 TB,S64XNA0T654321,2030-01-31
 ```
 
+**HPE MSA import.** The *HPE MSA export* button next to **Disks > Disks** (also
+*MSA import* in a device's **Disks** tab) reads the CSV disk export of an HPE MSA
+(*Pools → Disks*, export to CSV). The `Location` column (`1.4` = enclosure 1,
+slot 4) defines the enclosures; in the next step each enclosure (shelf) is
+assigned to a NetBox device. The preview shows per disk whether it is new,
+updated (same serial in the same slot), replacing another disk, skipped or in
+conflict (slot outside the area, serial already installed elsewhere). If a
+device has no slot area yet, the area is created during the import, pre-filled
+from the device type template or from the export (12 or 24 bays). `Type`,
+`Size` (GiB are converted), `Disk Group`, `Revision` and `Health` are mapped;
+`GLOBAL SP`/`DEDICATED SP` become hot spares, `Fault` becomes failed. Optionally
+missing RAID groups are created from `Disk Group` (level *Other*) and the install
+date is estimated from `Power On Hours`.
+
 **REST API and GraphQL.**
 
 | Endpoint | Content |
@@ -352,6 +366,9 @@ and `netbox_utilities_disk_bay_template(_list)`.
 layout and filling slots requires `netbox_utilities.add_disk`, replacing
 requires `netbox_utilities.change_disk`, and RAID groups use the
 `netbox_utilities.*_raidgroup` permissions.
+The HPE MSA import requires `netbox_utilities.add_disk`; updating or replacing
+existing disks additionally requires `netbox_utilities.change_disk`, and creating
+RAID groups `netbox_utilities.add_raidgroup` (otherwise they are skipped).
 
 ### Pre-filter for the B-side of a cable
 

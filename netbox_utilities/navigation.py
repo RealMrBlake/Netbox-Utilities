@@ -38,6 +38,12 @@ menu = PluginMenu(
                             icon_class="mdi mdi-upload",
                             permissions=("netbox_utilities.add_disk",),
                         ),
+                        PluginMenuButton(
+                            link="plugins:netbox_utilities:disk_msa_import",
+                            title="HPE-MSA-Export importieren",
+                            icon_class="mdi mdi-database-import",
+                            permissions=("netbox_utilities.add_disk",),
+                        ),
                     ),
                 ),
                 PluginMenuItem(

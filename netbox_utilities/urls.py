@@ -18,6 +18,7 @@ urlpatterns = [
     path("settings/", views.UtilitiesSettingsView.as_view(), name="settings"),
     path("tenant/select/", views.SelectTenantView.as_view(), name="select_tenant"),
     # Datenträger
+    path("disks/import-msa/", disk_views.MSADiskImportView.as_view(), name="disk_msa_import"),
     path("disks/by-device/", disk_views.DiskByDeviceView.as_view(), name="disk_by_device"),
     path("disks/", include(get_model_urls("netbox_utilities", "disk", detail=False))),
     path("disks/<int:pk>/", include(get_model_urls("netbox_utilities", "disk"))),

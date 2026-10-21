@@ -1,0 +1,180 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}HPE-MSA-Export importieren{% endblock %}
+
+{% block content %}
+  <div class="row mb-3">
+    <div class="col col-xl-10 offset-xl-1">
+
+      <ol class="nbu-msa-steps list-inline small text-muted mb-3">
+        <li class="list-inline-item{% if step == 'upload' %} fw-bold text-body{% endif %}">1. Export hochladen</li>
+        <li class="list-inline-item">›</li>
+        <li class="list-inline-item{% if step == 'assign' %} fw-bold text-body{% endif %}">2. Shelfs zuordnen</li>
+        <li class="list-inline-item">›</li>
+        <li class="list-inline-item{% if step == 'plan' %} fw-bold text-body{% endif %}">3. Prüfen &amp; importieren</li>
+      </ol>
+
+      {% if parse_errors %}
+        <div class="alert alert-warning">
+          <strong>Einige Zeilen wurden ignoriert:</strong>
+          <ul class="mb-0">{% for error in parse_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      {% if step == 'upload' %}
+        <form method="post" enctype="multipart/form-data" class="card">
+          {% csrf_token %}
+          <input type="hidden" name="step" value="upload">
+          <h2 class="card-header"><i class="mdi mdi-database-import me-1" aria-hidden="true"></i>HPE-MSA-Export importieren</h2>
+          <div class="card-body">
+            <p class="text-muted">
+              In der MSA-Oberfläche unter <em>Pools → Disks</em> (bzw. <em>System → Disks</em>) die Liste als CSV exportieren.
+              Die Spalte <em>Location</em> (z. B. <code>1.4</code>) enthält Shelf und Steckplatz.
+            </p>
+            {% if upload_form.non_field_errors %}<div class="alert alert-danger">{{ upload_form.non_field_errors }}</div>{% endif %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ upload_form.export_file.id_for_label }}">{{ upload_form.export_file.label }}</label>
+              {{ upload_form.export_file }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ upload_form.export_text.id_for_label }}">{{ upload_form.export_text.label }}</label>
+              {{ upload_form.export_text }}
+            </div>
+            <div class="text-end">
+              <button type="submit" class="btn btn-primary">Weiter</button>
+            </div>
+          </div>
+        </form>
+
+      {% else %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="export_data" value="{{ export_data }}">
+
+          {% if step == 'assign' %}
+            <input type="hidden" name="step" value="assign">
+            {% if assign_form.non_field_errors %}<div class="alert alert-danger">{{ assign_form.non_field_errors }}</div>{% endif %}
+            <div class="card mb-3">
+              <h2 class="card-header"><i class="mdi mdi-server me-1" aria-hidden="true"></i>Welches Gerät ist welches Shelf?</h2>
+              <div class="card-body">
+                <p class="text-muted">Shelf 1 ist in der Regel der Controller-Einschub, weitere Nummern sind Erweiterungs-Shelfs. Shelfs ohne Gerät werden übersprungen.</p>
+                <table class="table table-hover align-middle">
+                  <thead><tr><th>Shelf</th><th>Datenträger</th><th>Modelle</th><th style="min-width: 20rem">Gerät in NetBox</th></tr></thead>
+                  <tbody>
+                    {% for enclosure in enclosures %}
+                      <tr>
+                        <td class="fw-bold">{{ enclosure.id }}</td>
+                        <td>{{ enclosure.count }} <span class="text-muted small">(Steckplatz {{ enclosure.first }}–{{ enclosure.last }})</span></td>
+                        <td class="small">{{ enclosure.models|join:", " }}</td>
+                        <td>
+                          {{ enclosure.field }}
+                          {% for error in enclosure.field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card mb-3">
+              <h2 class="card-header">Optionen</h2>
+              <div class="card-body">
+                {% for field in assign_form.option_fields %}
+                  <div class="form-check form-switch mb-2">
+                    {{ field }}
+                    <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="form-text">{{ field.help_text }}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="text-end">
+              <a href="{% url 'plugins:netbox_utilities:disk_msa_import' %}" class="btn btn-outline-secondary">Andere Datei</a>
+              <button type="submit" class="btn btn-primary">Weiter zur Vorschau</button>
+            </div>
+
+          {% else %}
+            <input type="hidden" name="step" value="plan">
+            {# Carry the assignment of step 2 along. #}
+            {% for enclosure, field in assign_form.device_fields %}
+              {% if field.value %}<input type="hidden" name="{{ field.html_name }}" value="{{ field.value }}">{% endif %}
+            {% endfor %}
+            {% for field in assign_form.option_fields %}
+              {% if field.value %}<input type="hidden" name="{{ field.html_name }}" value="on">{% endif %}
+            {% endfor %}
+
+            {% for plan in plans %}
+              <div class="card mb-3">
+                <h2 class="card-header">
+                  <i class="mdi mdi-server me-1" aria-hidden="true"></i>
+                  Shelf {{ plan.enclosure }} → <a href="{% url 'dcim:device_disks' pk=plan.device.pk %}" target="_blank">{{ plan.device }}</a>
+                  <span class="badge text-bg-secondary ms-2">{{ plan.importing }} von {{ plan.rows|length }} werden importiert</span>
+                </h2>
+                <div class="card-body">
+                  {% if plan.bay_form %}
+                    <div class="alert alert-warning">
+                      <i class="mdi mdi-alert" aria-hidden="true"></i>
+                      <strong>{{ plan.device }} hat noch keine Datenträger-Steckplätze.</strong>
+                      Der folgende Bereich wird beim Import angelegt – bitte prüfen und bei Bedarf anpassen, dann „Vorschau aktualisieren“.
+                    </div>
+                    {% include 'netbox_utilities/inc/disk_layout_fields.html' with form=plan.bay_form %}
+                  {% elif plan.bays|length > 1 %}
+                    <div class="mb-3" style="max-width: 24rem">
+                      <label class="form-label" for="bay_{{ plan.enclosure }}">Bereich</label>
+                      <select name="bay_{{ plan.enclosure }}" id="bay_{{ plan.enclosure }}" class="form-select">
+                        {% for bay in plan.bays %}
+                          <option value="{{ bay.pk }}"{% if bay.pk == plan.bay.pk %} selected{% endif %}>{{ bay.name }} ({{ bay.first_slot }}–{{ bay.last_slot }})</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  {% else %}
+                    <input type="hidden" name="bay_{{ plan.enclosure }}" value="{{ plan.bay.pk }}">
+                    <p class="text-muted">Bereich: <strong>{{ plan.bay.name }}</strong> (Steckplatz {{ plan.bay.first_slot }}–{{ plan.bay.last_slot }})</p>
+                  {% endif %}
+
+                  {% if plan.groups and assign_form.cleaned_data.create_raid_groups %}
+                    <p class="small text-muted mb-2">Disk Groups: {{ plan.groups|join:", " }}</p>
+                  {% endif %}
+
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                      <thead>
+                        <tr><th>Slot</th><th>Aktion</th><th>Status</th><th>Typ</th><th>Größe</th><th>Modell</th><th>Seriennummer</th><th>Disk Group</th><th>Firmware</th></tr>
+                      </thead>
+                      <tbody>
+                        {% for row in plan.rows %}
+                          <tr{% if row.action == 'conflict' or row.action == 'skip' %} class="text-muted"{% endif %}>
+                            <td>{{ row.item.slot }}</td>
+                            <td>
+                              <span class="badge text-bg-{{ row.color }}">{{ row.label }}</span>
+                              {% if row.reason %}<div class="small">{{ row.reason }}</div>{% endif %}
+                            </td>
+                            <td>{{ row.item.usage }}{% if row.item.health and row.item.health != 'OK' %} <span class="badge text-bg-danger">{{ row.item.health }}</span>{% endif %}</td>
+                            <td>{{ row.item.disk_type|upper }} {{ row.item.interface|upper }}</td>
+                            <td>{{ row.capacity }}</td>
+                            <td>{{ row.item.manufacturer }} {{ row.item.model }}</td>
+                            <td class="font-monospace">{{ row.item.serial }}</td>
+                            <td>{{ row.item.disk_group|default:"—" }}</td>
+                            <td>{{ row.item.firmware }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="submit" name="step" value="back" class="btn btn-outline-secondary me-auto">Zurück</button>
+              <button type="submit" class="btn btn-outline-primary">Vorschau aktualisieren</button>
+              <button type="submit" name="do_import" value="1" class="btn btn-primary">
+                <i class="mdi mdi-check" aria-hidden="true"></i> Importieren
+              </button>
+            </div>
+          {% endif %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endblock content %}

@@ -1,3 +1,5 @@
+import base64
+from datetime import timedelta
 from itertools import groupby
 from urllib.parse import urlencode
 
@@ -9,12 +11,13 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views import View
 from netbox.plugins import get_plugin_config
 from netbox.views import generic
 from utilities.views import ContentTypePermissionRequiredMixin, ViewTab, register_model_view
 
-from . import disk_filtersets, disk_forms, disk_tables, disks
+from . import disk_filtersets, disk_forms, disk_tables, disks, msa_import
 from .models import DEFAULT_BAY_NAME, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup
 
 BAY_NAME_SUGGESTIONS = ("Front", "Rückseite", "Intern", "BOSS-Karte (M.2)", "PCIe", "M.2")
@@ -572,3 +575,311 @@ class DiskBayTemplateBulkDeleteView(generic.BulkDeleteView):
     queryset = DiskBayTemplate.objects.all()
     filterset = disk_filtersets.DiskBayTemplateFilterSet
     table = disk_tables.DiskBayTemplateTable
+
+
+#
+# HPE MSA import
+#
+
+IMPORTING_ACTIONS = (msa_import.ACTION_NEW, msa_import.ACTION_UPDATE, msa_import.ACTION_REPLACE)
+
+
+class MSADiskImportView(ContentTypePermissionRequiredMixin, View):
+    """Import the disk CSV export of an HPE MSA: map each enclosure (shelf) to a device, preview, create.
+
+    The wizard keeps no server-side state; the export travels base64-encoded in a hidden field.
+    """
+
+    template_name = "netbox_utilities/disk_msa_import.html"
+
+    def get_required_permission(self):
+        return "netbox_utilities.add_disk"
+
+    def get(self, request):
+        return self._render(request, "upload", upload_form=disk_forms.MSAUploadForm())
+
+    def post(self, request):
+        step = request.POST.get("step", "upload")
+        if step == "upload" or not request.POST.get("export_data"):
+            upload_form = disk_forms.MSAUploadForm(request.POST, request.FILES)
+            if not upload_form.is_valid():
+                return self._render(request, "upload", upload_form=upload_form)
+            raw = upload_form.cleaned_data["raw"]
+            export = upload_form.cleaned_data["export"]
+            return self._render_assign(request, raw, export, self._assign_form(request, export))
+
+        try:
+            raw = base64.b64decode(request.POST["export_data"]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            messages.error(request, "Die Importdaten waren beschädigt. Bitte die Datei erneut hochladen.")
+            return redirect("plugins:netbox_utilities:disk_msa_import")
+        export = msa_import.parse_export(raw)
+        assign_form = self._assign_form(request, export, data=request.POST)
+        if step == "back" or not assign_form.is_valid():
+            return self._render_assign(request, raw, export, assign_form)
+
+        bound = step == "plan"
+        plans = [
+            self._plan_enclosure(request, enclosure, device, export.enclosures[enclosure], assign_form, bound)
+            for enclosure, device in assign_form.cleaned_data["assigned"].items()
+        ]
+        if bound and "do_import" in request.POST:
+            error = self._import_blocker(request, plans)
+            if error:
+                messages.error(request, error)
+            else:
+                try:
+                    summary = self._execute(request, plans, assign_form.cleaned_data)
+                except ValidationError as exc:
+                    for message in exc.messages:
+                        messages.error(request, message)
+                else:
+                    messages.success(request, summary)
+                    devices = [plan["device"] for plan in plans]
+                    if len(devices) == 1:
+                        return redirect("dcim:device_disks", pk=devices[0].pk)
+                    return redirect(
+                        f"{reverse('plugins:netbox_utilities:disk_by_device')}?"
+                        + urlencode([("device_id", device.pk) for device in devices])
+                    )
+        return self._render(
+            request,
+            "plan",
+            export_data=self._encode(raw),
+            assign_form=assign_form,
+            plans=plans,
+            parse_errors=export.errors,
+        )
+
+    @staticmethod
+    def _encode(raw):
+        return base64.b64encode(raw.encode("utf-8")).decode("ascii")
+
+    @staticmethod
+    def _assign_form(request, export, data=None):
+        form = disk_forms.MSAAssignForm(data, enclosures=list(export.enclosures))
+        devices = Device.objects.restrict(request.user, "view")
+        for enclosure in form.enclosures:
+            form.fields[f"device_{enclosure}"].queryset = devices
+        return form
+
+    def _render_assign(self, request, raw, export, assign_form):
+        enclosures = [
+            {
+                "id": enclosure,
+                "field": assign_form[f"device_{enclosure}"],
+                "count": len(items),
+                "first": items[0].slot,
+                "last": items[-1].slot,
+                "models": sorted({item.model for item in items if item.model}),
+            }
+            for enclosure, items in export.enclosures.items()
+        ]
+        return self._render(
+            request,
+            "assign",
+            export_data=self._encode(raw),
+            assign_form=assign_form,
+            enclosures=enclosures,
+            parse_errors=export.errors,
+        )
+
+    @staticmethod
+    def _bay_defaults(device, items):
+        """Initial values for a new slot area: the device type template, else a guess from the export."""
+        templates = DiskBayTemplate.objects.filter(device_type_id=device.device_type_id).order_by("weight", "name")
+        template = templates.first()
+        if template is not None:
+            values = template.layout_values()
+        else:
+            first = 0 if min(item.slot for item in items) == 0 else 1
+            count = msa_import.suggest_slot_count(max(item.slot for item in items) - first + 1)
+            values = {
+                "name": DEFAULT_BAY_NAME,
+                "weight": 100,
+                "slot_count": count,
+                "rows": 1,
+                "first_slot": first,
+                "numbering": disks.NUMBERING_HORIZONTAL,
+                "form_factor": msa_import.suggest_form_factor(count),
+            }
+        values["save_as_template"] = template is None
+        return values
+
+    def _plan_enclosure(self, request, enclosure, device, items, assign_form, bound):
+        bays = list(DiskBayLayout.objects.filter(device=device).order_by("weight", "name", "pk"))
+        bay = bay_form = None
+        if bays:
+            requested = request.POST.get(f"bay_{enclosure}") if bound else None
+            bay = next((item for item in bays if str(item.pk) == requested), None)
+            if bay is None:
+                highest = max(item.slot for item in items)
+                bay = next((item for item in bays if item.first_slot <= highest <= item.last_slot), bays[0])
+            first_slot, last_slot = bay.first_slot, bay.last_slot
+        else:
+            # The device has no slots yet: ask for the area right here, pre-filled from the export.
+            defaults = self._bay_defaults(device, items)
+            bay_form = disk_forms.DiskBayLayoutForm(
+                request.POST if bound else None,
+                prefix=f"bay{enclosure}",
+                instance=DiskBayLayout(device=device),
+                initial=defaults,
+            )
+            bay_form.fields["slot_count"].widget.attrs.pop("autofocus", None)
+            if bound and bay_form.is_valid():
+                first_slot = bay_form.cleaned_data["first_slot"]
+                slot_count = bay_form.cleaned_data["slot_count"]
+            else:
+                first_slot, slot_count = defaults["first_slot"], defaults["slot_count"]
+            last_slot = first_slot + slot_count - 1
+
+        # Disks in the chosen area, or without area while the device has none yet.
+        installed = Disk.objects.filter(device=device, status__in=disks.SLOT_OCCUPYING_STATUSES)
+        installed = installed.filter(bay=bay) if bay is not None else installed.filter(bay__isnull=True)
+        occupants = {disk.slot: disk for disk in installed}
+        holders = {}
+        serials = [item.serial for item in items if item.serial]
+        for disk in Disk.objects.filter(serial__in=serials, status__in=disks.SLOT_OCCUPYING_STATUSES).select_related(
+            "device", "bay"
+        ):
+            holders.setdefault(disk.serial.casefold(), []).append(disk)
+
+        replace = assign_form.cleaned_data["replace_existing"]
+        rows = []
+        for item in items:
+            occupant = occupants.get(item.slot)
+            elsewhere = next(
+                (
+                    f"{disk.device} – {disk.slot_label}"
+                    for disk in holders.get(item.serial.casefold(), [])
+                    if occupant is None or disk.pk != occupant.pk
+                ),
+                None,
+            )
+            action, reason = msa_import.classify(
+                item,
+                first_slot,
+                last_slot,
+                occupant_serial=None if occupant is None else occupant.serial,
+                serial_elsewhere=elsewhere,
+                replace=replace,
+            )
+            label, color = msa_import.ACTION_LABELS[action]
+            rows.append(
+                {
+                    "item": item,
+                    "occupant": occupant,
+                    "action": action,
+                    "label": label,
+                    "color": color,
+                    "reason": reason,
+                    "capacity": disks.format_capacity(item.capacity_gb),
+                }
+            )
+        return {
+            "enclosure": enclosure,
+            "device": device,
+            "bays": bays,
+            "bay": bay,
+            "bay_form": bay_form,
+            "rows": rows,
+            "importing": sum(1 for row in rows if row["action"] in IMPORTING_ACTIONS),
+            "groups": sorted({item.disk_group for item in items if item.disk_group}),
+        }
+
+    @staticmethod
+    def _import_blocker(request, plans):
+        if any(plan["bay_form"] is not None and not plan["bay_form"].is_valid() for plan in plans):
+            return "Bitte die Angaben zu den neuen Steckplatz-Bereichen korrigieren."
+        actions = [row["action"] for plan in plans for row in plan["rows"]]
+        if not any(action in IMPORTING_ACTIONS for action in actions):
+            return "Es gibt nichts zu importieren."
+        changes = any(action in (msa_import.ACTION_UPDATE, msa_import.ACTION_REPLACE) for action in actions)
+        if changes and not request.user.has_perm("netbox_utilities.change_disk"):
+            return "Zum Aktualisieren oder Ersetzen vorhandener Datenträger fehlt die Berechtigung."
+        return None
+
+    @staticmethod
+    def _execute(request, plans, options):
+        today = timezone.localdate()
+        may_add_groups = request.user.has_perm("netbox_utilities.add_raidgroup")
+        totals = dict.fromkeys((*IMPORTING_ACTIONS, "bays", "groups"), 0)
+
+        with transaction.atomic():
+            for plan in plans:
+                device, bay, bay_form = plan["device"], plan["bay"], plan["bay_form"]
+                if bay_form is not None:
+                    bay = bay_form.save()
+                    totals["bays"] += 1
+                    # Disks recorded before the device had any area belong to its first one.
+                    for disk in Disk.objects.filter(device=device, bay__isnull=True):
+                        disk.snapshot()
+                        disk.bay = bay
+                        disk.save()
+                    if bay_form.cleaned_data.get("save_as_template"):
+                        values = bay.layout_values()
+                        DiskBayTemplate.objects.update_or_create(
+                            device_type_id=device.device_type_id, name=values.pop("name"), defaults=values
+                        )
+
+                groups = {group.name.casefold(): group for group in RAIDGroup.objects.filter(device=device)}
+                if options["create_raid_groups"] and may_add_groups:
+                    for name in plan["groups"]:
+                        if name.casefold() not in groups:
+                            group = RAIDGroup(
+                                device=device, name=name, level="other", description="Aus HPE MSA importiert"
+                            )
+                            group.full_clean()
+                            group.save()
+                            groups[name.casefold()] = group
+                            totals["groups"] += 1
+
+                for row in plan["rows"]:
+                    item, action = row["item"], row["action"]
+                    if action not in IMPORTING_ACTIONS:
+                        continue
+                    values = {
+                        "status": item.status,
+                        "disk_type": item.disk_type,
+                        "interface": item.interface,
+                        "manufacturer": item.manufacturer,
+                        "model": item.model,
+                        "capacity_gb": item.capacity_gb,
+                        "firmware": item.firmware,
+                        "raid_group": groups.get(item.disk_group.casefold()) if item.disk_group else None,
+                    }
+                    if action == msa_import.ACTION_UPDATE:
+                        disk = Disk.objects.get(pk=row["occupant"].pk)
+                        disk.snapshot()
+                        disk.bay = bay
+                        for name, value in values.items():
+                            if value not in (None, "") or name == "raid_group":
+                                setattr(disk, name, value)
+                    else:
+                        if action == msa_import.ACTION_REPLACE:
+                            old = Disk.objects.get(pk=row["occupant"].pk)
+                            old.snapshot()
+                            old.status = disks.STATUS_REPLACED
+                            old.save()
+                        disk = Disk(device=device, bay=bay, slot=item.slot, serial=item.serial, **values)
+                        disk.form_factor = bay.form_factor
+                        if options["estimate_install_date"] and item.power_on_hours:
+                            disk.install_date = today - timedelta(hours=item.power_on_hours)
+                        else:
+                            disk.install_date = today
+                    disk.full_clean()
+                    disk.save()
+                    totals[action] += 1
+
+        parts = [f"{totals[msa_import.ACTION_NEW]} neu", f"{totals[msa_import.ACTION_UPDATE]} aktualisiert"]
+        if totals[msa_import.ACTION_REPLACE]:
+            parts.append(f"{totals[msa_import.ACTION_REPLACE]} ersetzt")
+        text = "MSA-Import abgeschlossen: " + ", ".join(parts) + "."
+        if totals["bays"]:
+            text += f" {totals['bays']} Steckplatz-Bereich(e) angelegt."
+        if totals["groups"]:
+            text += f" {totals['groups']} RAID-Gruppe(n) angelegt – bitte das RAID-Level prüfen."
+        return text
+
+    def _render(self, request, step, **context):
+        return render(request, self.template_name, {"step": step, **context})
