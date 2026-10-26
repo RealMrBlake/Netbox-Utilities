@@ -12,6 +12,24 @@ uploads and more.
 | **Python** | `>=3.12` |
 | **Repository** | <https://git.mrblake.cc/MrBlake/Netbox-Utilities> |
 
+## Screenshots
+
+Disks grouped by device, with failed-disk warnings:
+
+![Disks grouped by device, with failed-disk warnings](docs/screenshots/disks-by-device.png)
+
+Disk list:
+
+![Disk list](docs/screenshots/disks.png)
+
+Personalised navigation:
+
+![Personalised navigation](docs/screenshots/navigation.png)
+
+Plugin settings:
+
+![Plugin settings](docs/screenshots/settings.png)
+
 ## Features
 
 - Every user can reorder or hide the menus of the left navigation.
