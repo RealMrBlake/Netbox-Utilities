@@ -219,8 +219,8 @@ sudo systemctl restart netbox netbox-rq
 | `disk_device_roles` | `["Server", "NAS", "SAN", "MSA"]` | Device role names (case-insensitive) that get the **Disks** tab |
 | `disk_age_warning_years` | `5` | Warn about disks older than this (manufacture date, otherwise install date) |
 | `disk_warranty_warning_days` | `90` | Warn this many days before the warranty ends |
-| `hardware_enabled` | `True` | **CPU & RAM** panels, catalogue, columns and cluster capacity |
-| `hardware_device_roles` | `["Server"]` | Device roles (case-insensitive) that show the **CPU & RAM** panel; cluster hosts always show it |
+| `hardware_enabled` | `True` | **CPU & RAM** tab, catalogue, columns and cluster capacity |
+| `hardware_device_roles` | `["Server"]` | Device roles (case-insensitive) that show the **CPU & RAM** tab; cluster hosts always show it |
 | `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
 
 ## Usage
@@ -410,10 +410,11 @@ RAID groups `netbox_utilities.add_raidgroup` (otherwise they are skipped).
 
 ### CPU & RAM
 
-Servers and virtualization hosts get a **CPU & RAM** panel on the device page.
+Servers and virtualization hosts get a **CPU & RAM** tab next to **Disks**.
 It is shown for devices whose role is listed in `hardware_device_roles`, for
 every device assigned to a cluster, and for every device that already has CPU &
-RAM recorded. **Add** opens a form with:
+RAM recorded; the badge shows the total number of cores. **Add** opens a form
+with:
 
 - **CPU model**: a searchable select over the catalogue. Typing `6338`,
   `Gold 6338` or `epyc 7543` is enough; each entry shows cores, threads and
@@ -423,7 +424,7 @@ RAM recorded. **Add** opens a form with:
 - **RAM**: number and size of the modules, total RAM (calculated from modules ×
   size when left empty), type (DDR3/DDR4/DDR5) and speed in MT/s.
 
-The panel then shows e.g. *2 × Intel Xeon Gold 6338 · 64 cores / 128 threads ·
+The tab then shows e.g. *2 × Intel Xeon Gold 6338 · 64 cores / 128 threads ·
 1 TB (16 × 64 GB DDR4-3200)*. The device list offers the optional columns
 **CPU**, **Cores / Threads** and **RAM** under **Configure Table**.
 
@@ -457,8 +458,8 @@ machines (vCPUs and memory of the VM):
   percent and the RAM that remains if the largest host fails (N+1). A table
   lists every host with its CPU, VMs, ratio and RAM usage; hosts without CPU &
   RAM are flagged with a link to record them.
-- **Host (device) page:** the CPU & RAM panel adds the VMs running on that
-  host (VMs whose *Device* is set) with the same figures.
+- **Host (device):** the CPU & RAM tab adds the capacity of that host and a
+  list of the VMs running on it (VMs whose *Device* is set).
 - **VM page:** a **Host hardware** panel shows the CPU of the host, or of the
   cluster hosts if the VM has no fixed host, and warns if the VM has more
   vCPUs than the host has threads.
@@ -487,7 +488,7 @@ esx02,EPYC 9354,2,24,32,ddr5,4800
 `?cores__gte=32`, `?cluster_id=4` and `?cpu_id=17`. GraphQL offers
 `netbox_utilities_cpu_model(_list)` and `netbox_utilities_device_hardware(_list)`.
 
-**Permissions.** The panels require `netbox_utilities.view_devicehardware`;
+**Permissions.** The tab and panels require `netbox_utilities.view_devicehardware`;
 recording and editing use `netbox_utilities.add_devicehardware` and
 `netbox_utilities.change_devicehardware`. The catalogue uses the
 `netbox_utilities.*_cpumodel` permissions.

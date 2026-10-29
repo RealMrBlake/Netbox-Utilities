@@ -2,11 +2,12 @@ from dcim.models import Device
 from django.db.models import Count
 from django.urls import reverse
 from netbox.views import generic
-from utilities.views import register_model_view
+from utilities.views import ViewTab, register_model_view
 from virtualization.models import VirtualMachine
 
 from . import hardware, hardware_filtersets, hardware_forms, hardware_tables
 from .models import CPUModel, DeviceHardware
+from .runtime import hardware_enabled
 
 
 def host_entry(device):
@@ -38,21 +39,58 @@ def capacity_context(capacity):
     }
 
 
+def hardware_tab_url(device):
+    return reverse("dcim:device_hardware", kwargs={"pk": device.pk})
+
+
+def hardware_tab_badge(device):
+    """Total cores of the device; "—" without CPU; None hides the tab for other devices."""
+    if not hardware_enabled():
+        return None
+    record = DeviceHardware.objects.filter(device=device).select_related("cpu").first()
+    if record is None:
+        return "—" if hardware.supports_hardware(device) else None
+    return str(record.total_cores) if record.cpu_id else "—"
+
+
+@register_model_view(Device, "hardware", path="hardware")
+class DeviceHardwareTabView(generic.ObjectView):
+    queryset = Device.objects.all()
+    template_name = "netbox_utilities/device_hardware.html"
+    tab = ViewTab(
+        label="CPU & RAM",
+        badge=hardware_tab_badge,
+        permission="netbox_utilities.view_devicehardware",
+        weight=2060,
+        hide_if_empty=True,
+    )
+
+    def get_extra_context(self, request, instance):
+        return device_hardware_context(request, instance)
+
+
 def device_hardware_context(request, device):
-    """Panel on the device page: CPU/RAM and, for virtualization hosts, the VMs running on it."""
+    """The "CPU & RAM" tab: CPU/RAM and, for virtualization hosts, the VMs running on it."""
     record = DeviceHardware.objects.filter(device=device).select_related("cpu").first()
     context = {
         "record": record,
+        "supported": hardware.supports_hardware(device),
         "can_add": request.user.has_perm("netbox_utilities.add_devicehardware"),
         "can_change": request.user.has_perm("netbox_utilities.change_devicehardware"),
         "add_url": f"{reverse('plugins:netbox_utilities:devicehardware_add')}?device={device.pk}"
-        f"&return_url={device.get_absolute_url()}",
+        f"&return_url={hardware_tab_url(device)}",
     }
-    vms = list(VirtualMachine.objects.restrict(request.user, "view").filter(device=device))
+    vms = list(
+        VirtualMachine.objects.restrict(request.user, "view")
+        .filter(device=device)
+        .select_related("tenant")
+        .order_by("name")
+    )
     if vms or device.cluster_id:
         capacity = hardware.build_capacity([host_entry(device)], vm_rows(vms))
         context.update(capacity_context(capacity))
         context["host"] = capacity.hosts[0]
+        context["vms"] = vms
         context["vm_list_url"] = f"{reverse('virtualization:virtualmachine_list')}?device_id={device.pk}"
     return context
 
@@ -190,7 +228,7 @@ class DeviceHardwareEditView(generic.ObjectEditView):
 
     def get_return_url(self, request, obj=None):
         if obj is not None and obj.pk and obj.device_id and "return_url" not in request.GET:
-            return obj.device.get_absolute_url()
+            return hardware_tab_url(obj.device)
         return super().get_return_url(request, obj)
 
 

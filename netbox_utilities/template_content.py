@@ -111,9 +111,6 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
         return self.render("netbox_utilities/device_bulk_module_button.html")
 
     def right_page(self):
-        return self._hardware_panel() + self._rack_width_panel()
-
-    def _rack_width_panel(self):
         placement = DeviceRackPlacement.objects.filter(device=self.context["object"]).first()
         if placement is None:
             return ""
@@ -124,18 +121,6 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
                 "horizontal_position": placement.horizontal_position,
             },
         )
-
-    def _hardware_panel(self):
-        request, device = self.context["request"], self.context["object"]
-        if not hardware_enabled() or not request.user.has_perm("netbox_utilities.view_devicehardware"):
-            return ""
-        from . import hardware
-        from .hardware_views import device_hardware_context
-
-        context = device_hardware_context(request, device)
-        if context["record"] is None and not hardware.supports_hardware(device):
-            return ""
-        return self.render("netbox_utilities/device_hardware_panel.html", context)
 
 
 class ClusterHardwareContent(PluginTemplateExtension):

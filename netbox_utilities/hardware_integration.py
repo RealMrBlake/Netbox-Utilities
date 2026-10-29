@@ -70,6 +70,9 @@ def install_hardware_support():
     from utilities.tables import register_table_column
     from virtualization.tables import ClusterTable
 
+    # Registers the "CPU & RAM" device tab before NetBox builds the dcim URLs.
+    from . import hardware_views  # noqa: F401
+
     common = {"accessor": tables.A("pk"), "orderable": False, "empty_values": ()}
     register_table_column(DeviceCPUColumn(verbose_name="CPU", **common), "netbox_utilities_cpu", DeviceTable)
     register_table_column(
