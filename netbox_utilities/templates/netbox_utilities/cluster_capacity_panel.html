@@ -45,8 +45,15 @@
       </div>
     </div>
     <div class="card-footer small text-muted">
-      Gezählt werden alle VMs außer „Offline“ und „Außer Betrieb“. VMs ohne festen Host werden anteilig nach Größe
-      auf die Hosts verteilt: vCPUs nach Threads, RAM nach Host-RAM. Ist bei keinem Host CPU/RAM erfasst, zu gleichen Teilen.
+      Gezählt werden alle VMs außer „Offline“ und „Außer Betrieb“.
+      {% if capacity.distributed %}
+        VMs ohne festen Host sind anteilig nach Größe auf die Hosts verteilt: vCPUs nach Threads, RAM nach Host-RAM
+        (zu gleichen Teilen, wenn bei keinem Host CPU/RAM erfasst ist).
+      {% elif capacity.unplaced_vm_count %}
+        {{ capacity.unplaced_vm_count }} VM{{ capacity.unplaced_vm_count|pluralize:",s" }} ohne festen Host
+        {{ capacity.unplaced_vm_count|pluralize:"zählt,zählen" }} nur zur Cluster-Summe: Im Cluster sind VMs fest Hosts
+        zugewiesen, deshalb wird nicht automatisch verteilt.
+      {% endif %}
     </div>
   {% endif %}
 </div>

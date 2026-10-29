@@ -475,7 +475,9 @@ VMs that are assigned only to a cluster, without a fixed host (*Device*), are
 spread over the cluster hosts in proportion to their size: vCPUs by the number
 of threads, memory by the host RAM. A host with twice the threads carries twice
 the vCPUs of these VMs. If no host of the cluster has CPU & RAM recorded, the
-load is split evenly. The cluster table and the CPU & RAM tab of each host
+load is split evenly. As soon as a single VM of the cluster (in any status) is
+assigned to one of its hosts, the placement counts as managed by hand: nothing
+is spread, and the VMs without a host only count towards the cluster totals. The cluster table and the CPU & RAM tab of each host
 include this share and mark it as such; the cluster totals count every VM once. VM memory is read in MB as NetBox stores it.
 
 **CSV import.** **Hardware > CPU & RAM > Import** accepts `device` (name),

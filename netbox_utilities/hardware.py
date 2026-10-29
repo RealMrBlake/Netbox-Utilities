@@ -122,6 +122,10 @@ class Capacity:
     unplaced_vm_count: int = 0
     # True for one host of a cluster: vcpus/vm_memory_gb include its share of the unplaced VMs.
     host_share: bool = False
+    # Some VM is pinned to a host, so VMs without a host are not spread automatically.
+    manual_placement: bool = False
+    # VMs without a host were spread over the hosts.
+    distributed: bool = False
 
     @property
     def known_hosts(self):
@@ -200,12 +204,16 @@ def build_capacity(hosts, vms):
     vms:   iterable of (host key or None, vcpus, memory in MB, status).
 
     VMs without a fixed host (only a cluster) are spread over the hosts in proportion to
-    their size: vCPUs by threads, memory by RAM.
+    their size: vCPUs by threads, memory by RAM. As soon as any VM of the cluster (in any
+    status) is pinned to one of its hosts, the placement is managed by hand and nothing is
+    spread; the unplaced VMs then only count towards the cluster totals.
     """
     capacity = Capacity(hosts=list(hosts))
     by_key = {host.key: host for host in capacity.hosts}
     unplaced_vcpus = unplaced_memory_gb = 0
     for host_key, vcpus, memory_mb, status in vms:
+        if host_key in by_key:
+            capacity.manual_placement = True
         if status in INACTIVE_VM_STATUSES:
             continue
         vcpus = float(vcpus or 0)
@@ -223,7 +231,8 @@ def build_capacity(hosts, vms):
             host.vcpus += vcpus
             host.vm_memory_gb += memory_gb
 
-    if capacity.hosts and capacity.unplaced_vm_count:
+    if capacity.hosts and capacity.unplaced_vm_count and not capacity.manual_placement:
+        capacity.distributed = True
         for host, weight in zip(capacity.hosts, _weights(capacity.hosts, "threads"), strict=True):
             host.shared_vcpus = unplaced_vcpus * weight
         for host, weight in zip(capacity.hosts, _weights(capacity.hosts, "memory_gb"), strict=True):
@@ -240,4 +249,6 @@ def host_capacity(cluster_capacity, host):
         vm_memory_gb=host.total_vm_memory_gb,
         unplaced_vm_count=cluster_capacity.unplaced_vm_count,
         host_share=True,
+        manual_placement=cluster_capacity.manual_placement,
+        distributed=cluster_capacity.distributed,
     )
