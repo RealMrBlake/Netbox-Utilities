@@ -117,11 +117,29 @@ def build_cluster_capacity(request, cluster_id, extra_host=None):
     return hardware.build_capacity([host_entry(device) for device in hosts], vm_rows(vms)), hosts
 
 
+def ratio_level(ratio, limit):
+    """Bootstrap colour for a vCPU:core ratio."""
+    if ratio is None:
+        return "secondary"
+    if limit and ratio > limit:
+        return "danger" if ratio > limit * 1.5 else "warning"
+    return "success"
+
+
+def memory_level(value):
+    if value is None:
+        return "secondary"
+    return "danger" if value > 100 else "warning" if value > 85 else "success"
+
+
 def cluster_capacity_context(request, cluster):
     capacity, hosts = build_cluster_capacity(request, cluster.pk)
+    limit = hardware.vcpu_ratio_warning()
     rows = []
     for device, host in zip(hosts, capacity.hosts, strict=True):
         record = getattr(device, "netbox_utilities_hardware", None)
+        ratio = host.total_vcpus / host.cores if host.cores else None
+        memory_percent = hardware.percent(host.total_vm_memory_gb, host.memory_gb)
         rows.append(
             {
                 "device": device,
@@ -129,12 +147,20 @@ def cluster_capacity_context(request, cluster):
                 "host": host,
                 "memory": hardware.format_memory(host.memory_gb),
                 "vm_memory": hardware.format_memory(round(host.total_vm_memory_gb, 1)),
-                "memory_percent": hardware.percent(host.total_vm_memory_gb, host.memory_gb),
-                "vcpu_per_core": hardware.format_ratio(host.total_vcpus / host.cores if host.cores else None),
+                "memory_percent": memory_percent,
+                "memory_bar": min(memory_percent or 0, 100),
+                "memory_level": memory_level(memory_percent),
+                "vcpu_per_core": hardware.format_ratio(ratio),
+                "ratio_level": ratio_level(ratio, limit),
             }
         )
+    memory_percent = capacity.memory_percent
     return {
         **capacity_context(capacity),
+        "ratio_limit": limit,
+        "cluster_ratio_level": ratio_level(capacity.vcpu_per_core, limit),
+        "cluster_memory_bar": min(memory_percent or 0, 100),
+        "cluster_memory_level": memory_level(memory_percent),
         "rows": rows,
         "hardware_list_url": f"{reverse('plugins:netbox_utilities:devicehardware_list')}?cluster_id={cluster.pk}",
         "can_add": request.user.has_perm("netbox_utilities.add_devicehardware"),

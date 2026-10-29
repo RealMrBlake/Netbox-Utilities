@@ -6,44 +6,119 @@
   {% if not rows %}
     <div class="card-body text-muted">Dem Cluster sind keine Hosts (Geräte) zugeordnet.</div>
   {% else %}
-    <div class="row g-0">
-      <div class="col-12 col-xl-5 border-end">
-        {% include 'netbox_utilities/inc/hardware_capacity.html' %}
-      </div>
-      <div class="col-12 col-xl-7">
-        <div class="table-responsive">
-          <table class="table table-hover table-sm align-middle mb-0">
-            <thead>
-              <tr><th>Host</th><th>CPU</th><th>Kerne / Threads</th><th>RAM</th><th>VMs</th><th>vCPU : Kern</th><th>RAM belegt</th></tr>
-            </thead>
-            <tbody>
-              {% for row in rows %}
-                <tr>
-                  <td><a href="{{ row.device.get_absolute_url }}">{{ row.device }}</a></td>
-                  <td class="small">
-                    {% if row.record and row.record.cpu %}{{ row.record.cpu_display }}
-                    {% elif can_add %}<a href="{% url 'plugins:netbox_utilities:devicehardware_add' %}?device={{ row.device.pk }}&return_url={{ request.path|urlencode }}" class="text-warning">erfassen</a>
-                    {% else %}<span class="text-warning">fehlt</span>{% endif %}
-                  </td>
-                  <td>{% if row.host.cores %}{{ row.host.cores }} / {{ row.host.threads }}{% else %}—{% endif %}</td>
-                  <td>{{ row.memory }}</td>
-                  <td>
-                    {{ row.host.vm_count }}{% if row.host.shared_vcpus or row.host.shared_memory_gb %} <span class="text-muted small">+ anteilig</span>{% endif %}
-                    <div class="text-muted small">{{ row.host.total_vcpus|floatformat:"-1" }} vCPU, {{ row.vm_memory }}</div>
-                  </td>
-                  <td>{{ row.vcpu_per_core }}</td>
-                  <td>
-                    {% if row.memory_percent is not None %}
-                      <span class="badge {% if row.memory_percent > 100 %}text-bg-danger{% elif row.memory_percent > 85 %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ row.memory_percent }} %</span>
-                    {% else %}—{% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    <div class="card-body pb-0">
+      <div class="row g-3">
+        {# Hosts #}
+        <div class="col-6 col-xl-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small text-uppercase">Hosts</div>
+            <div class="fs-3 fw-semibold lh-sm">{{ rows|length }}</div>
+            <div class="small text-muted">
+              {% if capacity.cores %}{{ capacity.cores }} Kerne · {{ capacity.threads }} Threads · {{ memory }}{% else %}keine CPU erfasst{% endif %}
+            </div>
+          </div>
+        </div>
+        {# vCPU ratio #}
+        <div class="col-6 col-xl-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small text-uppercase">vCPU : Kern</div>
+            <div class="fs-3 fw-semibold lh-sm text-{{ cluster_ratio_level }}">{{ vcpu_per_core }}</div>
+            <div class="small text-muted">
+              {{ capacity.vcpus|floatformat:"-1" }} vCPUs in {{ capacity.vm_count }} VM{{ capacity.vm_count|pluralize:",s" }}
+              {% if ratio_limit %}· Grenze {{ ratio_limit }} : 1{% endif %}
+            </div>
+          </div>
+        </div>
+        {# RAM #}
+        <div class="col-6 col-xl-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small text-uppercase">RAM belegt</div>
+            <div class="fs-3 fw-semibold lh-sm text-{{ cluster_memory_level }}">
+              {% if capacity.memory_percent is not None %}{{ capacity.memory_percent }} %{% else %}—{% endif %}
+            </div>
+            <div class="progress my-1" style="height: .4rem">
+              <div class="progress-bar bg-{{ cluster_memory_level }}" style="width: {{ cluster_memory_bar }}%"></div>
+            </div>
+            <div class="small text-muted">{{ vm_memory }} von {{ memory }}</div>
+          </div>
+        </div>
+        {# N+1 #}
+        <div class="col-6 col-xl-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small text-uppercase">Ausfall größter Host (N+1)</div>
+            {% if capacity.failover_memory_gb is None %}
+              <div class="fs-3 fw-semibold lh-sm text-muted">—</div>
+              <div class="small text-muted">braucht mindestens 2 Hosts mit erfasstem RAM</div>
+            {% else %}
+              <div class="fs-3 fw-semibold lh-sm text-{% if capacity.failover_ok %}success{% else %}warning{% endif %}">
+                {% if capacity.failover_ok %}OK{% else %}Nicht erfüllt{% endif %}
+              </div>
+              <div class="small text-muted">{{ failover_memory }} verbleiben · {{ vm_memory }} benötigt</div>
+            {% endif %}
+          </div>
         </div>
       </div>
+
+      {% if capacity_warnings %}
+        <div class="alert alert-warning mt-3 mb-0 py-2">
+          <ul class="mb-0 ps-3 small">
+            {% for level, text in capacity_warnings %}<li>{{ text }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
     </div>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Host</th>
+            <th>CPU</th>
+            <th class="text-end">Kerne / Threads</th>
+            <th class="text-end">RAM</th>
+            <th>VMs</th>
+            <th class="text-end">vCPU : Kern</th>
+            <th style="min-width: 11rem">RAM belegt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td class="text-nowrap"><a href="{{ row.device.get_absolute_url }}">{{ row.device }}</a></td>
+              <td class="small">
+                {% if row.record and row.record.cpu %}{{ row.record.cpu_display }}
+                {% elif can_add %}<a href="{% url 'plugins:netbox_utilities:devicehardware_add' %}?device={{ row.device.pk }}&return_url={{ request.path|urlencode }}" class="text-warning"><i class="mdi mdi-plus-circle-outline"></i> erfassen</a>
+                {% else %}<span class="text-warning">fehlt</span>{% endif %}
+              </td>
+              <td class="text-end text-nowrap">{% if row.host.cores %}{{ row.host.cores }} / {{ row.host.threads }}{% else %}—{% endif %}</td>
+              <td class="text-end text-nowrap">{{ row.memory }}</td>
+              <td class="text-nowrap">
+                {% if row.host.vm_count or row.host.total_vcpus %}
+                  {{ row.host.vm_count }} VM{{ row.host.vm_count|pluralize:",s" }}{% if row.host.shared_vcpus or row.host.shared_memory_gb %} <span class="badge text-bg-light border">+ anteilig</span>{% endif %}
+                  <span class="text-muted small">· {{ row.host.total_vcpus|floatformat:"-1" }} vCPU · {{ row.vm_memory }}</span>
+                {% else %}
+                  <span class="text-muted">keine VMs</span>
+                {% endif %}
+              </td>
+              <td class="text-end text-nowrap">
+                {% if row.host.cores %}<span class="fw-semibold text-{{ row.ratio_level }}">{{ row.vcpu_per_core }}</span>{% else %}—{% endif %}
+              </td>
+              <td>
+                {% if row.memory_percent is not None %}
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height: .5rem">
+                      <div class="progress-bar bg-{{ row.memory_level }}" style="width: {{ row.memory_bar }}%"></div>
+                    </div>
+                    <span class="small text-nowrap" style="min-width: 2.75rem">{{ row.memory_percent }} %</span>
+                  </div>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
     <div class="card-footer small text-muted">
       Gezählt werden alle VMs außer „Offline“ und „Außer Betrieb“.
       {% if capacity.distributed %}
