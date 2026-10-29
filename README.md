@@ -338,7 +338,7 @@ device and slot. The device list offers an optional **Disks** column
 (used/total, linked to the tab) under **Configure Table**; it runs two queries
 per row, so enable it only where needed.
 
-**CSV import.** **Disks > Disks > Import** accepts CSV, JSON or YAML
+**CSV import.** **Hardware > Disks > Import** accepts CSV, JSON or YAML
 with these columns: `device` (device name), `bay` (area name, may be empty when
 the device has only one area), `slot`, `status`, `disk_type`,
 `interface`, `form_factor`, `manufacturer`, `model`, `capacity` (e.g. `4 TB`),
