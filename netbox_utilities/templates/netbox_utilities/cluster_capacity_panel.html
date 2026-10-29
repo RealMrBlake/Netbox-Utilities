@@ -27,7 +27,10 @@
                   </td>
                   <td>{% if row.host.cores %}{{ row.host.cores }} / {{ row.host.threads }}{% else %}—{% endif %}</td>
                   <td>{{ row.memory }}</td>
-                  <td>{{ row.host.vm_count }} <span class="text-muted small">({{ row.host.vcpus|floatformat:"-1" }} vCPU, {{ row.vm_memory }})</span></td>
+                  <td>
+                    {{ row.host.vm_count }}{% if row.host.shared_vcpus or row.host.shared_memory_gb %} <span class="text-muted small">+ anteilig</span>{% endif %}
+                    <div class="text-muted small">{{ row.host.total_vcpus|floatformat:"-1" }} vCPU, {{ row.vm_memory }}</div>
+                  </td>
                   <td>{{ row.vcpu_per_core }}</td>
                   <td>
                     {% if row.memory_percent is not None %}
@@ -42,7 +45,8 @@
       </div>
     </div>
     <div class="card-footer small text-muted">
-      Gezählt werden alle VMs außer „Offline“ und „Außer Betrieb“. VMs ohne festen Host zählen nur zur Cluster-Summe.
+      Gezählt werden alle VMs außer „Offline“ und „Außer Betrieb“. VMs ohne festen Host werden anteilig nach Größe
+      auf die Hosts verteilt: vCPUs nach Threads, RAM nach Host-RAM. Ist bei keinem Host CPU/RAM erfasst, zu gleichen Teilen.
     </div>
   {% endif %}
 </div>

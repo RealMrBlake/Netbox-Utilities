@@ -14,7 +14,13 @@
     <th scope="row">VMs</th>
     <td>
       {{ capacity.vm_count }} VM{{ capacity.vm_count|pluralize:",s" }} · {{ capacity.vcpus|floatformat:"-1" }} vCPUs · {{ vm_memory }} RAM
-      {% if capacity.unplaced_vm_count %}<div class="small text-muted">davon {{ capacity.unplaced_vm_count }} ohne festen Host</div>{% endif %}
+      {% if capacity.host_share and capacity.unplaced_vm_count %}
+        <div class="small text-muted">
+          inkl. anteiliger Last aus {{ capacity.unplaced_vm_count }} Cluster-VM{{ capacity.unplaced_vm_count|pluralize:",s" }} ohne festen Host
+        </div>
+      {% elif capacity.unplaced_vm_count %}
+        <div class="small text-muted">davon {{ capacity.unplaced_vm_count }} ohne festen Host, anteilig nach Größe auf die Hosts verteilt</div>
+      {% endif %}
     </td>
   </tr>
   <tr>

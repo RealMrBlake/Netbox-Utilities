@@ -49,7 +49,7 @@ class ClusterCapacityColumn(tables.Column):
         from .hardware_views import host_entry, vm_rows
 
         hosts = Device.objects.filter(cluster=record).select_related("netbox_utilities_hardware__cpu")
-        vms = VirtualMachine.objects.filter(cluster=record).select_related("device")
+        vms = VirtualMachine.objects.filter(cluster=record)
         return build_capacity([host_entry(device) for device in hosts], vm_rows(vms))
 
     def render(self, record):

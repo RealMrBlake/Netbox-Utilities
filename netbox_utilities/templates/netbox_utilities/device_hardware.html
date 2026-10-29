@@ -64,6 +64,12 @@
     {% else %}
       <div class="card-body text-muted">Keine VMs mit diesem Gerät als Host.</div>
     {% endif %}
+    {% if capacity.host_share and capacity.unplaced_vm_count %}
+      <div class="card-footer small text-muted">
+        Die Liste zeigt nur VMs, deren Gerät dieser Host ist. {{ capacity.unplaced_vm_count }} weitere VM{{ capacity.unplaced_vm_count|pluralize:",s" }}
+        des Clusters ohne festen Host {{ capacity.unplaced_vm_count|pluralize:"ist,sind" }} anteilig in der Auslastung enthalten.
+      </div>
+    {% endif %}
   </div>
 {% endif %}
 {% endblock content %}

@@ -469,7 +469,14 @@ machines (vCPUs and memory of the VM):
 Warnings appear when VMs are allocated more RAM than the hosts have, when the
 RAM no longer fits after the failure of the largest host, and when the vCPU
 ratio exceeds `hardware_vcpu_ratio_warning`. VMs with the status *Offline* or
-*Decommissioning* are not counted. VM memory is read in MB as NetBox stores it.
+*Decommissioning* are not counted.
+
+VMs that are assigned only to a cluster, without a fixed host (*Device*), are
+spread over the cluster hosts in proportion to their size: vCPUs by the number
+of threads, memory by the host RAM. A host with twice the threads carries twice
+the vCPUs of these VMs. If no host of the cluster has CPU & RAM recorded, the
+load is split evenly. The cluster table and the CPU & RAM tab of each host
+include this share and mark it as such; the cluster totals count every VM once. VM memory is read in MB as NetBox stores it.
 
 **CSV import.** **Hardware > CPU & RAM > Import** accepts `device` (name),
 `cpu` (catalogue model name, e.g. `Xeon Gold 6338`), `cpu_count`, `memory_gb`,

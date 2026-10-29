@@ -116,3 +116,46 @@ class CapacityTest(SimpleTestCase):
         capacity = hardware.build_capacity(self.hosts()[:1], [])
         self.assertIsNone(capacity.failover_memory_gb)
         self.assertEqual(capacity.vcpu_per_core, 0)
+
+
+class UnplacedVMTest(SimpleTestCase):
+    def test_spread_by_host_size(self):
+        hosts = [
+            hardware.Host("small", cores=16, threads=32, memory_gb=256, key=1),
+            hardware.Host("big", cores=48, threads=96, memory_gb=768, key=2),
+        ]
+        vms = [(None, 16, 100 * 1024, "active"), (1, 4, 8 * 1024, "active")]
+        capacity = hardware.build_capacity(hosts, vms)
+        small, big = capacity.hosts
+        self.assertEqual(capacity.unplaced_vm_count, 1)
+        self.assertAlmostEqual(small.shared_vcpus, 4)
+        self.assertAlmostEqual(big.shared_vcpus, 12)
+        self.assertAlmostEqual(small.shared_memory_gb, 25)
+        self.assertAlmostEqual(big.shared_memory_gb, 75)
+        self.assertAlmostEqual(small.total_vcpus, 8)
+        self.assertAlmostEqual(small.total_vm_memory_gb, 33)
+        # The cluster sums count every VM exactly once.
+        self.assertEqual((capacity.vcpus, capacity.vm_memory_gb), (20, 108))
+
+    def test_equal_shares_without_recorded_hardware(self):
+        hosts = [hardware.Host("a", key=1), hardware.Host("b", key=2)]
+        capacity = hardware.build_capacity(hosts, [(None, 8, 16 * 1024, "active")])
+        self.assertEqual([host.shared_vcpus for host in capacity.hosts], [4, 4])
+        self.assertEqual([host.shared_memory_gb for host in capacity.hosts], [8, 8])
+
+    def test_host_capacity_includes_share(self):
+        hosts = [
+            hardware.Host("a", cores=32, threads=64, memory_gb=512, key=1),
+            hardware.Host("b", cores=32, threads=64, memory_gb=512, key=2),
+        ]
+        cluster = hardware.build_capacity(hosts, [(None, 32, 512 * 1024, "active"), (1, 8, 64 * 1024, "active")])
+        single = hardware.host_capacity(cluster, cluster.hosts[0])
+        self.assertTrue(single.host_share)
+        self.assertEqual((single.vm_count, single.vcpus, single.vm_memory_gb), (1, 24, 320))
+        self.assertEqual(single.memory_percent, 62)
+        self.assertEqual(single.vcpu_per_core, 0.75)
+
+    def test_hosts_are_matched_by_key_not_name(self):
+        hosts = [hardware.Host("esx", key=1), hardware.Host("esx", key=2)]
+        capacity = hardware.build_capacity(hosts, [(2, 4, 1024, "active")])
+        self.assertEqual([host.vcpus for host in capacity.hosts], [0, 4])

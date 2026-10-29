@@ -79,19 +79,38 @@ def percent(part, whole):
 
 @dataclass
 class Host:
-    """One physical host; cores/threads/memory are None when no hardware is recorded."""
+    """One physical host; cores/threads/memory are None when no hardware is recorded.
+
+    vcpus/vm_memory_gb come from VMs placed on this host, shared_* is its share of the
+    cluster VMs without a fixed host (see build_capacity).
+    """
 
     name: str
     cores: int | None = None
     threads: int | None = None
     memory_gb: float | None = None
+    key: object = None
     vcpus: float = 0
     vm_memory_gb: float = 0
     vm_count: int = 0
+    shared_vcpus: float = 0
+    shared_memory_gb: float = 0
+
+    def __post_init__(self):
+        if self.key is None:
+            self.key = self.name
 
     @property
     def complete(self):
         return bool(self.cores and self.memory_gb)
+
+    @property
+    def total_vcpus(self):
+        return self.vcpus + self.shared_vcpus
+
+    @property
+    def total_vm_memory_gb(self):
+        return self.vm_memory_gb + self.shared_memory_gb
 
 
 @dataclass
@@ -101,6 +120,8 @@ class Capacity:
     vcpus: float = 0
     vm_memory_gb: float = 0
     unplaced_vm_count: int = 0
+    # True for one host of a cluster: vcpus/vm_memory_gb include its share of the unplaced VMs.
+    host_share: bool = False
 
     @property
     def known_hosts(self):
@@ -163,15 +184,28 @@ class Capacity:
         return result
 
 
+def _weights(hosts, attribute):
+    """Share per host proportional to its size; equal shares if no host has the value recorded."""
+    sizes = [getattr(host, attribute) or 0 for host in hosts]
+    total = sum(sizes)
+    if not total:
+        return [1 / len(hosts)] * len(hosts)
+    return [size / total for size in sizes]
+
+
 def build_capacity(hosts, vms):
     """Aggregate hosts and VMs.
 
     hosts: iterable of Host (memory in GB).
-    vms:   iterable of (host name or None, vcpus, memory in MB, status).
+    vms:   iterable of (host key or None, vcpus, memory in MB, status).
+
+    VMs without a fixed host (only a cluster) are spread over the hosts in proportion to
+    their size: vCPUs by threads, memory by RAM.
     """
     capacity = Capacity(hosts=list(hosts))
-    by_name = {host.name: host for host in capacity.hosts}
-    for host_name, vcpus, memory_mb, status in vms:
+    by_key = {host.key: host for host in capacity.hosts}
+    unplaced_vcpus = unplaced_memory_gb = 0
+    for host_key, vcpus, memory_mb, status in vms:
         if status in INACTIVE_VM_STATUSES:
             continue
         vcpus = float(vcpus or 0)
@@ -179,11 +213,31 @@ def build_capacity(hosts, vms):
         capacity.vm_count += 1
         capacity.vcpus += vcpus
         capacity.vm_memory_gb += memory_gb
-        host = by_name.get(host_name)
+        host = by_key.get(host_key)
         if host is None:
             capacity.unplaced_vm_count += 1
+            unplaced_vcpus += vcpus
+            unplaced_memory_gb += memory_gb
         else:
             host.vm_count += 1
             host.vcpus += vcpus
             host.vm_memory_gb += memory_gb
+
+    if capacity.hosts and capacity.unplaced_vm_count:
+        for host, weight in zip(capacity.hosts, _weights(capacity.hosts, "threads"), strict=True):
+            host.shared_vcpus = unplaced_vcpus * weight
+        for host, weight in zip(capacity.hosts, _weights(capacity.hosts, "memory_gb"), strict=True):
+            host.shared_memory_gb = unplaced_memory_gb * weight
     return capacity
+
+
+def host_capacity(cluster_capacity, host):
+    """A Capacity for one host of a cluster, including its share of the VMs without a fixed host."""
+    return Capacity(
+        hosts=[host],
+        vm_count=host.vm_count,
+        vcpus=host.total_vcpus,
+        vm_memory_gb=host.total_vm_memory_gb,
+        unplaced_vm_count=cluster_capacity.unplaced_vm_count,
+        host_share=True,
+    )

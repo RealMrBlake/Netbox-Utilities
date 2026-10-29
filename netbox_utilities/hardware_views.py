@@ -14,9 +14,10 @@ def host_entry(device):
     """hardware.Host for a device, with or without recorded CPU/RAM."""
     record = getattr(device, "netbox_utilities_hardware", None)
     if record is None:
-        return hardware.Host(name=device.name)
+        return hardware.Host(name=device.name, key=device.pk)
     return hardware.Host(
         name=device.name,
+        key=device.pk,
         cores=record.total_cores,
         threads=record.total_threads,
         memory_gb=record.memory_gb,
@@ -24,7 +25,7 @@ def host_entry(device):
 
 
 def vm_rows(vms):
-    return [(vm.device.name if vm.device_id else None, vm.vcpus, vm.memory, vm.status) for vm in vms]
+    return [(vm.device_id, vm.vcpus, vm.memory, vm.status) for vm in vms]
 
 
 def capacity_context(capacity):
@@ -86,24 +87,38 @@ def device_hardware_context(request, device):
         .select_related("tenant")
         .order_by("name")
     )
-    if vms or device.cluster_id:
+    if device.cluster_id:
+        # Includes this host's share of the cluster VMs that have no fixed host.
+        cluster_capacity, _ = build_cluster_capacity(request, device.cluster_id, extra_host=device)
+        host = next(host for host in cluster_capacity.hosts if host.key == device.pk)
+        capacity = hardware.host_capacity(cluster_capacity, host)
+    elif vms:
         capacity = hardware.build_capacity([host_entry(device)], vm_rows(vms))
+        host = capacity.hosts[0]
+    if device.cluster_id or vms:
         context.update(capacity_context(capacity))
-        context["host"] = capacity.hosts[0]
+        context["host"] = host
         context["vms"] = vms
         context["vm_list_url"] = f"{reverse('virtualization:virtualmachine_list')}?device_id={device.pk}"
     return context
 
 
-def cluster_capacity_context(request, cluster):
+def build_cluster_capacity(request, cluster_id, extra_host=None):
+    """Capacity of a cluster's hosts and VMs; returns (capacity, host devices in the same order)."""
     hosts = list(
         Device.objects.restrict(request.user, "view")
-        .filter(cluster=cluster)
+        .filter(cluster_id=cluster_id)
         .select_related("netbox_utilities_hardware__cpu")
         .order_by("name")
     )
-    vms = VirtualMachine.objects.restrict(request.user, "view").filter(cluster=cluster).select_related("device")
-    capacity = hardware.build_capacity([host_entry(device) for device in hosts], vm_rows(vms))
+    if extra_host is not None and all(host.pk != extra_host.pk for host in hosts):
+        hosts.append(extra_host)
+    vms = VirtualMachine.objects.restrict(request.user, "view").filter(cluster_id=cluster_id)
+    return hardware.build_capacity([host_entry(device) for device in hosts], vm_rows(vms)), hosts
+
+
+def cluster_capacity_context(request, cluster):
+    capacity, hosts = build_cluster_capacity(request, cluster.pk)
     rows = []
     for device, host in zip(hosts, capacity.hosts, strict=True):
         record = getattr(device, "netbox_utilities_hardware", None)
@@ -113,9 +128,9 @@ def cluster_capacity_context(request, cluster):
                 "record": record,
                 "host": host,
                 "memory": hardware.format_memory(host.memory_gb),
-                "vm_memory": hardware.format_memory(round(host.vm_memory_gb, 1)),
-                "memory_percent": hardware.percent(host.vm_memory_gb, host.memory_gb),
-                "vcpu_per_core": hardware.format_ratio(host.vcpus / host.cores if host.cores else None),
+                "vm_memory": hardware.format_memory(round(host.total_vm_memory_gb, 1)),
+                "memory_percent": hardware.percent(host.total_vm_memory_gb, host.memory_gb),
+                "vcpu_per_core": hardware.format_ratio(host.total_vcpus / host.cores if host.cores else None),
             }
         )
     return {
