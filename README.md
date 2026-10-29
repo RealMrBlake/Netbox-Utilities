@@ -47,6 +47,7 @@ Plugin settings:
 - The B-side device selection of a cable can be pre-filtered by tenant group, tenant and site.
 - A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
 - A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, HPE MSA disk export import, REST API and GraphQL.
+- **CPU & RAM** per server from a built-in catalogue of 700+ Intel and AMD server CPUs since 2012, with cluster capacity and overcommit for NetBox virtualization.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -218,6 +219,9 @@ sudo systemctl restart netbox netbox-rq
 | `disk_device_roles` | `["Server", "NAS", "SAN", "MSA"]` | Device role names (case-insensitive) that get the **Disks** tab |
 | `disk_age_warning_years` | `5` | Warn about disks older than this (manufacture date, otherwise install date) |
 | `disk_warranty_warning_days` | `90` | Warn this many days before the warranty ends |
+| `hardware_enabled` | `True` | **CPU & RAM** panels, catalogue, columns and cluster capacity |
+| `hardware_device_roles` | `["Server"]` | Device roles (case-insensitive) that show the **CPU & RAM** panel; cluster hosts always show it |
+| `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
 
 ## Usage
 
@@ -269,7 +273,7 @@ can start at slot 0 again.
 for the device type. The next device of the same type offers **Apply
 template**, which creates all stored areas with one click; on a device that
 already has areas, the button adds the missing ones. Templates are managed under
-**Disks > Disk templates** in the main menu.
+**Hardware > Disk templates** in the main menu.
 
 **Slot grid.** Each area is drawn as its own grid and coloured by
 status (active, hot spare, failed, planned). A warning icon marks disks with
@@ -312,10 +316,11 @@ capacity, the usable RAID capacity, spares and failed disks. The warnings panel
 lists failed disks, expired warranties, warranties ending within
 `disk_warranty_warning_days` and disks older than `disk_age_warning_years`.
 
-**Main menu.** The plugin adds its own **Disks** menu with the entries
-**Disks**, **RAID groups** and **Disk templates**.
+**Main menu.** The plugin adds its own **Hardware** menu with the entries
+**Disks**, **RAID groups** and **Disk templates**, plus **CPU & RAM** and
+**CPU models** (see below).
 
-**Disks grouped by device.** **Disks > Disks** shows all disks grouped by device.
+**Disks grouped by device.** **Hardware > Disks** shows all disks grouped by device.
 Each device is a collapsible section whose header shows the device, role, site,
 tenant, number of disks, raw capacity, failed disks and warnings, plus a link to
 the device's **Disks** tab. The page offers a search (serial number, model,
@@ -351,7 +356,7 @@ srv-01,Front,1,spare,ssd,sas,Samsung,PM1643a,1.92 TB,S4XXNA0R123457,2029-05-31
 srv-01,PCIe,0,active,nvme,nvme,Samsung,PM9A3,3.84 TB,S64XNA0T654321,2030-01-31
 ```
 
-**HPE MSA import.** The *HPE MSA export* button next to **Disks > Disks** (also
+**HPE MSA import.** The *HPE MSA export* button next to **Hardware > Disks** (also
 *MSA import* in a device's **Disks** tab) reads the CSV disk export of an HPE MSA
 (*Pools → Disks*, export to CSV). The `Location` column (`1.4` = enclosure 1,
 slot 4) defines the enclosures; in the next step each enclosure (shelf) is
@@ -402,6 +407,90 @@ requires `netbox_utilities.change_disk`, and RAID groups use the
 The HPE MSA import requires `netbox_utilities.add_disk`; updating or replacing
 existing disks additionally requires `netbox_utilities.change_disk`, and creating
 RAID groups `netbox_utilities.add_raidgroup` (otherwise they are skipped).
+
+### CPU & RAM
+
+Servers and virtualization hosts get a **CPU & RAM** panel on the device page.
+It is shown for devices whose role is listed in `hardware_device_roles`, for
+every device assigned to a cluster, and for every device that already has CPU &
+RAM recorded. **Add** opens a form with:
+
+- **CPU model**: a searchable select over the catalogue. Typing `6338`,
+  `Gold 6338` or `epyc 7543` is enough; each entry shows cores, threads and
+  base/turbo clock.
+- **Number of CPUs** (populated sockets). It is checked against the maximum
+  socket count of the model, e.g. EPYC "P" models are single-socket only.
+- **RAM**: number and size of the modules, total RAM (calculated from modules ×
+  size when left empty), type (DDR3/DDR4/DDR5) and speed in MT/s.
+
+The panel then shows e.g. *2 × Intel Xeon Gold 6338 · 64 cores / 128 threads ·
+1 TB (16 × 64 GB DDR4-3200)*. The device list offers the optional columns
+**CPU**, **Cores / Threads** and **RAM** under **Configure Table**.
+
+**CPU catalogue.** **Hardware > CPU models** lists about 700 server CPUs:
+
+| Vendor | Families |
+|---|---|
+| Intel | Xeon E5-2600/2400/4600/1600 v1–v4, E7 v2–v4, E3-1200 v2–v6, Xeon E-2100 to E-2400, Xeon 6300P, Xeon Scalable 1st–5th Gen (Skylake to Emerald Rapids), Xeon 6 (Sierra Forest, Granite Rapids), Xeon 6+ (Clearwater Forest) |
+| AMD | Opteron 4300/6300, EPYC 7001/7002/7003 (incl. F and X models), 9004 (Genoa, Genoa-X, Bergamo), 8004, 4004, 4005, 9005 (Turin) |
+
+Each entry has cores, threads, base and turbo clock, TDP, socket, launch year
+and maximum socket count. The values were checked against Intel ARK, AMD and
+server vendor specifications. Missing models can be added in the UI or by CSV
+import; catalogue entries can be edited, too. The catalogue is loaded by the
+migration and refreshed after a plugin update with:
+
+```bash
+cd /opt/netbox/netbox
+../venv/bin/python manage.py netbox_utilities_cpu_catalog          # add new models, keep edited ones
+../venv/bin/python manage.py netbox_utilities_cpu_catalog --force  # also reset edited catalogue entries
+```
+
+Models you created yourself are never changed by the command.
+
+**Virtualization.** CPU & RAM work together with NetBox clusters and virtual
+machines (vCPUs and memory of the VM):
+
+- **Cluster page:** a **Capacity (CPU & RAM)** panel sums the hosts (devices
+  of the cluster) and compares them with the VMs: physical cores/threads and
+  RAM, allocated vCPUs and RAM, the vCPU-to-core ratio, RAM allocation in
+  percent and the RAM that remains if the largest host fails (N+1). A table
+  lists every host with its CPU, VMs, ratio and RAM usage; hosts without CPU &
+  RAM are flagged with a link to record them.
+- **Host (device) page:** the CPU & RAM panel adds the VMs running on that
+  host (VMs whose *Device* is set) with the same figures.
+- **VM page:** a **Host hardware** panel shows the CPU of the host, or of the
+  cluster hosts if the VM has no fixed host, and warns if the VM has more
+  vCPUs than the host has threads.
+- **Cluster list:** the optional column **vCPU : core · RAM** shows the ratio
+  and RAM allocation per cluster.
+
+Warnings appear when VMs are allocated more RAM than the hosts have, when the
+RAM no longer fits after the failure of the largest host, and when the vCPU
+ratio exceeds `hardware_vcpu_ratio_warning`. VMs with the status *Offline* or
+*Decommissioning* are not counted. VM memory is read in MB as NetBox stores it.
+
+**CSV import.** **Hardware > CPU & RAM > Import** accepts `device` (name),
+`cpu` (catalogue model name, e.g. `Xeon Gold 6338`), `cpu_count`, `memory_gb`,
+`memory_type` (`ddr3`, `ddr4`, `ddr5`), `memory_modules`, `memory_module_gb`,
+`memory_speed_mts`, `description`, `comments` and `tags`.
+
+```csv
+device,cpu,cpu_count,memory_modules,memory_module_gb,memory_type,memory_speed_mts
+esx01,Xeon Gold 6338,2,16,64,ddr4,3200
+esx02,EPYC 9354,2,24,32,ddr5,4800
+```
+
+**REST API and GraphQL.** `/api/plugins/utilities/cpu-models/` and
+`/api/plugins/utilities/device-hardware/` (with read-only `total_cores` and
+`total_threads`); filters include `?q=6338`, `?manufacturer=amd`,
+`?cores__gte=32`, `?cluster_id=4` and `?cpu_id=17`. GraphQL offers
+`netbox_utilities_cpu_model(_list)` and `netbox_utilities_device_hardware(_list)`.
+
+**Permissions.** The panels require `netbox_utilities.view_devicehardware`;
+recording and editing use `netbox_utilities.add_devicehardware` and
+`netbox_utilities.change_devicehardware`. The catalogue uses the
+`netbox_utilities.*_cpumodel` permissions.
 
 ### Pre-filter for the B-side of a cable
 

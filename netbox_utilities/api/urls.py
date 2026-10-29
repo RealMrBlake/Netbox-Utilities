@@ -9,5 +9,7 @@ router.register("disks", views.DiskViewSet)
 router.register("raid-groups", views.RAIDGroupViewSet)
 router.register("disk-bay-layouts", views.DiskBayLayoutViewSet)
 router.register("disk-bay-templates", views.DiskBayTemplateViewSet)
+router.register("cpu-models", views.CPUModelViewSet)
+router.register("device-hardware", views.DeviceHardwareViewSet)
 
 urlpatterns = router.urls

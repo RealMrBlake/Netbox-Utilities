@@ -1,6 +1,6 @@
 from netbox.search import SearchIndex
 
-from .models import Disk, RAIDGroup
+from .models import CPUModel, Disk, RAIDGroup
 
 
 class DiskIndex(SearchIndex):
@@ -25,4 +25,15 @@ class RAIDGroupIndex(SearchIndex):
     display_attrs = ("device", "level")
 
 
-indexes = [DiskIndex, RAIDGroupIndex]
+class CPUModelIndex(SearchIndex):
+    model = CPUModel
+    fields = (
+        ("name", 100),
+        ("family", 300),
+        ("socket", 500),
+        ("description", 500),
+    )
+    display_attrs = ("manufacturer", "cores", "threads", "base_clock_ghz")
+
+
+indexes = [DiskIndex, RAIDGroupIndex, CPUModelIndex]

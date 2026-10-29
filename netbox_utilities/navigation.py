@@ -19,10 +19,10 @@ menu_items = (
     ),
 )
 
-# Own top-level menu for disks; the disk entry opens the list grouped by device.
+# Own top-level menu for server hardware; the disk entry opens the list grouped by device.
 menu = PluginMenu(
-    label="Datenträger",
-    icon_class="mdi mdi-harddisk",
+    label="Hardware",
+    icon_class="mdi mdi-server",
     groups=(
         (
             "Datenträger",
@@ -55,6 +55,43 @@ menu = PluginMenu(
                     link="plugins:netbox_utilities:diskbaytemplate_list",
                     link_text="Datenträger-Vorlagen",
                     permissions=("netbox_utilities.view_diskbaytemplate",),
+                ),
+            ),
+        ),
+        (
+            "CPU & RAM",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_utilities:devicehardware_list",
+                    link_text="CPU & RAM",
+                    permissions=("netbox_utilities.view_devicehardware",),
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_utilities:devicehardware_add",
+                            title="Hinzufügen",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=("netbox_utilities.add_devicehardware",),
+                        ),
+                        PluginMenuButton(
+                            link="plugins:netbox_utilities:devicehardware_bulk_import",
+                            title="Importieren",
+                            icon_class="mdi mdi-upload",
+                            permissions=("netbox_utilities.add_devicehardware",),
+                        ),
+                    ),
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_utilities:cpumodel_list",
+                    link_text="CPU-Modelle",
+                    permissions=("netbox_utilities.view_cpumodel",),
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_utilities:cpumodel_add",
+                            title="Hinzufügen",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=("netbox_utilities.add_cpumodel",),
+                        ),
+                    ),
                 ),
             ),
         ),

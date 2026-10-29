@@ -21,6 +21,7 @@ from .navigation_helpers import (
 )
 from .runtime import (
     connection_vlans_enabled,
+    hardware_enabled,
     navigation_customization_enabled,
     offline_svg_export_enabled,
     tenant_filter_enabled,
@@ -110,6 +111,9 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
         return self.render("netbox_utilities/device_bulk_module_button.html")
 
     def right_page(self):
+        return self._hardware_panel() + self._rack_width_panel()
+
+    def _rack_width_panel(self):
         placement = DeviceRackPlacement.objects.filter(device=self.context["object"]).first()
         if placement is None:
             return ""
@@ -120,6 +124,47 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
                 "horizontal_position": placement.horizontal_position,
             },
         )
+
+    def _hardware_panel(self):
+        request, device = self.context["request"], self.context["object"]
+        if not hardware_enabled() or not request.user.has_perm("netbox_utilities.view_devicehardware"):
+            return ""
+        from . import hardware
+        from .hardware_views import device_hardware_context
+
+        context = device_hardware_context(request, device)
+        if context["record"] is None and not hardware.supports_hardware(device):
+            return ""
+        return self.render("netbox_utilities/device_hardware_panel.html", context)
+
+
+class ClusterHardwareContent(PluginTemplateExtension):
+    models = ["virtualization.cluster"]
+
+    def full_width_page(self):
+        request = self.context["request"]
+        if not hardware_enabled() or not request.user.has_perm("netbox_utilities.view_devicehardware"):
+            return ""
+        from .hardware_views import cluster_capacity_context
+
+        return self.render(
+            "netbox_utilities/cluster_capacity_panel.html", cluster_capacity_context(request, self.context["object"])
+        )
+
+
+class VirtualMachineHardwareContent(PluginTemplateExtension):
+    models = ["virtualization.virtualmachine"]
+
+    def right_page(self):
+        request = self.context["request"]
+        if not hardware_enabled() or not request.user.has_perm("netbox_utilities.view_devicehardware"):
+            return ""
+        from .hardware_views import vm_host_context
+
+        vm = self.context["object"]
+        if vm.device_id is None and vm.cluster_id is None:
+            return ""
+        return self.render("netbox_utilities/vm_host_panel.html", vm_host_context(request, vm))
 
 
 class ConnectionVLANContent(PluginTemplateExtension):
@@ -174,4 +219,6 @@ template_extensions = [
     DeviceUtilitiesContent,
     ConnectionVLANContent,
     RackUtilitiesContent,
+    ClusterHardwareContent,
+    VirtualMachineHardwareContent,
 ]

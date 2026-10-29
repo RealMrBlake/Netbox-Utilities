@@ -1,0 +1,46 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">CPU-Modell</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Hersteller</th><td>{{ object.get_manufacturer_display }}</td></tr>
+        <tr><th scope="row">Modell</th><td>{{ object.name }}</td></tr>
+        <tr><th scope="row">Familie</th><td>{{ object.family|placeholder }}</td></tr>
+        <tr><th scope="row">Sockel</th><td>{{ object.socket|placeholder }}</td></tr>
+        <tr><th scope="row">Erscheinungsjahr</th><td>{{ object.launch_year|placeholder }}</td></tr>
+        <tr><th scope="row">Max. Sockel</th><td>{{ object.max_sockets }}</td></tr>
+        <tr><th scope="row">Beschreibung</th><td>{{ object.description|placeholder }}</td></tr>
+        <tr>
+          <th scope="row">Herkunft</th>
+          <td>
+            {% if object.builtin %}Katalog{% if object.customized %} <span class="badge text-bg-warning">angepasst</span>{% endif %}
+            {% else %}Selbst angelegt{% endif %}
+          </td>
+        </tr>
+      </table>
+    </div>
+    {% include 'inc/panels/tags.html' %}
+    {% include 'inc/panels/custom_fields.html' %}
+  </div>
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Leistung</h2>
+      <table class="table table-hover attr-table">
+        <tr><th scope="row">Kerne</th><td>{{ object.cores }}</td></tr>
+        <tr><th scope="row">Threads</th><td>{{ object.threads }}</td></tr>
+        <tr><th scope="row">Takt (Basis / Turbo)</th><td>{{ object.clock_display }}</td></tr>
+        <tr><th scope="row">TDP</th><td>{% if object.tdp_watts %}{{ object.tdp_watts }} W{% else %}{{ ""|placeholder }}{% endif %}</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h2 class="card-header">Geräte mit diesem Modell <span class="badge text-bg-secondary">{{ device_count }}</span></h2>
+  <div class="table-responsive">{% render_table devices_table 'inc/table.html' %}</div>
+</div>
+{% endblock content %}

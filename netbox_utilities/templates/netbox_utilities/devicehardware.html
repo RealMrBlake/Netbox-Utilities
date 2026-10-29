@@ -1,0 +1,31 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-12 col-xl-6">
+    <div class="card">
+      <h2 class="card-header">Gerät</h2>
+      <table class="table table-hover attr-table mb-0">
+        <tr><th scope="row">Gerät</th><td>{{ object.device|linkify }}</td></tr>
+        <tr><th scope="row">Cluster</th><td>{{ object.device.cluster|linkify|placeholder }}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2 class="card-header">CPU &amp; RAM</h2>
+      {% include 'netbox_utilities/inc/hardware_record.html' with record=object %}
+    </div>
+    {% include 'inc/panels/tags.html' %}
+    {% include 'inc/panels/custom_fields.html' %}
+    {% include 'inc/panels/comments.html' %}
+  </div>
+  <div class="col col-12 col-xl-6">
+    {% if capacity %}
+      <div class="card">
+        <h2 class="card-header">Virtualisierung</h2>
+        {% include 'netbox_utilities/inc/hardware_capacity.html' %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

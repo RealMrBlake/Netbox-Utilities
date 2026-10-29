@@ -1,0 +1,44 @@
+{# Capacity of one host or a whole cluster versus its VMs; expects the context of hardware_views.capacity_context. #}
+{% for level, text in capacity_warnings %}
+  <div class="alert alert-{{ level }} py-2 mb-2 small"><i class="mdi mdi-alert" aria-hidden="true"></i> {{ text }}</div>
+{% endfor %}
+<table class="table table-hover attr-table mb-0">
+  <tr>
+    <th scope="row">Physisch</th>
+    <td>
+      {% if capacity.cores %}{{ capacity.cores }} Kerne / {{ capacity.threads }} Threads{% else %}<span class="text-muted">—</span>{% endif %}
+      · {{ memory }} RAM
+    </td>
+  </tr>
+  <tr>
+    <th scope="row">VMs</th>
+    <td>
+      {{ capacity.vm_count }} VM{{ capacity.vm_count|pluralize:",s" }} · {{ capacity.vcpus|floatformat:"-1" }} vCPUs · {{ vm_memory }} RAM
+      {% if capacity.unplaced_vm_count %}<div class="small text-muted">davon {{ capacity.unplaced_vm_count }} ohne festen Host</div>{% endif %}
+    </td>
+  </tr>
+  <tr>
+    <th scope="row">vCPU : Kern</th>
+    <td>{{ vcpu_per_core }} <span class="text-muted small">({{ vcpu_per_thread }} je Thread)</span></td>
+  </tr>
+  <tr>
+    <th scope="row">RAM zugewiesen</th>
+    <td>
+      {% if capacity.memory_percent is not None %}
+        <div class="progress" role="progressbar" aria-valuenow="{{ capacity.memory_percent }}" aria-valuemin="0" aria-valuemax="100" style="height: 1.1rem">
+          <div class="progress-bar {% if capacity.memory_percent > 100 %}bg-danger{% elif capacity.memory_percent > 85 %}bg-warning{% else %}bg-success{% endif %}"
+               style="width: {% if capacity.memory_percent > 100 %}100{% else %}{{ capacity.memory_percent }}{% endif %}%">{{ capacity.memory_percent }} %</div>
+        </div>
+      {% else %}<span class="text-muted">—</span>{% endif %}
+    </td>
+  </tr>
+  {% if capacity.failover_memory_gb is not None %}
+    <tr>
+      <th scope="row">RAM bei Host-Ausfall</th>
+      <td>
+        {{ failover_memory }}
+        {% if capacity.failover_ok %}<span class="badge text-bg-success">N+1 OK</span>{% else %}<span class="badge text-bg-warning">N+1 nicht erfüllt</span>{% endif %}
+      </td>
+    </tr>
+  {% endif %}
+</table>

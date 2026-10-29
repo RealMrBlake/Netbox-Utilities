@@ -7,7 +7,7 @@ from django.utils import timezone
 from netbox.models import NetBoxModel
 from utilities.choices import ChoiceSet
 
-from . import disks
+from . import disks, hardware
 
 
 class NavigationPreference(models.Model):
@@ -497,3 +497,164 @@ class Disk(NetBoxModel):
         if self.status == disks.STATUS_REPLACED and not self.removal_date:
             self.removal_date = timezone.localdate()
         return super().save(*args, **kwargs)
+
+
+#
+# CPU & RAM
+#
+
+
+class CPUManufacturerChoices(ChoiceSet):
+    CHOICES = [
+        ("intel", "Intel"),
+        ("amd", "AMD"),
+        ("other", "Sonstiges"),
+    ]
+
+
+class MemoryTypeChoices(ChoiceSet):
+    CHOICES = list(hardware.MEMORY_TYPES.items())
+
+
+class CPUModel(NetBoxModel):
+    """One entry of the CPU catalogue; the built-in entries come from cpu_catalog.py."""
+
+    manufacturer = models.CharField("Hersteller", max_length=20, choices=CPUManufacturerChoices)
+    family = models.CharField(
+        "Familie", max_length=100, blank=True, help_text="z. B. Xeon Scalable 3. Gen (Ice Lake-SP)"
+    )
+    name = models.CharField("Modell", max_length=100, help_text="z. B. Xeon Gold 6338 oder EPYC 7543")
+    cores = models.PositiveSmallIntegerField("Kerne", validators=[MinValueValidator(1), MaxValueValidator(1024)])
+    threads = models.PositiveSmallIntegerField("Threads", validators=[MinValueValidator(1), MaxValueValidator(2048)])
+    base_clock_ghz = models.DecimalField("Basistakt (GHz)", max_digits=4, decimal_places=2)
+    boost_clock_ghz = models.DecimalField("Turbo (GHz)", max_digits=4, decimal_places=2, blank=True, null=True)
+    tdp_watts = models.PositiveSmallIntegerField("TDP (W)", blank=True, null=True)
+    socket = models.CharField("Sockel", max_length=30, blank=True)
+    launch_year = models.PositiveSmallIntegerField("Erscheinungsjahr", blank=True, null=True)
+    max_sockets = models.PositiveSmallIntegerField(
+        "Max. Sockel",
+        default=2,
+        validators=[MinValueValidator(1), MaxValueValidator(8)],
+        help_text="Wie viele CPUs dieses Modells ein System höchstens haben kann.",
+    )
+    builtin = models.BooleanField("Aus dem Katalog", default=False, editable=False)
+    customized = models.BooleanField("Angepasst", default=False, editable=False)
+    description = models.CharField("Beschreibung", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ("manufacturer", "-launch_year", "name")
+        constraints = (
+            models.UniqueConstraint(fields=("manufacturer", "name"), name="netbox_utilities_cpumodel_unique_name"),
+        )
+        verbose_name = "CPU-Modell"
+        verbose_name_plural = "CPU-Modelle"
+
+    def __str__(self):
+        return f"{self.get_manufacturer_display()} {self.name}" if self.manufacturer != "other" else self.name
+
+    def get_absolute_url(self):
+        return reverse("plugins:netbox_utilities:cpumodel", args=[self.pk])
+
+    @property
+    def clock_display(self):
+        base = hardware.format_clock(self.base_clock_ghz)
+        return f"{base} / {hardware.format_clock(self.boost_clock_ghz)}" if self.boost_clock_ghz else base
+
+    @property
+    def summary(self):
+        """ "32 Kerne / 64 Threads, 2,0 / 3,2 GHz" for selects and panels."""
+        return f"{self.cores} Kerne / {self.threads} Threads, {self.clock_display}"
+
+    def clean(self):
+        super().clean()
+        if self.cores and self.threads and self.threads < self.cores:
+            raise ValidationError({"threads": "Es kann nicht weniger Threads als Kerne geben."})
+        if self.base_clock_ghz and self.boost_clock_ghz and self.boost_clock_ghz < self.base_clock_ghz:
+            raise ValidationError({"boost_clock_ghz": "Der Turbo-Takt liegt unter dem Basistakt."})
+
+
+class DeviceHardware(NetBoxModel):
+    """CPU and RAM of one device (server or virtualization host)."""
+
+    device = models.OneToOneField(
+        "dcim.Device",
+        on_delete=models.CASCADE,
+        related_name="netbox_utilities_hardware",
+        verbose_name="Gerät",
+    )
+    cpu = models.ForeignKey(
+        CPUModel,
+        on_delete=models.PROTECT,
+        related_name="devices",
+        blank=True,
+        null=True,
+        verbose_name="CPU-Modell",
+    )
+    cpu_count = models.PositiveSmallIntegerField(
+        "Anzahl CPUs",
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(8)],
+        help_text="Bestückte Sockel",
+    )
+    memory_gb = models.PositiveIntegerField("RAM gesamt (GB)", blank=True, null=True)
+    memory_type = models.CharField("RAM-Typ", max_length=20, choices=MemoryTypeChoices, blank=True)
+    memory_modules = models.PositiveSmallIntegerField(
+        "Anzahl Module", blank=True, null=True, validators=[MaxValueValidator(256)]
+    )
+    memory_module_gb = models.PositiveIntegerField("Modulgröße (GB)", blank=True, null=True)
+    memory_speed_mts = models.PositiveIntegerField(
+        "Takt (MT/s)", blank=True, null=True, help_text="z. B. 3200 oder 4800"
+    )
+    description = models.CharField("Beschreibung", max_length=200, blank=True)
+    comments = models.TextField("Kommentare", blank=True)
+
+    class Meta:
+        ordering = ("device",)
+        verbose_name = "CPU & RAM"
+        verbose_name_plural = "CPU & RAM"
+
+    def __str__(self):
+        return f"{self.device} – CPU & RAM"
+
+    def get_absolute_url(self):
+        return reverse("plugins:netbox_utilities:devicehardware", args=[self.pk])
+
+    @property
+    def total_cores(self):
+        return self.cpu.cores * self.cpu_count if self.cpu_id else None
+
+    @property
+    def total_threads(self):
+        return self.cpu.threads * self.cpu_count if self.cpu_id else None
+
+    @property
+    def cpu_display(self):
+        if not self.cpu_id:
+            return "—"
+        return f"{self.cpu_count} × {self.cpu}" if self.cpu_count > 1 else str(self.cpu)
+
+    @property
+    def memory_display(self):
+        return hardware.format_memory(self.memory_gb)
+
+    @property
+    def memory_detail(self):
+        """ "12 × 32 GB DDR4-3200"."""
+        parts = []
+        if self.memory_modules and self.memory_module_gb:
+            parts.append(f"{self.memory_modules} × {self.memory_module_gb} GB")
+        kind = self.get_memory_type_display() if self.memory_type else ""
+        if kind and self.memory_speed_mts:
+            kind = f"{kind}-{self.memory_speed_mts}"
+        elif self.memory_speed_mts:
+            kind = f"{self.memory_speed_mts} MT/s"
+        if kind:
+            parts.append(kind)
+        return " ".join(parts)
+
+    def clean(self):
+        super().clean()
+        if not self.memory_gb and self.memory_modules and self.memory_module_gb:
+            self.memory_gb = self.memory_modules * self.memory_module_gb
+        if self.cpu_id and self.cpu_count and self.cpu_count > self.cpu.max_sockets:
+            raise ValidationError({"cpu_count": f"{self.cpu} unterstützt höchstens {self.cpu.max_sockets} Sockel."})

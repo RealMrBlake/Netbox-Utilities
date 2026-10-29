@@ -1,7 +1,7 @@
 from django.urls import include, path
 from utilities.urls import get_model_urls
 
-from . import disk_views, views
+from . import disk_views, hardware_views, views  # noqa: F401 - hardware_views registers its model views
 
 app_name = "netbox_utilities"
 
@@ -27,6 +27,11 @@ urlpatterns = [
     path("raid-groups/<int:pk>/", include(get_model_urls("netbox_utilities", "raidgroup"))),
     path("disk-templates/", include(get_model_urls("netbox_utilities", "diskbaytemplate", detail=False))),
     path("disk-templates/<int:pk>/", include(get_model_urls("netbox_utilities", "diskbaytemplate"))),
+    # CPU & RAM
+    path("cpu-models/", include(get_model_urls("netbox_utilities", "cpumodel", detail=False))),
+    path("cpu-models/<int:pk>/", include(get_model_urls("netbox_utilities", "cpumodel"))),
+    path("hardware/", include(get_model_urls("netbox_utilities", "devicehardware", detail=False))),
+    path("hardware/<int:pk>/", include(get_model_urls("netbox_utilities", "devicehardware"))),
     path("devices/<int:pk>/disks/setup/", disk_views.DeviceDiskSetupView.as_view(), name="device_disk_setup"),
     path("devices/<int:pk>/disks/fill/", disk_views.DeviceDiskBulkFillView.as_view(), name="device_disk_fill"),
     path("devices/<int:pk>/disks/move/", disk_views.DeviceDiskMoveView.as_view(), name="device_disk_move"),

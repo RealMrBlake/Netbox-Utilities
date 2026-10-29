@@ -6,7 +6,9 @@ __version__ = "0.16.0"
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Navigation, tenant utilities, connection VLANs, partial-width racks, disks and bulk operations"
+    description = (
+        "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM and bulk operations"
+    )
     version = __version__
     author = "LKE"
     base_url = "utilities"
@@ -26,6 +28,9 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "disk_device_roles": ["Server", "NAS", "SAN", "MSA"],
         "disk_age_warning_years": 5,
         "disk_warranty_warning_days": 90,
+        "hardware_enabled": True,
+        "hardware_device_roles": ["Server"],
+        "hardware_vcpu_ratio_warning": 4,
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
@@ -46,6 +51,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .disk_integration import install_disk_support
 
             install_disk_support()
+        if get_plugin_config("netbox_utilities", "hardware_enabled"):
+            from .hardware_integration import install_hardware_support
+
+            install_hardware_support()
         if get_plugin_config("netbox_utilities", "site_prefix_column_enabled"):
             from .site_prefix import install_site_prefix_column
 

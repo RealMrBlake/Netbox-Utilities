@@ -1,0 +1,29 @@
+<div class="card">
+  <h2 class="card-header"><i class="mdi mdi-chip me-1" aria-hidden="true"></i>Host-Hardware</h2>
+  {% if not records %}
+    <div class="card-body text-muted">
+      {% if device %}Für den Host <a href="{{ device.get_absolute_url }}">{{ device }}</a> ist noch keine CPU erfasst.
+      {% else %}Die VM hat keinen Host und ihr Cluster keine Hosts mit erfasster CPU.{% endif %}
+    </div>
+  {% else %}
+    <table class="table table-hover attr-table mb-0">
+      <tr>
+        <th scope="row">{% if device %}Host{% else %}Cluster-Hosts{% endif %}</th>
+        <td>
+          {% for record in records %}<a href="{{ record.device.get_absolute_url }}">{{ record.device }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </td>
+      </tr>
+      <tr><th scope="row">CPU</th><td>{{ cpus|join:", "|default:"—" }}</td></tr>
+      {% if smallest_threads %}
+        <tr>
+          <th scope="row">vCPUs</th>
+          <td>
+            {{ vcpus|floatformat:"-1"|default:"—" }} von {{ smallest_threads }} Threads{% if not device %} (kleinster Host){% endif %}
+            {% if vcpu_share is not None %}<span class="text-muted small">· {{ vcpu_share }} %</span>{% endif %}
+            {% if oversized %}<div class="text-danger small">Die VM hat mehr vCPUs, als der Host Threads hat.</div>{% endif %}
+          </td>
+        </tr>
+      {% endif %}
+    </table>
+  {% endif %}
+</div>

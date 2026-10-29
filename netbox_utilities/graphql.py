@@ -4,7 +4,7 @@ import strawberry
 import strawberry_django
 from netbox.graphql.types import NetBoxObjectType
 
-from .models import Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup
+from .models import CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup
 
 if TYPE_CHECKING:
     from dcim.graphql.types import DeviceType, DeviceTypeType
@@ -70,6 +70,55 @@ class NetBoxUtilitiesDiskBayTemplateType(NetBoxObjectType):
     device_type: Annotated["DeviceTypeType", strawberry.lazy("dcim.graphql.types")]
 
 
+@strawberry_django.type(
+    CPUModel,
+    fields=[
+        "id",
+        "manufacturer",
+        "family",
+        "name",
+        "cores",
+        "threads",
+        "base_clock_ghz",
+        "boost_clock_ghz",
+        "tdp_watts",
+        "socket",
+        "launch_year",
+        "max_sockets",
+        "builtin",
+        "description",
+    ],
+)
+class NetBoxUtilitiesCPUModelType(NetBoxObjectType):
+    pass
+
+
+@strawberry_django.type(
+    DeviceHardware,
+    fields=[
+        "id",
+        "cpu_count",
+        "memory_gb",
+        "memory_type",
+        "memory_modules",
+        "memory_module_gb",
+        "memory_speed_mts",
+        "description",
+    ],
+)
+class NetBoxUtilitiesDeviceHardwareType(NetBoxObjectType):
+    device: Annotated["DeviceType", strawberry.lazy("dcim.graphql.types")]
+    cpu: Annotated["NetBoxUtilitiesCPUModelType", strawberry.lazy("netbox_utilities.graphql")] | None
+
+    @strawberry_django.field
+    def total_cores(self) -> int | None:
+        return self.total_cores
+
+    @strawberry_django.field
+    def total_threads(self) -> int | None:
+        return self.total_threads
+
+
 @strawberry.type(name="Query")
 class NetBoxUtilitiesDiskQuery:
     netbox_utilities_disk: NetBoxUtilitiesDiskType = strawberry_django.field()
@@ -80,6 +129,10 @@ class NetBoxUtilitiesDiskQuery:
     netbox_utilities_disk_bay_layout_list: list[NetBoxUtilitiesDiskBayLayoutType] = strawberry_django.field()
     netbox_utilities_disk_bay_template: NetBoxUtilitiesDiskBayTemplateType = strawberry_django.field()
     netbox_utilities_disk_bay_template_list: list[NetBoxUtilitiesDiskBayTemplateType] = strawberry_django.field()
+    netbox_utilities_cpu_model: NetBoxUtilitiesCPUModelType = strawberry_django.field()
+    netbox_utilities_cpu_model_list: list[NetBoxUtilitiesCPUModelType] = strawberry_django.field()
+    netbox_utilities_device_hardware: NetBoxUtilitiesDeviceHardwareType = strawberry_django.field()
+    netbox_utilities_device_hardware_list: list[NetBoxUtilitiesDeviceHardwareType] = strawberry_django.field()
 
 
 schema = [NetBoxUtilitiesDiskQuery]
