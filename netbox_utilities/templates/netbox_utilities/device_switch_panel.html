@@ -1,0 +1,62 @@
+{% load static %}
+<div class="card nbu-switch-card" data-nbu-switch-panel>
+  <div class="card-header d-flex flex-wrap align-items-center gap-2">
+    <h2 class="card-title mb-0 me-auto"><i class="mdi mdi-switch me-1" aria-hidden="true"></i>{{ texts.title }}</h2>
+    <span class="small text-muted">
+      {{ summary.total }} {{ texts.ports }} ·
+      <span class="text-success fw-semibold">{{ summary.connected }} {{ texts.connected }}</span> ·
+      {{ summary.free }} {{ texts.free }} ·
+      {{ summary.disabled }} {{ texts.disabled }}
+    </span>
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary active" data-nbu-switch-mode="status">{{ texts.status }}</button>
+      <button type="button" class="btn btn-outline-secondary" data-nbu-switch-mode="vlan">{{ texts.vlan }}</button>
+    </div>
+    <a href="{% url 'plugins:netbox_utilities:device_switch_ports_pdf' pk=object.pk %}" class="btn btn-sm btn-outline-secondary">
+      <i class="mdi mdi-file-pdf-box" aria-hidden="true"></i> {{ texts.export }}
+    </a>
+  </div>
+  <div class="card-body">
+    {% if not groups %}
+      <span class="text-muted">{{ texts.none }}</span>
+    {% else %}
+      <div class="nbu-faceplate">
+        {% for group in groups %}
+          <div class="nbu-faceplate-group">
+            <div class="nbu-faceplate-label">{{ group.title }}</div>
+            <div class="nbu-faceplate-ports">
+              {% for column in group.columns %}
+                <div class="nbu-faceplate-column">
+                  {% for port in column %}
+                    <a href="{{ port.url }}"
+                       class="nbu-jack nbu-jack-{{ port.state }}{% if group.optical %} nbu-jack-sfp{% endif %}{% if port.color %} nbu-jack-labelled{% endif %}"
+                       {% if port.color %}style="--nbu-vlan: {{ port.color }}; --nbu-ink: {{ port.ink }}"{% endif %}
+                       data-bs-toggle="tooltip" data-bs-html="true"
+                       title="<strong>{{ port.name|force_escape }}</strong><br>{{ port.state_text }}{% if port.label %}<br>{{ texts.vlan }}: {{ port.label|force_escape }}{% endif %}{% if port.peer %}<br>{{ texts.peer }}: {{ port.peer|force_escape }}{% endif %}{% if port.description %}<br><em>{{ port.description|force_escape }}</em>{% endif %}">
+                      <span class="nbu-jack-number">{{ port.short }}</span>
+                      <span class="nbu-jack-vlan">{{ port.vlan }}</span>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="nbu-switch-legend small mt-2" data-nbu-switch-legend="status">
+        <span><span class="nbu-jack-swatch nbu-jack-connected"></span>{{ texts.connected }}</span>
+        <span><span class="nbu-jack-swatch nbu-jack-free"></span>{{ texts.free }}</span>
+        <span><span class="nbu-jack-swatch nbu-jack-disabled"></span>{{ texts.disabled }}</span>
+      </div>
+      <div class="nbu-switch-legend small mt-2 d-none" data-nbu-switch-legend="vlan">
+        {% for vlan, color, total, connected in legend %}
+          <span>
+            <span class="nbu-jack-swatch" style="background: {{ color|default:'#6c757d' }}"></span>{{ vlan|default:texts.no_label }}
+            <span class="text-muted">({{ connected }}/{{ total }})</span>
+          </span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+<script src="{% static 'netbox_utilities/switch_panel.js' %}?v={{ asset_version }}" defer></script>

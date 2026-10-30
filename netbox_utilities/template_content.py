@@ -126,6 +126,21 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
             return ""
         return self.render("netbox_utilities/device_bulk_module_button.html")
 
+    def left_page(self):
+        # Rendered into the left column; switch_panel.js moves it above the "Device" and "Management" cards.
+        request, device = self.context["request"], self.context["object"]
+        if not switch_ports_enabled() or not request.user.has_perm("dcim.view_interface"):
+            return ""
+        from . import switch_ports
+        from .switch_port_views import switch_panel_context
+
+        if not switch_ports.is_switch(device):
+            return ""
+        return self.render(
+            "netbox_utilities/device_switch_panel.html",
+            {**switch_panel_context(request, device), "asset_version": __version__},
+        )
+
     def right_page(self):
         placement = DeviceRackPlacement.objects.filter(device=self.context["object"]).first()
         if placement is None:

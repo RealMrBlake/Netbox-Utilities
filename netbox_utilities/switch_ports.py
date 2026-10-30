@@ -42,6 +42,38 @@ VLAN_PALETTE = (
     "#9edae5",  # light cyan
 )
 
+# Texts of the front panel on the device page, by NetBox user language.
+PANEL_TEXTS = {
+    "de": {
+        "title": "Ports",
+        "status": "Status",
+        "vlan": "VLAN",
+        "connected": "Belegt",
+        "free": "Frei",
+        "disabled": "Deaktiviert",
+        "no_label": "ohne Label",
+        "ports": "Ports",
+        "export": "PDF exportieren",
+        "peer": "Gegenstelle",
+        "marked": "als verbunden markiert",
+        "none": "Keine physischen Schnittstellen.",
+    },
+    "en": {
+        "title": "Ports",
+        "status": "Status",
+        "vlan": "VLAN",
+        "connected": "Connected",
+        "free": "Free",
+        "disabled": "Disabled",
+        "no_label": "no label",
+        "ports": "ports",
+        "export": "Export PDF",
+        "peer": "Peer",
+        "marked": "marked as connected",
+        "none": "No physical interfaces.",
+    },
+}
+
 _NAME_PATTERN = re.compile(r"^(?P<prefix>.*?)(?P<number>\d+)$")
 _NATURAL = re.compile(r"(\d+)")
 
@@ -87,6 +119,18 @@ def vlan_key(label):
     return match.group(1) if match else text
 
 
+def ink_for(hex_color):
+    """ "#000000" or "#ffffff", whichever has the higher WCAG contrast against the colour."""
+    value = hex_color.lstrip("#")
+    red, green, blue = (int(value[index : index + 2], 16) / 255 for index in (0, 2, 4))
+
+    def channel(component):
+        return component / 12.92 if component <= 0.03928 else ((component + 0.055) / 1.055) ** 2.4
+
+    luminance = 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+    return "#000000" if (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) else "#ffffff"
+
+
 def vlan_color(label):
     key = vlan_key(label)
     if not key:
@@ -114,6 +158,8 @@ class Port:
     virtual: bool = False
     # Set by assign_vlan_colors(); otherwise the colour comes from a hash of the label.
     assigned_color: str = ""
+    # Translated status for tooltips, set by the view.
+    state_text: str = ""
 
     @property
     def state(self):
@@ -138,6 +184,11 @@ class Port:
     @property
     def vlan(self):
         return vlan_key(self.label)
+
+    @property
+    def ink(self):
+        """Text colour (black or white) that contrasts best with the VLAN colour."""
+        return ink_for(self.color) if self.color else ""
 
     @property
     def color(self):

@@ -48,7 +48,7 @@ Plugin settings:
 - A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
 - A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, HPE MSA disk export import, REST API and GraphQL.
 - **CPU & RAM** per server from a built-in catalogue of 700+ Intel and AMD server CPUs since 2012, with cluster capacity and overcommit for NetBox virtualization.
-- **Switch port usage as PDF** for switches: front panel coloured by VLAN (from the interface label) plus the full port list, in the user's NetBox language.
+- **Switch front panel** on the device page (Aruba-style, status or VLAN colours) and **switch port usage as PDF**, in the user's NetBox language.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -223,8 +223,8 @@ sudo systemctl restart netbox netbox-rq
 | `hardware_enabled` | `True` | **CPU & RAM** tab, catalogue, columns and cluster capacity |
 | `hardware_device_roles` | `["Server"]` | Device roles (case-insensitive) that show the **CPU & RAM** tab; cluster hosts always show it |
 | `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
-| `switch_ports_enabled` | `True` | **Export switch port usage** button for switches |
-| `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the export button |
+| `switch_ports_enabled` | `True` | Front panel and **Export switch port usage** button for switches |
+| `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the front panel and export button |
 
 ## Usage
 
@@ -504,6 +504,28 @@ esx02,EPYC 9354,2,24,32,ddr5,4800
 recording and editing use `netbox_utilities.add_devicehardware` and
 `netbox_utilities.change_devicehardware`. The catalogue uses the
 `netbox_utilities.*_cpumodel` permissions.
+
+### Switch front panel
+
+On the **Device** tab of a switch (role from `switch_device_roles`) a **Ports**
+panel appears above the *Device* and *Management* cards, similar to the port
+view in the web interface of Aruba switches:
+
+- A dark faceplate with every physical port as an RJ45 or SFP jack, odd ports
+  on top and even ports below, grouped per stack member or line card.
+- **Status** view: green = link/connected, dark = free, red dot = disabled.
+- **VLAN** view: every VLAN from the interface label gets its own colour (the
+  same colours as in the PDF), the VLAN is printed in the jack and the text
+  colour is chosen for contrast; free ports are dimmed, connected ports framed.
+  A legend lists every VLAN with connected/total ports.
+- Hovering shows name, status, VLAN, peer and description; clicking opens the
+  interface. The header shows the key figures and links to the PDF export.
+- The chosen view is remembered in the browser; texts follow the user's NetBox
+  language (German or English).
+
+NetBox offers plugins no slot above these cards, so the panel is rendered into
+the left column and moved to the top by a small script; without JavaScript it
+stays in the left column.
 
 ### Switch port usage (PDF)
 

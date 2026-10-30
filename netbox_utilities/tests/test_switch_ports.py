@@ -137,3 +137,11 @@ class PDFTest(SimpleTestCase):
                 ink = switch_port_pdf.text_color(fill)
                 light, dark = sorted((switch_port_pdf.luminance(fill), switch_port_pdf.luminance(ink)), reverse=True)
                 self.assertGreaterEqual((light + 0.05) / (dark + 0.05), 3)
+
+
+class InkTest(SimpleTestCase):
+    def test_text_colour_contrasts_with_vlan_colour(self):
+        self.assertEqual(switch_ports.ink_for("#ff7f0e"), "#000000")
+        self.assertEqual(switch_ports.ink_for("#1f77b4"), "#ffffff")
+        self.assertEqual(port("1", label="10", assigned_color="#2ca02c").ink, "#000000")
+        self.assertEqual(port("2").ink, "")

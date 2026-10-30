@@ -401,3 +401,119 @@ a.nbu-disk-slot[draggable="true"] {
   transform: rotate(90deg);
 }
 
+
+/* ---------- Switch front panel on the device page (Aruba-like) ---------- */
+.nbu-faceplate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+  padding: .75rem 1rem;
+  border-radius: .6rem;
+  background: linear-gradient(180deg, #3a3f45 0%, #2a2e33 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 3px rgba(0, 0, 0, .25);
+  overflow-x: auto;
+}
+.nbu-faceplate-label {
+  color: #ced4da;
+  font-size: .7rem;
+  margin-bottom: .3rem;
+  letter-spacing: .02em;
+}
+.nbu-faceplate-ports {
+  display: flex;
+  gap: .25rem;
+}
+.nbu-faceplate-column {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.nbu-jack {
+  --nbu-vlan: #6c757d;
+  --nbu-ink: #fff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 1.9rem;
+  border-radius: .2rem .2rem .35rem .35rem;
+  border: 1px solid rgba(0, 0, 0, .55);
+  text-decoration: none !important;
+  line-height: 1;
+  transition: transform .1s, filter .1s;
+}
+/* RJ45 latch notch */
+.nbu-jack:not(.nbu-jack-sfp)::before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 40%;
+  height: .22rem;
+  transform: translateX(-50%);
+  background: #2a2e33;
+  border-radius: .15rem .15rem 0 0;
+}
+.nbu-jack-sfp {
+  width: 2.5rem;
+  border-radius: .12rem;
+}
+.nbu-jack:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+.nbu-jack-number {
+  font-size: .68rem;
+  font-weight: 700;
+}
+.nbu-jack-vlan {
+  font-size: .5rem;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 .1rem;
+  display: none;
+}
+
+/* Status view: green link, dark free port, disabled with a red mark */
+.nbu-jack-connected { background: #2fb344; color: #fff; }
+.nbu-jack-free { background: #15181b; color: #8a9199; }
+.nbu-jack-disabled { background: #15181b; color: #6c737a; }
+.nbu-jack-disabled::after {
+  content: "";
+  position: absolute;
+  top: .15rem;
+  right: .15rem;
+  width: .4rem;
+  height: .4rem;
+  border-radius: 50%;
+  background: #d63939;
+}
+
+/* VLAN view: fill by VLAN label; free ports dimmed, connected ports with a bright frame */
+.nbu-switch-vlan .nbu-jack-vlan { display: block; }
+.nbu-switch-vlan .nbu-jack-labelled { background: var(--nbu-vlan); color: var(--nbu-ink); }
+.nbu-switch-vlan .nbu-jack:not(.nbu-jack-labelled) { background: #15181b; color: #8a9199; }
+.nbu-switch-vlan .nbu-jack-connected { box-shadow: 0 0 0 2px #fff; }
+.nbu-switch-vlan .nbu-jack-free.nbu-jack-labelled,
+.nbu-switch-vlan .nbu-jack-disabled.nbu-jack-labelled { opacity: .45; }
+
+.nbu-switch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem 1rem;
+}
+.nbu-jack-swatch {
+  position: relative;
+  display: inline-block;
+  width: .85rem;
+  height: .85rem;
+  border-radius: .15rem;
+  margin-right: .3rem;
+  vertical-align: -.1rem;
+  border: 1px solid rgba(0, 0, 0, .35);
+}
+.nbu-jack-swatch.nbu-jack-disabled::after { top: .1rem; right: .1rem; width: .3rem; height: .3rem; }

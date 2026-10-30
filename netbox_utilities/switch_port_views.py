@@ -45,10 +45,34 @@ def collect_ports(interfaces):
                 description=interface.description,
                 peer=peer,
                 lag=interface.lag.name if interface.lag_id else "",
+                url=interface.get_absolute_url(),
                 virtual=interface.type in switch_ports.VIRTUAL_TYPES,
             )
         )
     return ports
+
+
+def switch_panel_context(request, device):
+    """Front panel above the "Device" and "Management" cards, in the user's NetBox language."""
+    interfaces = (
+        Interface.objects.restrict(request.user, "view")
+        .filter(device=device)
+        .select_related("lag", "cable", "_path")
+        .order_by("_name")
+    )
+    ports = collect_ports(interfaces)
+    switch_ports.assign_vlan_colors(ports)
+    texts = switch_ports.PANEL_TEXTS[switch_port_pdf.language(translation.get_language())]
+    for port in ports:
+        if port.peer == switch_ports.MARKED_CONNECTED:
+            port.peer = texts["marked"]
+        port.state_text = texts[port.state]
+    return {
+        "groups": switch_ports.build_groups(ports),
+        "summary": switch_ports.summary(ports),
+        "legend": switch_ports.vlan_legend(ports),
+        "texts": texts,
+    }
 
 
 def device_info(device):
