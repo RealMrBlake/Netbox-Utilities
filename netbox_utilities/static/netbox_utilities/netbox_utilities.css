@@ -403,18 +403,42 @@ a.nbu-disk-slot[draggable="true"] {
 
 
 /* ---------- Switch front panel on the device page (Aruba-like) ---------- */
+/* Light theme by default; NetBox sets data-bs-theme="dark" on the html element for the dark theme. */
+.nbu-switch-card {
+  --nbu-plate-from: #eef0f2;
+  --nbu-plate-to: #d9dde1;
+  --nbu-plate-edge: #c4c9ce;
+  --nbu-plate-label: #495057;
+  --nbu-jack-border: rgba(0, 0, 0, .35);
+  --nbu-jack-free: #ffffff;
+  --nbu-jack-free-ink: #6c757d;
+  --nbu-link: #2fb344;
+  --nbu-frame: #212529;
+}
+[data-bs-theme="dark"] .nbu-switch-card {
+  --nbu-plate-from: #3a3f45;
+  --nbu-plate-to: #2a2e33;
+  --nbu-plate-edge: #1d2024;
+  --nbu-plate-label: #ced4da;
+  --nbu-jack-border: rgba(0, 0, 0, .6);
+  --nbu-jack-free: #15181b;
+  --nbu-jack-free-ink: #8a9199;
+  --nbu-frame: #ffffff;
+}
 .nbu-faceplate {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: .75rem 1.25rem;
   padding: .75rem 1rem;
   border-radius: .6rem;
-  background: linear-gradient(180deg, #3a3f45 0%, #2a2e33 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 3px rgba(0, 0, 0, .25);
+  border: 1px solid var(--nbu-plate-edge);
+  background: linear-gradient(180deg, var(--nbu-plate-from) 0%, var(--nbu-plate-to) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15), 0 1px 3px rgba(0, 0, 0, .15);
   overflow-x: auto;
 }
 .nbu-faceplate-label {
-  color: #ced4da;
+  color: var(--nbu-plate-label);
   font-size: .7rem;
   margin-bottom: .3rem;
   letter-spacing: .02em;
@@ -439,12 +463,12 @@ a.nbu-disk-slot[draggable="true"] {
   width: 2.15rem;
   height: 1.9rem;
   border-radius: .2rem .2rem .35rem .35rem;
-  border: 1px solid rgba(0, 0, 0, .55);
+  border: 1px solid var(--nbu-jack-border);
   text-decoration: none !important;
   line-height: 1;
   transition: transform .1s, filter .1s;
 }
-/* RJ45 latch notch */
+/* RJ45 latch notch in the colour of the faceplate */
 .nbu-jack:not(.nbu-jack-sfp)::before {
   content: "";
   position: absolute;
@@ -453,7 +477,7 @@ a.nbu-disk-slot[draggable="true"] {
   width: 40%;
   height: .22rem;
   transform: translateX(-50%);
-  background: #2a2e33;
+  background: var(--nbu-plate-to);
   border-radius: .15rem .15rem 0 0;
 }
 .nbu-jack-sfp {
@@ -462,11 +486,15 @@ a.nbu-disk-slot[draggable="true"] {
 }
 .nbu-jack:hover {
   transform: translateY(-1px);
-  filter: brightness(1.15);
+  filter: brightness(1.1);
 }
 .nbu-jack-number {
   font-size: .68rem;
   font-weight: 700;
+}
+.nbu-jack-mgmt .nbu-jack-number {
+  font-size: .55rem;
+  letter-spacing: .02em;
 }
 .nbu-jack-vlan {
   font-size: .5rem;
@@ -478,10 +506,10 @@ a.nbu-disk-slot[draggable="true"] {
   display: none;
 }
 
-/* Status view: green link, dark free port, disabled with a red mark */
-.nbu-jack-connected { background: #2fb344; color: #fff; }
-.nbu-jack-free { background: #15181b; color: #8a9199; }
-.nbu-jack-disabled { background: #15181b; color: #6c737a; }
+/* Status view: green link, free port in the jack colour of the theme, disabled with a red dot */
+.nbu-jack-connected { background: var(--nbu-link); color: #fff; }
+.nbu-jack-free,
+.nbu-jack-disabled { background: var(--nbu-jack-free); color: var(--nbu-jack-free-ink); }
 .nbu-jack-disabled::after {
   content: "";
   position: absolute;
@@ -493,11 +521,11 @@ a.nbu-disk-slot[draggable="true"] {
   background: #d63939;
 }
 
-/* VLAN view: fill by VLAN label; free ports dimmed, connected ports with a bright frame */
+/* VLAN view: fill by VLAN label; free ports dimmed, connected ports framed */
 .nbu-switch-vlan .nbu-jack-vlan { display: block; }
 .nbu-switch-vlan .nbu-jack-labelled { background: var(--nbu-vlan); color: var(--nbu-ink); }
-.nbu-switch-vlan .nbu-jack:not(.nbu-jack-labelled) { background: #15181b; color: #8a9199; }
-.nbu-switch-vlan .nbu-jack-connected { box-shadow: 0 0 0 2px #fff; }
+.nbu-switch-vlan .nbu-jack:not(.nbu-jack-labelled) { background: var(--nbu-jack-free); color: var(--nbu-jack-free-ink); }
+.nbu-switch-vlan .nbu-jack-connected { box-shadow: 0 0 0 2px var(--nbu-frame); }
 .nbu-switch-vlan .nbu-jack-free.nbu-jack-labelled,
 .nbu-switch-vlan .nbu-jack-disabled.nbu-jack-labelled { opacity: .45; }
 
@@ -514,6 +542,6 @@ a.nbu-disk-slot[draggable="true"] {
   border-radius: .15rem;
   margin-right: .3rem;
   vertical-align: -.1rem;
-  border: 1px solid rgba(0, 0, 0, .35);
+  border: 1px solid var(--nbu-jack-border);
 }
 .nbu-jack-swatch.nbu-jack-disabled::after { top: .1rem; right: .1rem; width: .3rem; height: .3rem; }

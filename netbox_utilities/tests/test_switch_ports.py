@@ -145,3 +145,15 @@ class InkTest(SimpleTestCase):
         self.assertEqual(switch_ports.ink_for("#1f77b4"), "#ffffff")
         self.assertEqual(port("1", label="10", assigned_color="#2ca02c").ink, "#000000")
         self.assertEqual(port("2").ink, "")
+
+
+class ManagementTest(SimpleTestCase):
+    def test_management_ports_are_abbreviated_and_grouped_last(self):
+        ports = [port("Management"), port("Gi1/0/1"), port("mgmt0"), port("oobm"), port("eth0", mgmt_only=True)]
+        self.assertEqual([p.short for p in ports], ["MGMT", "1", "MGMT", "MGMT", "MGMT"])
+        groups = switch_ports.build_groups(ports)
+        self.assertEqual([group.title for group in groups], ["Gi1/0", "Management"])
+        self.assertEqual(len(groups[-1].ports), 4)
+
+    def test_other_ports_without_number_are_shortened(self):
+        self.assertEqual(port("console").short, "conso")

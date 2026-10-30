@@ -74,6 +74,8 @@ PANEL_TEXTS = {
     },
 }
 
+# Out-of-band management ports by name, e.g. "mgmt", "Management", "mgmt0", "oobm", "me0", "MgmtEth0/RP0/CPU0/0".
+_MGMT_NAME = re.compile(r"(?i)^(mgmt|management|oobm|me0|fxp0|em0|ma1|mgmteth)")
 _NAME_PATTERN = re.compile(r"^(?P<prefix>.*?)(?P<number>\d+)$")
 _NATURAL = re.compile(r"(\d+)")
 
@@ -176,10 +178,18 @@ class Port:
         return split_name(self.name)[1]
 
     @property
+    def is_management(self):
+        return self.mgmt_only or bool(_MGMT_NAME.match(self.name or ""))
+
+    @property
     def short(self):
-        """Text inside the tile: the port number, or the name if it has none."""
+        """Text inside the tile: the port number, "MGMT" for management ports, else a shortened name."""
+        if self.is_management:
+            return "MGMT"
         number = self.number
-        return str(number) if number is not None else self.name
+        if number is not None:
+            return str(number)
+        return (self.name or "")[:5]
 
     @property
     def vlan(self):
@@ -223,11 +233,18 @@ def _zip_longest(top, bottom):
         yield (top[index] if index < len(top) else None, bottom[index] if index < len(bottom) else None)
 
 
+MGMT_GROUP = ("__mgmt__", False)
+
+
 def build_groups(ports):
     """Physical ports grouped by name prefix and medium, in natural order."""
     groups = {}
     for port in ports:
         if port.virtual:
+            continue
+        if port.is_management:
+            # All management ports in one small group at the end.
+            groups.setdefault(MGMT_GROUP, PortGroup(title="Management", optical=False)).ports.append(port)
             continue
         prefix, _ = split_name(port.name)
         optical = is_optical(port.type)
@@ -236,7 +253,11 @@ def build_groups(ports):
             title = prefix.rstrip("/:-. ") or "Ports"
             groups[key] = PortGroup(title=f"{title} (SFP)" if optical else title, optical=optical)
         groups[key].ports.append(port)
-    return sorted(groups.values(), key=lambda group: (natural_key(group.title), group.optical))
+    management = groups.get(MGMT_GROUP)
+    return sorted(
+        groups.values(),
+        key=lambda group: (group is management, natural_key(group.title), group.optical),
+    )
 
 
 def summary(ports):

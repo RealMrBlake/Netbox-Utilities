@@ -513,7 +513,10 @@ view in the web interface of Aruba switches:
 
 - A dark faceplate with every physical port as an RJ45 or SFP jack, odd ports
   on top and even ports below, grouped per stack member or line card.
-- **Status** view: green = link/connected, dark = free, red dot = disabled.
+- **Status** view: green = link/connected, empty jack = free, red dot = disabled.
+- Management ports (marked *management only* or named `mgmt`, `management`,
+  `oobm`, `me0` …) are shown as **MGMT** in a group of their own at the end.
+- The faceplate follows NetBox's light and dark theme.
 - **VLAN** view: every VLAN from the interface label gets its own colour (the
   same colours as in the PDF), the VLAN is printed in the jack and the text
   colour is chosen for contrast; free ports are dimmed, connected ports framed.
