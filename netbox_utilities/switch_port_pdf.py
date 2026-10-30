@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Flowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -80,12 +80,12 @@ TEXTS = {
     },
 }
 
-PAGE = landscape(A4)
+PAGE = A4
 MARGIN = 12 * mm
-TILE_W = 10.5 * mm
-TILE_H = 9 * mm
+TILE_W = 12.5 * mm
+TILE_H = 9.5 * mm
 TILE_GAP = 1.2 * mm
-OPTICAL_W = 12 * mm
+OPTICAL_W = 13.5 * mm
 FREE_FILL = colors.white
 UNLABELLED_FILL = colors.HexColor("#e9ecef")
 BORDER_DARK = colors.HexColor("#212529")
@@ -226,7 +226,7 @@ def _styles():
         "meta": ParagraphStyle("m", parent=sheet["Normal"], fontSize=8.5, textColor=colors.HexColor("#495057")),
         "h2": ParagraphStyle("h", parent=sheet["Heading2"], fontSize=11, spaceBefore=3 * mm, spaceAfter=1.5 * mm),
         "group": ParagraphStyle("g", parent=sheet["Normal"], fontSize=7.5, textColor=colors.HexColor("#495057")),
-        "cell": ParagraphStyle("c", parent=sheet["Normal"], fontSize=7, leading=8.5),
+        "cell": ParagraphStyle("c", parent=sheet["Normal"], fontSize=6.5, leading=7.8),
         "figure": ParagraphStyle("f", parent=sheet["Normal"], fontSize=14, leading=16),
         "small": ParagraphStyle("s", parent=sheet["Normal"], fontSize=7, textColor=colors.HexColor("#495057")),
     }
@@ -279,7 +279,7 @@ def _legend(ports, t, styles):
         items.append((fill, f"{label}  <font color='#6c757d'>({connected}/{total})</font>"))
     if not items:
         return []
-    per_row = 6
+    per_row = 4
     cells = []
     style = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 1 * mm)]
     for row_index in range(math.ceil(len(items) / per_row)):
@@ -334,7 +334,7 @@ def _port_table(ports, t, styles):
         if port.state == switch_ports.STATE_DISABLED:
             style.append(("TEXTCOLOR", (0, index), (1, index), colors.HexColor("#6c757d")))
     width = PAGE[0] - 2 * MARGIN
-    widths = [w * width for w in (0.13, 0.08, 0.11, 0.25, 0.22, 0.13, 0.08)]
+    widths = [w * width for w in (0.19, 0.09, 0.12, 0.21, 0.17, 0.15, 0.07)]
     table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle(style))
     return table
