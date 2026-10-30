@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 
 DEFAULT_SWITCH_DEVICE_ROLES = ("Switch",)
 
+# Peer text of interfaces that are only marked as connected; translated in the export.
+MARKED_CONNECTED = "__marked__"
+
 STATE_CONNECTED = "connected"
 STATE_FREE = "free"
 STATE_DISABLED = "disabled"
@@ -19,24 +22,24 @@ STATE_LABELS = {
 VIRTUAL_TYPES = ("virtual", "lag", "bridge")
 OPTICAL_MARKERS = ("sfp", "qsfp", "xfp", "x2", "cfp", "osfp", "gbic")
 
-# Readable background colours for VLAN labels (white text works on all of them).
+# Distinct background colours for VLAN labels; the text colour is chosen per colour for contrast.
 VLAN_PALETTE = (
-    "#1f77b4",
-    "#d62728",
-    "#2ca02c",
-    "#9467bd",
-    "#e377c2",
-    "#8c564b",
-    "#17becf",
-    "#bcbd22",
-    "#ff7f0e",
-    "#393b79",
-    "#637939",
-    "#843c39",
-    "#7b4173",
-    "#3182bd",
-    "#e6550d",
-    "#31a354",
+    "#1f77b4",  # blue
+    "#ff7f0e",  # orange
+    "#2ca02c",  # green
+    "#d62728",  # red
+    "#9467bd",  # purple
+    "#8c564b",  # brown
+    "#e377c2",  # pink
+    "#17becf",  # cyan
+    "#bcbd22",  # olive
+    "#7f7f7f",  # grey
+    "#393b79",  # navy
+    "#ffbb78",  # light orange
+    "#98df8a",  # light green
+    "#c5b0d5",  # lavender
+    "#f7b6d2",  # rose
+    "#9edae5",  # light cyan
 )
 
 _NAME_PATTERN = re.compile(r"^(?P<prefix>.*?)(?P<number>\d+)$")
@@ -109,6 +112,8 @@ class Port:
     speed: str = ""
     url: str = ""
     virtual: bool = False
+    # Set by assign_vlan_colors(); otherwise the colour comes from a hash of the label.
+    assigned_color: str = ""
 
     @property
     def state(self):
@@ -136,7 +141,9 @@ class Port:
 
     @property
     def color(self):
-        return vlan_color(self.label)
+        if not self.vlan:
+            return None
+        return self.assigned_color or vlan_color(self.label)
 
 
 @dataclass
@@ -195,16 +202,31 @@ def summary(ports):
     }
 
 
+def assign_vlan_colors(ports):
+    """Give every VLAN of one switch its own palette colour (in natural order), so no two collide.
+
+    Only with more VLANs than palette colours do the remaining ones fall back to the hash colour.
+    """
+    vlans = sorted({port.vlan for port in ports if port.vlan}, key=natural_key)
+    colors = {vlan: VLAN_PALETTE[index] for index, vlan in enumerate(vlans[: len(VLAN_PALETTE)])}
+    for port in ports:
+        if port.vlan:
+            port.assigned_color = colors.get(port.vlan, "")
+    return colors
+
+
 def vlan_legend(ports):
     """[(vlan, colour, port count, connected count)] sorted naturally; unlabelled ports last."""
     counts = {}
+    colors = {}
     for port in ports:
         if port.virtual:
             continue
+        colors.setdefault(port.vlan, port.color)
         entry = counts.setdefault(port.vlan, [0, 0])
         entry[0] += 1
         entry[1] += port.state == STATE_CONNECTED
-    legend = [(vlan, vlan_color(vlan), total, connected) for vlan, (total, connected) in counts.items() if vlan]
+    legend = [(vlan, colors[vlan], total, connected) for vlan, (total, connected) in counts.items() if vlan]
     legend.sort(key=lambda item: natural_key(item[0]))
     if "" in counts:
         legend.append(("", None, counts[""][0], counts[""][1]))

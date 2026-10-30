@@ -48,7 +48,7 @@ Plugin settings:
 - A **Prefix** column (first word of the site name) for device and rack lists, including sorting and filtering.
 - A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, HPE MSA disk export import, REST API and GraphQL.
 - **CPU & RAM** per server from a built-in catalogue of 700+ Intel and AMD server CPUs since 2012, with cluster capacity and overcommit for NetBox virtualization.
-- A **Ports** tab for switches: front-panel view of all interfaces, coloured by usage or by VLAN (from the interface label), with peers, CSV export and print view.
+- **Switch port usage as PDF** for switches: front panel coloured by VLAN (from the interface label) plus the full port list, in the user's NetBox language.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -223,8 +223,8 @@ sudo systemctl restart netbox netbox-rq
 | `hardware_enabled` | `True` | **CPU & RAM** tab, catalogue, columns and cluster capacity |
 | `hardware_device_roles` | `["Server"]` | Device roles (case-insensitive) that show the **CPU & RAM** tab; cluster hosts always show it |
 | `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
-| `switch_ports_enabled` | `True` | **Ports** tab for switches |
-| `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the **Ports** tab |
+| `switch_ports_enabled` | `True` | **Export switch port usage** button for switches |
+| `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the export button |
 
 ## Usage
 
@@ -505,35 +505,35 @@ recording and editing use `netbox_utilities.add_devicehardware` and
 `netbox_utilities.change_devicehardware`. The catalogue uses the
 `netbox_utilities.*_cpumodel` permissions.
 
-### Switch ports
+### Switch port usage (PDF)
 
-Devices with a role from `switch_device_roles` get a **Ports** tab; the badge
-shows used/total physical ports.
+Devices with a role from `switch_device_roles` get an **Export switch port
+usage** button (*Switch-Belegung exportieren*) on the device page. It
+downloads a PDF (A4 landscape) with:
 
-- **Key figures:** physical ports, used (with percentage), free (enabled
-  without cable) and disabled.
-- **Front panel:** every physical interface is a tile, arranged like the
-  device front with odd ports on top and even ports below. Ports are grouped
-  by name prefix, i.e. per stack member or line card (`Gi1/0/…`, `Gi2/0/…`),
-  and SFP/QSFP ports are shown separately. Each tile shows the port number and
-  the VLAN from the interface **label**. Hovering shows name, VLAN, status,
-  peer, description, LAG and type; clicking jumps to the port in the table.
-- **Colour modes:** *Usage* (used, free, disabled) or *VLAN*: every label
-  value gets its own colour; `VLAN 10`, `vlan10` and `10` count as the same
-  VLAN. In VLAN mode the legend lists every VLAN with used/total ports, and a
-  click on a VLAN highlights only its ports. The chosen mode is remembered in
-  the browser.
-- **Table:** all interfaces (including virtual ones such as LAGs and SVIs) with
-  status, VLAN label, peer, description, type and LAG, and a search field
-  that also highlights the matching tiles.
-- **Peer:** the far end through patch panels when the cable path is complete,
-  otherwise the directly cabled object. Interfaces marked as connected count
-  as used.
-- **Export:** *CSV* downloads the port list (semicolon separated, opens in
-  Excel); *Print* prints the front panel and table with colours.
+- **Header:** device, site, rack/position, model and date, plus the key
+  figures: physical ports, connected (with percentage), free and disabled.
+- **Front panel:** every physical interface as a tile, arranged like the
+  device front with odd ports on top and even ports below, grouped per stack
+  member or line card (`Gi1/0/…`, `Gi2/0/…`); SFP/QSFP ports are shown
+  separately. Each tile shows the port number and the VLAN from the interface
+  **label**. Every VLAN gets its own colour (`VLAN 10`, `vlan10` and `10` count
+  as the same VLAN); connected ports are filled with the full colour and a
+  thick border, free ports with a pale version, disabled ports have a dashed
+  border and a small ✕. The text colour is chosen per tile for the best
+  contrast (black or white). Tile widths adapt so that a 48-port switch fits
+  on one row.
+- **Legend:** every VLAN with its colour and connected/total ports.
+- **Port list:** all interfaces (including virtual ones such as LAGs and SVIs)
+  with status, VLAN label, peer, description, type and LAG. The peer is the
+  far end through patch panels when the cable path is complete, otherwise the
+  directly cabled object; interfaces marked as connected count as used.
 
-The tab requires `dcim.view_interface`. Virtual interfaces (`virtual`, `lag`,
-`bridge`) are not counted as ports.
+The PDF follows the language set in the user's NetBox preferences (German or
+English; other languages fall back to German). The button requires
+`dcim.view_interface`. The PDF is generated with
+[ReportLab](https://pypi.org/project/reportlab/), which is installed together
+with the plugin; it needs no system libraries.
 
 ### Pre-filter for the B-side of a cable
 

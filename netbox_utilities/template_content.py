@@ -1,6 +1,7 @@
 from dcim.models import ModuleBay
 from django.middleware.csrf import get_token
 from django.urls import reverse
+from django.utils import translation
 from netbox.plugins import PluginTemplateExtension
 from tenancy.models import Tenant, TenantGroup
 
@@ -24,6 +25,7 @@ from .runtime import (
     hardware_enabled,
     navigation_customization_enabled,
     offline_svg_export_enabled,
+    switch_ports_enabled,
     tenant_filter_enabled,
 )
 
@@ -94,6 +96,20 @@ class DeviceUtilitiesContent(PluginTemplateExtension):
     models = ["dcim.device"]
 
     def buttons(self):
+        return self._switch_ports_button() + self._bulk_module_button()
+
+    def _switch_ports_button(self):
+        request, device = self.context["request"], self.context["object"]
+        if not switch_ports_enabled() or not request.user.has_perm("dcim.view_interface"):
+            return ""
+        from . import switch_port_pdf, switch_ports
+
+        if not switch_ports.is_switch(device):
+            return ""
+        texts = switch_port_pdf.TEXTS[switch_port_pdf.language(translation.get_language())]
+        return self.render("netbox_utilities/device_switch_ports_button.html", {"label": texts["button"]})
+
+    def _bulk_module_button(self):
         request = self.context["request"]
         device = self.context["object"]
         if not request.user.has_perm("dcim.add_module"):

@@ -1,14 +1,12 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = (
-        "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM and bulk operations"
-    )
+    description = "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM, switch port export and bulk operations"
     version = __version__
     author = "LKE"
     base_url = "utilities"
@@ -57,9 +55,6 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .hardware_integration import install_hardware_support
 
             install_hardware_support()
-        if get_plugin_config("netbox_utilities", "switch_ports_enabled"):
-            # Registers the "Ports" device tab before NetBox builds the dcim URLs.
-            from . import switch_port_views  # noqa: F401
         if get_plugin_config("netbox_utilities", "site_prefix_column_enabled"):
             from .site_prefix import install_site_prefix_column
 

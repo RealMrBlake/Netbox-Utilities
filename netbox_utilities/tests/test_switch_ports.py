@@ -82,3 +82,58 @@ class LayoutTest(SimpleTestCase):
         self.assertEqual(
             switch_ports.summary(ports), {"total": 3, "connected": 1, "free": 1, "disabled": 1, "percent": 33}
         )
+
+
+class ColorAssignmentTest(SimpleTestCase):
+    def test_every_vlan_gets_its_own_colour(self):
+        ports = [
+            port(f"Gi1/0/{index}", label=label) for index, label in enumerate(["10", "VLAN 10", "20", "Trunk", ""])
+        ]
+        colors = switch_ports.assign_vlan_colors(ports)
+        self.assertEqual(len(set(colors.values())), 3)
+        self.assertEqual(ports[0].color, ports[1].color)
+        self.assertIsNone(ports[4].color)
+
+
+class PDFTest(SimpleTestCase):
+    def ports(self):
+        return [
+            port("Gi1/0/1", label="10", connected=True, peer="srv1 – eth0"),
+            port("Gi1/0/2", label="20"),
+            port("Gi1/0/3", enabled=False),
+            port("Te1/1/1", type="10gbase-x-sfpp", label="Trunk", connected=True, peer=switch_ports.MARKED_CONNECTED),
+            port("Po1", type="lag", virtual=True),
+        ]
+
+    def test_builds_pdf_in_both_languages(self):
+        from netbox_utilities import switch_port_pdf
+
+        device = switch_port_pdf.DeviceInfo(name="sw1", site="HQ", rack="R1 / U10", model="C9300")
+        for lang in ("de", "en"):
+            with self.subTest(lang=lang):
+                data = switch_port_pdf.build_pdf(device, self.ports(), lang=lang)
+                self.assertTrue(data.startswith(b"%PDF"))
+                self.assertGreater(len(data), 2000)
+
+    def test_language_follows_user_setting(self):
+        from netbox_utilities import switch_port_pdf
+
+        self.assertEqual(switch_port_pdf.language("en-us"), "en")
+        self.assertEqual(switch_port_pdf.language("de"), "de")
+        self.assertEqual(switch_port_pdf.language(None), "de")
+
+    def test_text_contrasts_with_fill(self):
+        from reportlab.lib import colors
+
+        from netbox_utilities import switch_port_pdf
+
+        self.assertEqual(switch_port_pdf.text_color(colors.HexColor("#ff7f0e")), colors.black)
+        self.assertEqual(switch_port_pdf.text_color(colors.HexColor("#2ca02c")), colors.black)
+        self.assertEqual(switch_port_pdf.text_color(colors.HexColor("#1f77b4")), colors.white)
+        self.assertEqual(switch_port_pdf.text_color(colors.HexColor("#393b79")), colors.white)
+        for color in switch_ports.VLAN_PALETTE:
+            with self.subTest(color=color):
+                fill = colors.HexColor(color)
+                ink = switch_port_pdf.text_color(fill)
+                light, dark = sorted((switch_port_pdf.luminance(fill), switch_port_pdf.luminance(ink)), reverse=True)
+                self.assertGreaterEqual((light + 0.05) / (dark + 0.05), 3)
