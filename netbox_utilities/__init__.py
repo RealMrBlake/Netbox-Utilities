@@ -31,6 +31,8 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "hardware_enabled": True,
         "hardware_device_roles": ["Server"],
         "hardware_vcpu_ratio_warning": 4,
+        "switch_ports_enabled": True,
+        "switch_device_roles": ["Switch"],
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
@@ -55,6 +57,9 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .hardware_integration import install_hardware_support
 
             install_hardware_support()
+        if get_plugin_config("netbox_utilities", "switch_ports_enabled"):
+            # Registers the "Ports" device tab before NetBox builds the dcim URLs.
+            from . import switch_port_views  # noqa: F401
         if get_plugin_config("netbox_utilities", "site_prefix_column_enabled"):
             from .site_prefix import install_site_prefix_column
 

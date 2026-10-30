@@ -400,3 +400,89 @@ a.nbu-disk-slot[draggable="true"] {
 .nbu-disk-group-header[aria-expanded="true"] .nbu-disk-group-chevron {
   transform: rotate(90deg);
 }
+
+/* ---------- Switch ports tab ---------- */
+.nbu-port-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  padding: .5rem;
+  border-radius: .5rem;
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+}
+.nbu-port-column {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.nbu-port {
+  --nbu-vlan-color: var(--bs-secondary-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 3.1rem;
+  height: 2.6rem;
+  border-radius: .3rem;
+  border: 2px solid transparent;
+  text-decoration: none;
+  line-height: 1.05;
+  transition: opacity .15s, transform .1s;
+}
+.nbu-port:hover {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.nbu-port-number {
+  font-weight: 600;
+  font-size: .8rem;
+}
+.nbu-port-vlan {
+  font-size: .62rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 .15rem;
+}
+.nbu-port-optical {
+  border-radius: .1rem;
+  width: 3.4rem;
+}
+/* Colour mode "Belegung" */
+.nbu-port-connected { background: var(--bs-success); color: #fff; }
+.nbu-port-free { background: var(--bs-body-bg); color: var(--bs-body-color); border-color: var(--bs-border-color); }
+.nbu-port-disabled {
+  background: repeating-linear-gradient(45deg, var(--bs-secondary-bg), var(--bs-secondary-bg) 4px, var(--bs-tertiary-bg) 4px, var(--bs-tertiary-bg) 8px);
+  color: var(--bs-secondary-color);
+  border-color: var(--bs-border-color);
+}
+/* Colour mode "VLAN": fill by VLAN, the border shows whether the port is in use */
+.nbu-ports-vlan .nbu-port { background: var(--nbu-vlan-color); color: #fff; }
+.nbu-ports-vlan .nbu-port:not([style]) { color: var(--bs-body-color); }
+.nbu-ports-vlan .nbu-port-free { opacity: .55; border-color: transparent; }
+.nbu-ports-vlan .nbu-port-connected { border-color: var(--bs-body-color); }
+.nbu-ports-vlan .nbu-port-disabled { opacity: .35; }
+.nbu-port-dimmed { opacity: .15 !important; }
+
+.nbu-port-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1rem;
+  align-items: center;
+}
+.nbu-port-swatch {
+  display: inline-block;
+  width: .9rem;
+  height: .9rem;
+  border-radius: .2rem;
+  margin-right: .3rem;
+  vertical-align: -.1rem;
+  border: 1px solid var(--bs-border-color);
+}
+
+@media print {
+  .nbu-port, .nbu-port-swatch, .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  [data-nbu-port-search], .btn-group, .btn { display: none !important; }
+}
