@@ -509,7 +509,7 @@ recording and editing use `netbox_utilities.add_devicehardware` and
 
 Devices with a role from `switch_device_roles` get an **Export switch port
 usage** button (*Switch-Belegung exportieren*) on the device page. It
-downloads a PDF (A4 portrait) with:
+downloads a PDF (A4 landscape) with:
 
 - **Header:** device, site, rack/position, model and date, plus the key
   figures: physical ports, connected (with percentage), free and disabled.
@@ -521,8 +521,8 @@ downloads a PDF (A4 portrait) with:
   as the same VLAN); connected ports are filled with the full colour and a
   thick border, free ports with a pale version, disabled ports have a dashed
   border and a small ✕. The text colour is chosen per tile for the best
-  contrast (black or white). Wide groups are split evenly, e.g. a 48-port
-  switch into ports 1–24 and 25–48.
+  contrast (black or white). A 48-port switch fits on one row; wider groups
+  are split evenly.
 - **Legend:** every VLAN with its colour and connected/total ports.
 - **Port list:** all interfaces (including virtual ones such as LAGs and SVIs)
   with status, VLAN label, peer, description, type and LAG. The peer is the

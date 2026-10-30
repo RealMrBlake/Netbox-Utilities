@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Flowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -80,7 +80,7 @@ TEXTS = {
     },
 }
 
-PAGE = A4
+PAGE = landscape(A4)
 MARGIN = 12 * mm
 TILE_W = 12.5 * mm
 TILE_H = 9.5 * mm
@@ -279,7 +279,7 @@ def _legend(ports, t, styles):
         items.append((fill, f"{label}  <font color='#6c757d'>({connected}/{total})</font>"))
     if not items:
         return []
-    per_row = 4
+    per_row = 6
     cells = []
     style = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 1 * mm)]
     for row_index in range(math.ceil(len(items) / per_row)):
@@ -334,7 +334,7 @@ def _port_table(ports, t, styles):
         if port.state == switch_ports.STATE_DISABLED:
             style.append(("TEXTCOLOR", (0, index), (1, index), colors.HexColor("#6c757d")))
     width = PAGE[0] - 2 * MARGIN
-    widths = [w * width for w in (0.19, 0.09, 0.12, 0.21, 0.17, 0.15, 0.07)]
+    widths = [w * width for w in (0.15, 0.07, 0.11, 0.25, 0.22, 0.13, 0.07)]
     table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle(style))
     return table
@@ -395,9 +395,10 @@ def build_pdf(device, ports, lang="de", generated=None):
         story.append(KeepTogether(block))
         story.append(Spacer(0, 1.5 * mm))
 
-    story.append(Paragraph(t["legend_state"], styles["small"]))
-    story.append(Spacer(0, 2 * mm))
-    story.extend(_legend(ports, t, styles))
+    # Keep the explanation and the VLAN legend on one page.
+    story.append(
+        KeepTogether([Paragraph(t["legend_state"], styles["small"]), Spacer(0, 2 * mm), *_legend(ports, t, styles)])
+    )
     story.append(CondPageBreak(40 * mm))
     story.append(Paragraph(t["list"], styles["h2"]))
     story.append(_port_table(ports, t, styles))
