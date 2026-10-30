@@ -27,13 +27,18 @@ TEXTS = {
         "free": "Frei",
         "disabled": "Deaktiviert",
         "front": "Frontansicht",
-        "legend_state": "Kräftige Farbe mit dickem Rahmen = belegt · blasse Farbe = frei · gestrichelt mit ✕ = deaktiviert",
-        "legend_vlan": "VLANs (Label)",
+        "legend_state": (
+            "Kräftige Farbe mit dickem Rahmen = belegt · blasse Farbe = frei · gestrichelt mit ✕ = deaktiviert"
+            " · oranges Eck = Label und Kabel-VLAN weichen ab"
+        ),
+        "legend_vlan": "VLANs (Label / Kabel)",
         "no_label": "ohne Label",
         "list": "Alle Schnittstellen",
         "port": "Port",
         "status": "Status",
         "vlan": "VLAN (Label)",
+        "vlan_cable": "VLAN (Kabel)",
+        "mismatch": "weicht ab",
         "peer": "Gegenstelle",
         "description": "Beschreibung",
         "type": "Typ",
@@ -57,13 +62,18 @@ TEXTS = {
         "free": "Free",
         "disabled": "Disabled",
         "front": "Front panel",
-        "legend_state": "Strong colour with thick border = connected · pale colour = free · dashed with ✕ = disabled",
-        "legend_vlan": "VLANs (label)",
+        "legend_state": (
+            "Strong colour with thick border = connected · pale colour = free · dashed with ✕ = disabled"
+            " · orange corner = label and cable VLAN differ"
+        ),
+        "legend_vlan": "VLANs (label / cable)",
         "no_label": "no label",
         "list": "All interfaces",
         "port": "Port",
         "status": "Status",
         "vlan": "VLAN (label)",
+        "vlan_cable": "VLAN (cable)",
+        "mismatch": "differs",
         "peer": "Peer",
         "description": "Description",
         "type": "Type",
@@ -90,6 +100,7 @@ FREE_FILL = colors.white
 UNLABELLED_FILL = colors.HexColor("#e9ecef")
 BORDER_DARK = colors.HexColor("#212529")
 BORDER_LIGHT = colors.HexColor("#adb5bd")
+MISMATCH = colors.HexColor("#fd7e14")
 
 
 def language(code):
@@ -190,6 +201,16 @@ class PortPanel(Flowable):
             while vlan and canvas.stringWidth(vlan, "Helvetica", 5.5) > self.tile_w - 1 * mm:
                 vlan = vlan[:-1]
             canvas.drawCentredString(x + self.tile_w / 2, y + 1.6 * mm, vlan)
+
+        if port.vlan_mismatch:
+            # Orange corner: label and cable VLAN differ.
+            canvas.setFillColor(MISMATCH)
+            path = canvas.beginPath()
+            path.moveTo(x, y + TILE_H)
+            path.lineTo(x + 2.4 * mm, y + TILE_H)
+            path.lineTo(x, y + TILE_H - 2.4 * mm)
+            path.close()
+            canvas.drawPath(path, stroke=0, fill=1)
 
         if disabled:
             # Small cross in the top right corner, away from the text.
@@ -296,8 +317,17 @@ def _legend(ports, t, styles):
     return [Paragraph(f"<b>{t['legend_vlan']}</b>", styles["small"]), Spacer(0, 1 * mm), table]
 
 
+def _cable_cell(port, t):
+    if not port.cable_vlans:
+        return "–"
+    text = _escape(port.cable_vlan_text)
+    if port.vlan_mismatch:
+        text += f" <font color='#fd7e14'><b>⚠ {t['mismatch']}</b></font>"
+    return text
+
+
 def _port_table(ports, t, styles):
-    header = [t["port"], t["status"], t["vlan"], t["peer"], t["description"], t["type"], t["lag"]]
+    header = [t["port"], t["status"], t["vlan"], t["vlan_cable"], t["peer"], t["description"], t["type"], t["lag"]]
     data = [[Paragraph(f"<b>{text}</b>", styles["cell"]) for text in header]]
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dee2e6")),
@@ -319,6 +349,7 @@ def _port_table(ports, t, styles):
                 Paragraph(name, styles["cell"]),
                 Paragraph(states[port.state], styles["cell"]),
                 Paragraph(_escape(port.label) or "–", styles["cell"]),
+                Paragraph(_cable_cell(port, t), styles["cell"]),
                 Paragraph(_escape(peer) or "–", styles["cell"]),
                 Paragraph(_escape(port.description) or "–", styles["cell"]),
                 Paragraph(_escape(port.type_display), styles["cell"]),
@@ -327,14 +358,15 @@ def _port_table(ports, t, styles):
         )
         if port.color:
             fill = colors.HexColor(port.color)
-            style.append(("BACKGROUND", (2, index), (2, index), fill))
-            data[index][2] = Paragraph(
-                f"<font color='{hex_of(text_color(fill))}'>{_escape(port.label)}</font>", styles["cell"]
-            )
+            # Colour the column the VLAN comes from: the label, or the cable if there is no label.
+            column = 2 if port.label else 3
+            text = _escape(port.label) if port.label else _escape(port.cable_vlan_text)
+            style.append(("BACKGROUND", (column, index), (column, index), fill))
+            data[index][column] = Paragraph(f"<font color='{hex_of(text_color(fill))}'>{text}</font>", styles["cell"])
         if port.state == switch_ports.STATE_DISABLED:
             style.append(("TEXTCOLOR", (0, index), (1, index), colors.HexColor("#6c757d")))
     width = PAGE[0] - 2 * MARGIN
-    widths = [w * width for w in (0.15, 0.07, 0.11, 0.25, 0.22, 0.13, 0.07)]
+    widths = [w * width for w in (0.14, 0.07, 0.10, 0.12, 0.21, 0.17, 0.13, 0.06)]
     table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle(style))
     return table

@@ -57,6 +57,9 @@ PANEL_TEXTS = {
         "peer": "Gegenstelle",
         "marked": "als verbunden markiert",
         "none": "Keine physischen Schnittstellen.",
+        "vlan_label": "VLAN (Label)",
+        "vlan_cable": "VLAN (Kabel)",
+        "mismatch": "Label und Kabel-VLAN weichen ab",
     },
     "en": {
         "title": "Ports",
@@ -71,6 +74,9 @@ PANEL_TEXTS = {
         "peer": "Peer",
         "marked": "marked as connected",
         "none": "No physical interfaces.",
+        "vlan_label": "VLAN (label)",
+        "vlan_cable": "VLAN (cable)",
+        "mismatch": "Label and cable VLAN differ",
     },
 }
 
@@ -162,6 +168,8 @@ class Port:
     assigned_color: str = ""
     # Translated status for tooltips, set by the view.
     state_text: str = ""
+    # VLANs assigned to the cable of the port (connection VLANs): [(vid, name)].
+    cable_vlans: list = field(default_factory=list)
 
     @property
     def state(self):
@@ -193,7 +201,26 @@ class Port:
 
     @property
     def vlan(self):
-        return vlan_key(self.label)
+        """The VLAN shown for the port: the label, or the VLANs of its cable if it has no label."""
+        return vlan_key(self.label) or self.cable_vlan_key
+
+    @property
+    def cable_vlan_key(self):
+        """ "10" or "10, 20" from the cable VLANs, matching the normalised labels."""
+        return ", ".join(str(vid) for vid in sorted({vid for vid, _ in self.cable_vlans}))
+
+    @property
+    def cable_vlan_text(self):
+        """ "10 Server, 20 VoIP" for tooltips and the port list."""
+        return ", ".join(f"{vid} {name}".strip() for vid, name in sorted(self.cable_vlans))
+
+    @property
+    def vlan_mismatch(self):
+        """True if the numbers in the label differ from the cable VLANs; labels without numbers never mismatch."""
+        if not self.label or not self.cable_vlans:
+            return False
+        label_ids = {int(number) for number in _NATURAL.findall(self.label) if number.isdigit()}
+        return bool(label_ids) and label_ids != {vid for vid, _ in self.cable_vlans}
 
     @property
     def ink(self):
@@ -204,7 +231,19 @@ class Port:
     def color(self):
         if not self.vlan:
             return None
-        return self.assigned_color or vlan_color(self.label)
+        return self.assigned_color or vlan_color(self.vlan_group)
+
+    @property
+    def vlan_group(self):
+        """Identity of the VLAN for colours and the legend.
+
+        A label with exactly one number is that VLAN ID, so "Server 30", "VLAN 30", "30" and a cable
+        with VLAN 30 belong together; other labels ("Trunk", "10,20") stay as they are.
+        """
+        if self.label:
+            numbers = [number for number in _NATURAL.findall(self.label) if number.isdigit()]
+            return str(int(numbers[0])) if len(numbers) == 1 else vlan_key(self.label)
+        return self.cable_vlan_key
 
 
 @dataclass
@@ -279,26 +318,34 @@ def assign_vlan_colors(ports):
 
     Only with more VLANs than palette colours do the remaining ones fall back to the hash colour.
     """
-    vlans = sorted({port.vlan for port in ports if port.vlan}, key=natural_key)
-    colors = {vlan: VLAN_PALETTE[index] for index, vlan in enumerate(vlans[: len(VLAN_PALETTE)])}
+    groups = sorted({port.vlan_group for port in ports if port.vlan_group}, key=natural_key)
+    colors = {group: VLAN_PALETTE[index] for index, group in enumerate(groups[: len(VLAN_PALETTE)])}
     for port in ports:
-        if port.vlan:
-            port.assigned_color = colors.get(port.vlan, "")
+        if port.vlan_group:
+            port.assigned_color = colors.get(port.vlan_group, "")
     return colors
 
 
 def vlan_legend(ports):
-    """[(vlan, colour, port count, connected count)] sorted naturally; unlabelled ports last."""
-    counts = {}
-    colors = {}
+    """[(text, colour, port count, connected count)] per VLAN in natural order; ports without VLAN last.
+
+    Ports are grouped by vlan_group; the text is the first label of the group (e.g. "Server 30"),
+    or the cable VLANs if no port of the group has a label.
+    """
+    counts, colors, names, labelled = {}, {}, {}, set()
     for port in ports:
         if port.virtual:
             continue
-        colors.setdefault(port.vlan, port.color)
-        entry = counts.setdefault(port.vlan, [0, 0])
+        group = port.vlan_group
+        colors.setdefault(group, port.color)
+        if port.label and group not in labelled:
+            names[group] = port.vlan
+            labelled.add(group)
+        names.setdefault(group, port.vlan)
+        entry = counts.setdefault(group, [0, 0])
         entry[0] += 1
         entry[1] += port.state == STATE_CONNECTED
-    legend = [(vlan, colors[vlan], total, connected) for vlan, (total, connected) in counts.items() if vlan]
+    legend = [(names[group], colors[group], total, connected) for group, (total, connected) in counts.items() if group]
     legend.sort(key=lambda item: natural_key(item[0]))
     if "" in counts:
         legend.append(("", None, counts[""][0], counts[""][1]))

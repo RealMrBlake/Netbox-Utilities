@@ -157,3 +157,40 @@ class ManagementTest(SimpleTestCase):
 
     def test_other_ports_without_number_are_shortened(self):
         self.assertEqual(port("console").short, "conso")
+
+
+class CableVlanTest(SimpleTestCase):
+    def test_cable_vlans_are_used_without_label(self):
+        p = port("Gi1/0/1", cable_vlans=[(20, "VoIP"), (10, "Office")])
+        self.assertEqual(p.vlan, "10, 20")
+        self.assertEqual(p.cable_vlan_text, "10 Office, 20 VoIP")
+        self.assertFalse(p.vlan_mismatch)
+
+    def test_label_wins_and_cable_vlan_shares_its_colour(self):
+        labelled = port("Gi1/0/1", label="VLAN 10", cable_vlans=[(10, "Office")])
+        cable_only = port("Gi1/0/2", cable_vlans=[(10, "Office")])
+        switch_ports.assign_vlan_colors([labelled, cable_only])
+        self.assertEqual(labelled.vlan, "10")
+        self.assertEqual(labelled.color, cable_only.color)
+        self.assertFalse(labelled.vlan_mismatch)
+
+    def test_mismatch_only_for_numeric_labels(self):
+        self.assertTrue(port("1", label="20", cable_vlans=[(30, "")]).vlan_mismatch)
+        self.assertTrue(port("2", label="Server 30", cable_vlans=[(30, ""), (40, "")]).vlan_mismatch)
+        self.assertFalse(port("3", label="Trunk", cable_vlans=[(30, "")]).vlan_mismatch)
+        self.assertFalse(port("4", label="10,20", cable_vlans=[(20, ""), (10, "")]).vlan_mismatch)
+
+
+class VlanIdentityTest(SimpleTestCase):
+    def test_label_number_and_cable_vlan_are_one_vlan(self):
+        ports = [
+            port("1", label="Server 30", connected=True),
+            port("2", label="VLAN 30"),
+            port("3", cable_vlans=[(30, "Server")], connected=True),
+            port("4", label="Trunk"),
+            port("5", label="10,20"),
+        ]
+        switch_ports.assign_vlan_colors(ports)
+        self.assertEqual(len({p.color for p in ports[:3]}), 1)
+        legend = [(text, total, connected) for text, _, total, connected in switch_ports.vlan_legend(ports)]
+        self.assertEqual(legend, [("10,20", 1, 0), ("Server 30", 3, 2), ("Trunk", 1, 0)])

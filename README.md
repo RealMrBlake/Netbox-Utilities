@@ -526,6 +526,21 @@ view in the web interface of Aruba switches:
 - The chosen view is remembered in the browser; texts follow the user's NetBox
   language (German or English).
 
+**VLANs from labels and cables.** Besides the interface label, the VLANs
+assigned to the port's cable (see *VLANs on connections*) are taken into
+account, in the front panel and in the PDF:
+
+- A port with a label shows the label; a port without a label shows the VLANs
+  of its cable (e.g. `10` or `10, 20`).
+- A label with exactly one number is that VLAN ID, so `Server 30`, `VLAN 30`,
+  `30` and a cable with VLAN 30 share one colour and one legend entry (named
+  after the label). Labels like `Trunk` or `10,20` stay as they are.
+- If the numbers in the label differ from the cable VLANs (label `20`, cable
+  VLAN 30), the port gets an orange corner and the tooltip and the PDF port
+  list show a warning. Labels without a number never count as a mismatch.
+- Tooltips and the PDF port list show both the label and the cable VLANs with
+  their names.
+
 NetBox offers plugins no slot above these cards, so the panel is rendered into
 the left column and moved to the top by a small script; without JavaScript it
 stays in the left column.

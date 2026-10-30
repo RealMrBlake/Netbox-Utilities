@@ -6,6 +6,7 @@ from django.views import View
 from utilities.views import ContentTypePermissionRequiredMixin
 
 from . import switch_port_pdf, switch_ports
+from .runtime import connection_vlans_enabled
 
 
 def _describe(endpoint):
@@ -24,6 +25,28 @@ def _peer(interface):
     if not endpoints and interface.cable_id:
         endpoints = interface.link_peers
     return ", ".join(_describe(endpoint) for endpoint in endpoints or [])
+
+
+def _cable_vlans(interface):
+    """[(vid, name)] of the VLANs assigned to the interface's cable, if connection VLANs are in use."""
+    if not interface.cable_id:
+        return []
+    assignment = getattr(interface.cable, "netbox_utilities_vlan_assignment", None)
+    if assignment is None:
+        return []
+    return [(vlan.vid, vlan.name) for vlan in assignment.vlans.all()]
+
+
+def interface_queryset(request, device):
+    interfaces = (
+        Interface.objects.restrict(request.user, "view")
+        .filter(device=device)
+        .select_related("lag", "cable", "_path")
+        .order_by("_name")
+    )
+    if connection_vlans_enabled():
+        interfaces = interfaces.prefetch_related("cable__netbox_utilities_vlan_assignment__vlans")
+    return interfaces
 
 
 def collect_ports(interfaces):
@@ -46,6 +69,7 @@ def collect_ports(interfaces):
                 peer=peer,
                 lag=interface.lag.name if interface.lag_id else "",
                 url=interface.get_absolute_url(),
+                cable_vlans=_cable_vlans(interface) if connection_vlans_enabled() else [],
                 virtual=interface.type in switch_ports.VIRTUAL_TYPES,
             )
         )
@@ -54,13 +78,7 @@ def collect_ports(interfaces):
 
 def switch_panel_context(request, device):
     """Front panel above the "Device" and "Management" cards, in the user's NetBox language."""
-    interfaces = (
-        Interface.objects.restrict(request.user, "view")
-        .filter(device=device)
-        .select_related("lag", "cable", "_path")
-        .order_by("_name")
-    )
-    ports = collect_ports(interfaces)
+    ports = collect_ports(interface_queryset(request, device))
     switch_ports.assign_vlan_colors(ports)
     texts = switch_ports.PANEL_TEXTS[switch_port_pdf.language(translation.get_language())]
     for port in ports:
@@ -99,12 +117,7 @@ class SwitchPortsPDFView(ContentTypePermissionRequiredMixin, View):
         device = get_object_or_404(
             Device.objects.restrict(request.user, "view").select_related("site", "rack", "device_type"), pk=pk
         )
-        interfaces = (
-            Interface.objects.restrict(request.user, "view")
-            .filter(device=device)
-            .select_related("lag", "cable", "_path")
-            .order_by("_name")
-        )
+        interfaces = interface_queryset(request, device)
         lang = switch_port_pdf.language(translation.get_language())
         pdf = switch_port_pdf.build_pdf(
             device_info(device), collect_ports(interfaces), lang=lang, generated=timezone.localtime()
