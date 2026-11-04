@@ -81,12 +81,12 @@ def switch_panel_context(request, device):
 
     A switch stack shows one front panel per member, one below the other, with shared VLAN colours.
     """
-    from .switch_stack import stack_members
+    from .switch_stack import stack_units
 
-    members = stack_members(device)
-    units = []
-    for unit in [device, *members]:
-        units.append({"device": unit, "ports": collect_ports(interface_queryset(request, unit))})
+    units = [
+        {"device": unit, "current": unit.pk == device.pk, "ports": collect_ports(interface_queryset(request, unit))}
+        for unit in stack_units(device)
+    ]
     ports = [port for unit in units for port in unit["ports"]]
     switch_ports.assign_vlan_colors(ports)
     texts = switch_ports.PANEL_TEXTS[switch_port_pdf.language(translation.get_language())]
@@ -97,7 +97,7 @@ def switch_panel_context(request, device):
     for unit in units:
         unit["groups"] = switch_ports.build_groups(unit["ports"])
     return {
-        "stack": bool(members),
+        "stack": len(units) > 1,
         "units": units,
         "has_ports": any(unit["groups"] for unit in units),
         "groups": units[0]["groups"],
@@ -131,14 +131,14 @@ class SwitchPortsPDFView(ContentTypePermissionRequiredMixin, View):
         device = get_object_or_404(
             Device.objects.restrict(request.user, "view").select_related("site", "rack", "device_type"), pk=pk
         )
-        from .switch_stack import stack_members
+        from .switch_stack import stack_units
 
         lang = switch_port_pdf.language(translation.get_language())
-        stack = [device, *stack_members(device)]
+        stack = stack_units(device)
         units = [(device_info(unit), collect_ports(interface_queryset(request, unit))) for unit in stack]
         ports = [port for _, unit_ports in units for port in unit_ports]
         pdf = switch_port_pdf.build_pdf(
-            device_info(device),
+            device_info(stack[0]),
             ports,
             lang=lang,
             generated=timezone.localtime(),

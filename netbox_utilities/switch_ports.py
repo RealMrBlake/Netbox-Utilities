@@ -46,6 +46,7 @@ VLAN_PALETTE = (
 PANEL_TEXTS = {
     "de": {
         "title": "Ports",
+        "this_device": "dieses Gerät",
         "status": "Status",
         "vlan": "VLAN",
         "connected": "Belegt",
@@ -63,6 +64,7 @@ PANEL_TEXTS = {
     },
     "en": {
         "title": "Ports",
+        "this_device": "this device",
         "status": "Status",
         "vlan": "VLAN",
         "connected": "Connected",

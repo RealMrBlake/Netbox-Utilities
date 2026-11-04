@@ -19,6 +19,19 @@ def stack_members(device):
     return sorted(members, key=lambda member: natural_key(member.name or str(member)))
 
 
+def stack_units(device):
+    """[stack switch, *members] for a stack switch or one of its members; [device] outside a stack."""
+    if device is None or not device.pk:
+        return [device]
+    stack = (
+        SwitchStack.objects.filter(device=device).select_related("device").first()
+        or SwitchStack.objects.filter(members=device).select_related("device").first()
+    )
+    if stack is None:
+        return [device]
+    return [stack.device, *stack_members(stack.device)]
+
+
 def build_stack_form_mixin():
     from dcim.models import Device
     from utilities.forms.fields import DynamicModelMultipleChoiceField
