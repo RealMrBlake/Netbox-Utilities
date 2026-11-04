@@ -99,6 +99,16 @@
   {% render_field form.vc_priority %}
 </div>
 
+{% if form.utilities_switch_stack %}
+  <div class="field-group my-5">
+    <div class="row">
+      <h2 class="col-9 offset-3">Switch-Stack</h2>
+    </div>
+    {% render_field form.utilities_switch_stack %}
+    {% render_field form.utilities_stack_members %}
+  </div>
+{% endif %}
+
 <div class="field-group mb-5">
   <div class="row">
     <h2 class="col-9 offset-3">{% trans "Ownership" %}</h2>

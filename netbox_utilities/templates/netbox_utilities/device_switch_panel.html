@@ -17,32 +17,39 @@
     </a>
   </div>
   <div class="card-body">
-    {% if not groups %}
+    {% if not has_ports %}
       <span class="text-muted">{{ texts.none }}</span>
     {% else %}
-      <div class="nbu-faceplate">
-        {% for group in groups %}
-          <div class="nbu-faceplate-group">
-            <div class="nbu-faceplate-label">{{ group.title }}</div>
-            <div class="nbu-faceplate-ports">
-              {% for column in group.columns %}
-                <div class="nbu-faceplate-column">
-                  {% for port in column %}
-                    <a href="{{ port.url }}"
-                       class="nbu-jack nbu-jack-{{ port.state }}{% if group.optical %} nbu-jack-sfp{% endif %}{% if port.color %} nbu-jack-labelled{% endif %}{% if port.is_management %} nbu-jack-mgmt{% endif %}{% if port.vlan_mismatch %} nbu-jack-mismatch{% endif %}"
-                       {% if port.color %}style="--nbu-vlan: {{ port.color }}; --nbu-ink: {{ port.ink }}"{% endif %}
-                       data-bs-toggle="tooltip" data-bs-html="true"
-                       title="<strong>{{ port.name|force_escape }}</strong><br>{{ port.state_text }}{% if port.label %}<br>{{ texts.vlan_label }}: {{ port.label|force_escape }}{% endif %}{% if port.cable_vlans %}<br>{{ texts.vlan_cable }}: {{ port.cable_vlan_text|force_escape }}{% endif %}{% if port.vlan_mismatch %}<br><span class='text-warning'>⚠ {{ texts.mismatch }}</span>{% endif %}{% if port.peer %}<br>{{ texts.peer }}: {{ port.peer|force_escape }}{% endif %}{% if port.description %}<br><em>{{ port.description|force_escape }}</em>{% endif %}">
-                      <span class="nbu-jack-number">{{ port.short }}</span>
-                      <span class="nbu-jack-vlan">{{ port.vlan }}</span>
-                    </a>
-                  {% endfor %}
-                </div>
-              {% endfor %}
-            </div>
+      {% for unit in units %}
+        {% if stack %}
+          <div class="nbu-stack-member small fw-semibold{% if not forloop.first %} mt-3{% endif %}">
+            <a href="{{ unit.device.get_absolute_url }}">{{ unit.device }}</a>
           </div>
-        {% endfor %}
-      </div>
+        {% endif %}
+        <div class="nbu-faceplate">
+          {% for group in unit.groups %}
+            <div class="nbu-faceplate-group">
+              <div class="nbu-faceplate-label">{{ group.title }}</div>
+              <div class="nbu-faceplate-ports">
+                {% for column in group.columns %}
+                  <div class="nbu-faceplate-column">
+                    {% for port in column %}
+                      <a href="{{ port.url }}"
+                         class="nbu-jack nbu-jack-{{ port.state }}{% if group.optical %} nbu-jack-sfp{% endif %}{% if port.color %} nbu-jack-labelled{% endif %}{% if port.is_management %} nbu-jack-mgmt{% endif %}{% if port.vlan_mismatch %} nbu-jack-mismatch{% endif %}"
+                         {% if port.color %}style="--nbu-vlan: {{ port.color }}; --nbu-ink: {{ port.ink }}"{% endif %}
+                         data-bs-toggle="tooltip" data-bs-html="true"
+                         title="<strong>{{ port.name|force_escape }}</strong><br>{{ port.state_text }}{% if port.label %}<br>{{ texts.vlan_label }}: {{ port.label|force_escape }}{% endif %}{% if port.cable_vlans %}<br>{{ texts.vlan_cable }}: {{ port.cable_vlan_text|force_escape }}{% endif %}{% if port.vlan_mismatch %}<br><span class='text-warning'>⚠ {{ texts.mismatch }}</span>{% endif %}{% if port.peer %}<br>{{ texts.peer }}: {{ port.peer|force_escape }}{% endif %}{% if port.description %}<br><em>{{ port.description|force_escape }}</em>{% endif %}">
+                        <span class="nbu-jack-number">{{ port.short }}</span>
+                        <span class="nbu-jack-vlan">{{ port.vlan }}</span>
+                      </a>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
       <div class="nbu-switch-legend small mt-2" data-nbu-switch-legend="status">
         <span><span class="nbu-jack-swatch nbu-jack-connected"></span>{{ texts.connected }}</span>
         <span><span class="nbu-jack-swatch nbu-jack-free"></span>{{ texts.free }}</span>

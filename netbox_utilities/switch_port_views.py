@@ -77,16 +77,30 @@ def collect_ports(interfaces):
 
 
 def switch_panel_context(request, device):
-    """Front panel above the "Device" and "Management" cards, in the user's NetBox language."""
-    ports = collect_ports(interface_queryset(request, device))
+    """Front panel above the "Device" and "Management" cards, in the user's NetBox language.
+
+    A switch stack shows one front panel per member, one below the other, with shared VLAN colours.
+    """
+    from .switch_stack import stack_members
+
+    members = stack_members(device)
+    units = []
+    for unit in [device, *members]:
+        units.append({"device": unit, "ports": collect_ports(interface_queryset(request, unit))})
+    ports = [port for unit in units for port in unit["ports"]]
     switch_ports.assign_vlan_colors(ports)
     texts = switch_ports.PANEL_TEXTS[switch_port_pdf.language(translation.get_language())]
     for port in ports:
         if port.peer == switch_ports.MARKED_CONNECTED:
             port.peer = texts["marked"]
         port.state_text = texts[port.state]
+    for unit in units:
+        unit["groups"] = switch_ports.build_groups(unit["ports"])
     return {
-        "groups": switch_ports.build_groups(ports),
+        "stack": bool(members),
+        "units": units,
+        "has_ports": any(unit["groups"] for unit in units),
+        "groups": units[0]["groups"],
         "summary": switch_ports.summary(ports),
         "legend": switch_ports.vlan_legend(ports),
         "texts": texts,

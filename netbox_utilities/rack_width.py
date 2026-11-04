@@ -12,6 +12,7 @@ from django.db.models import Count, Q
 from django.db.models.signals import post_save, pre_save
 
 from .models import DeviceRackPlacement
+from .switch_stack import STACK_FORM_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -391,9 +392,11 @@ def _install_device_form():
     if getattr(DeviceEditView, "_netbox_utilities_rack_width_installed", False):
         return
 
+    from .switch_stack import build_stack_form_mixin
+
     base_device_form = DeviceEditView.form
 
-    class RackWidthDeviceForm(base_device_form):
+    class RackWidthDeviceForm(build_stack_form_mixin(), base_device_form):
         utilities_rack_width = forms.ChoiceField(
             label="Rackbreite",
             choices=WIDTH_CHOICES,
@@ -422,12 +425,14 @@ def _install_device_form():
 
             reordered = {}
             for name, field in self.fields.items():
-                if name in {"utilities_rack_width", "utilities_horizontal_position"}:
+                if name in {"utilities_rack_width", "utilities_horizontal_position", *STACK_FORM_FIELDS}:
                     continue
                 reordered[name] = field
                 if name == "position":
                     reordered["utilities_rack_width"] = self.fields["utilities_rack_width"]
                     reordered["utilities_horizontal_position"] = self.fields["utilities_horizontal_position"]
+            for name in STACK_FORM_FIELDS:
+                reordered[name] = self.fields[name]
             self.fields = reordered
 
         def clean(self):

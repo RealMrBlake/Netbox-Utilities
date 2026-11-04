@@ -88,6 +88,29 @@ class DeviceRackPlacement(models.Model):
         return f"{self.device}: 1/{self.width}, Position {self.horizontal_position}"
 
 
+class SwitchStack(models.Model):
+    """A switch that represents a stack; its members are shown one below the other in the port panel."""
+
+    device = models.OneToOneField(
+        "dcim.Device",
+        on_delete=models.CASCADE,
+        related_name="netbox_utilities_switch_stack",
+    )
+    members = models.ManyToManyField(
+        "dcim.Device",
+        blank=True,
+        related_name="netbox_utilities_stack_memberships",
+    )
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Switch-Stack"
+        verbose_name_plural = "Switch-Stacks"
+
+    def __str__(self):
+        return f"Stack {self.device}"
+
+
 class CableVLANAssignment(models.Model):
     cable = models.OneToOneField(
         "dcim.Cable",
