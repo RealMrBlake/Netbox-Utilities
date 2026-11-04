@@ -545,6 +545,14 @@ NetBox offers plugins no slot above these cards, so the panel is rendered into
 the left column and moved to the top by a small script; without JavaScript it
 stays in the left column.
 
+**Switch stacks via REST API.** The stack set in the device form (*Switch-Stack*
+and *Stack-Mitglieder*) can also be read and written through
+`/api/plugins/utilities/switch-stacks/`: `device` is the stack switch, `members`
+the IDs of the further member devices. Filter with `?device_id=` or
+`?member_id=`. The model has no change log and no tags; permissions are
+`netbox_utilities.*_switchstack`. NetBox Synchronizer uses this endpoint to fill
+in detected stacks.
+
 ### Switch port usage (PDF)
 
 Devices with a role from `switch_device_roles` get an **Export switch port

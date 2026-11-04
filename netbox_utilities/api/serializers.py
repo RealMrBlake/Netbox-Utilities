@@ -3,7 +3,9 @@ from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
 
-from ..models import CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup
+from dcim.models import Device
+
+from ..models import CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup, SwitchStack
 
 LAYOUT_FIELDS = ("name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
 
@@ -196,3 +198,20 @@ class DeviceHardwareSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "device", "cpu", "cpu_count", "memory_gb")
+
+
+class SwitchStackSerializer(serializers.ModelSerializer):
+    """Stack switch and its further members as device IDs (the switch itself is always the first member)."""
+
+    device = serializers.PrimaryKeyRelatedField(queryset=Device.objects.all())
+    members = serializers.PrimaryKeyRelatedField(queryset=Device.objects.all(), many=True, required=False)
+
+    class Meta:
+        model = SwitchStack
+        fields = ("id", "device", "members", "updated")
+
+    def validate(self, data):
+        device = data.get("device") or getattr(self.instance, "device", None)
+        if device is not None and any(member.pk == device.pk for member in data.get("members") or []):
+            raise serializers.ValidationError({"members": "Der Switch kann nicht sein eigenes Mitglied sein."})
+        return data
