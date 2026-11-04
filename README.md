@@ -540,6 +540,9 @@ account, in the front panel and in the PDF:
   list show a warning. Labels without a number never count as a mismatch.
 - Tooltips and the PDF port list show both the label and the cable VLANs with
   their names.
+- A LAG note in the label such as `10,20 (LAG 1)` (written by NetBox
+  Synchronizer for LAG members) is shown, but ignored for VLAN colours, the
+  legend and the mismatch check.
 
 NetBox offers plugins no slot above these cards, so the panel is rendered into
 the left column and moved to the top by a small script; without JavaScript it

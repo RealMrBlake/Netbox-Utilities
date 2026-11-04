@@ -117,6 +117,10 @@ def split_name(name):
     return match.group("prefix"), int(match.group("number"))
 
 
+# "(LAG 1)" in a port label names the LAG of the port (written by NetBox Synchronizer), not a VLAN.
+_LAG_NOTE = re.compile(r"(?i)\s*\(\s*LAG\s*\d+\s*\)")
+
+
 def is_optical(interface_type):
     text = (interface_type or "").casefold()
     return any(marker in text for marker in OPTICAL_MARKERS)
@@ -204,7 +208,12 @@ class Port:
     @property
     def vlan(self):
         """The VLAN shown for the port: the label, or the VLANs of its cable if it has no label."""
-        return vlan_key(self.label) or self.cable_vlan_key
+        return vlan_key(self.vlan_text) or self.cable_vlan_key
+
+    @property
+    def vlan_text(self):
+        """The label without a LAG note: "10,20 (LAG 1)" → "10,20"."""
+        return _LAG_NOTE.sub("", self.label or "").strip()
 
     @property
     def cable_vlan_key(self):
@@ -219,9 +228,9 @@ class Port:
     @property
     def vlan_mismatch(self):
         """True if the numbers in the label differ from the cable VLANs; labels without numbers never mismatch."""
-        if not self.label or not self.cable_vlans:
+        if not self.vlan_text or not self.cable_vlans:
             return False
-        label_ids = {int(number) for number in _NATURAL.findall(self.label) if number.isdigit()}
+        label_ids = {int(number) for number in _NATURAL.findall(self.vlan_text) if number.isdigit()}
         return bool(label_ids) and label_ids != {vid for vid, _ in self.cable_vlans}
 
     @property
@@ -242,9 +251,9 @@ class Port:
         A label with exactly one number is that VLAN ID, so "Server 30", "VLAN 30", "30" and a cable
         with VLAN 30 belong together; other labels ("Trunk", "10,20") stay as they are.
         """
-        if self.label:
-            numbers = [number for number in _NATURAL.findall(self.label) if number.isdigit()]
-            return str(int(numbers[0])) if len(numbers) == 1 else vlan_key(self.label)
+        if self.vlan_text:
+            numbers = [number for number in _NATURAL.findall(self.vlan_text) if number.isdigit()]
+            return str(int(numbers[0])) if len(numbers) == 1 else vlan_key(self.vlan_text)
         return self.cable_vlan_key
 
 
@@ -340,7 +349,7 @@ def vlan_legend(ports):
             continue
         group = port.vlan_group
         colors.setdefault(group, port.color)
-        if port.label and group not in labelled:
+        if port.vlan_text and group not in labelled:
             names[group] = port.vlan
             labelled.add(group)
         names.setdefault(group, port.vlan)

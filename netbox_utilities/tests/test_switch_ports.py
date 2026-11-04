@@ -194,3 +194,10 @@ class VlanIdentityTest(SimpleTestCase):
         self.assertEqual(len({p.color for p in ports[:3]}), 1)
         legend = [(text, total, connected) for text, _, total, connected in switch_ports.vlan_legend(ports)]
         self.assertEqual(legend, [("10,20", 1, 0), ("Server 30", 3, 2), ("Trunk", 1, 0)])
+
+    def test_lag_note_in_label_is_no_vlan(self):
+        lag = port("1", label="30 (LAG 1)", cable_vlans=[(30, "")])
+        self.assertEqual((lag.vlan, lag.vlan_group, lag.vlan_mismatch), ("30", "30", False))
+        trunk = port("2", label="10,20 (LAG 2)")
+        self.assertEqual(trunk.vlan_group, "10,20")
+        self.assertEqual(port("3", label="(LAG 1)").vlan, "")
