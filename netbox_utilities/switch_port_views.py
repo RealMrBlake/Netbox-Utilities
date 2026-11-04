@@ -131,10 +131,18 @@ class SwitchPortsPDFView(ContentTypePermissionRequiredMixin, View):
         device = get_object_or_404(
             Device.objects.restrict(request.user, "view").select_related("site", "rack", "device_type"), pk=pk
         )
-        interfaces = interface_queryset(request, device)
+        from .switch_stack import stack_members
+
         lang = switch_port_pdf.language(translation.get_language())
+        stack = [device, *stack_members(device)]
+        units = [(device_info(unit), collect_ports(interface_queryset(request, unit))) for unit in stack]
+        ports = [port for _, unit_ports in units for port in unit_ports]
         pdf = switch_port_pdf.build_pdf(
-            device_info(device), collect_ports(interfaces), lang=lang, generated=timezone.localtime()
+            device_info(device),
+            ports,
+            lang=lang,
+            generated=timezone.localtime(),
+            members=units if len(stack) > 1 else None,
         )
         filename = f"{switch_port_pdf.TEXTS[lang]['filename']}-{device.name or device.pk}.pdf".replace(" ", "_")
         response = HttpResponse(pdf, content_type="application/pdf")

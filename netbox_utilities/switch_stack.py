@@ -15,7 +15,7 @@ def stack_members(device):
     stack = SwitchStack.objects.filter(device=device).first()
     if stack is None:
         return []
-    members = stack.members.exclude(pk=device.pk).select_related("role")
+    members = stack.members.exclude(pk=device.pk).select_related("role", "site", "rack", "device_type")
     return sorted(members, key=lambda member: natural_key(member.name or str(member)))
 
 

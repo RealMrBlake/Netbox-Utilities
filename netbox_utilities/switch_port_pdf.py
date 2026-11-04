@@ -372,8 +372,12 @@ def _port_table(ports, t, styles):
     return table
 
 
-def build_pdf(device, ports, lang="de", generated=None):
-    """Return the PDF as bytes. ``device`` is a DeviceInfo, ``ports`` a list of switch_ports.Port."""
+def build_pdf(device, ports, lang="de", generated=None, members=None):
+    """Return the PDF as bytes. ``device`` is a DeviceInfo, ``ports`` a list of switch_ports.Port.
+
+    For a switch stack, ``members`` is [(DeviceInfo, ports)] for every stack member including the
+    switch itself; front panels and port lists are then drawn per member, ``ports`` covers all of them.
+    """
     t = TEXTS[language(lang)]
     styles = _styles()
     generated = generated or datetime.now()
@@ -414,18 +418,22 @@ def build_pdf(device, ports, lang="de", generated=None):
     ]
 
     switch_ports.assign_vlan_colors(ports)
-    groups = switch_ports.build_groups(ports)
-    if not groups:
+    units = members or [(device, ports)]
+    if not any(switch_ports.build_groups(unit_ports) for _, unit_ports in units):
         story.append(Paragraph(t["none"], styles["meta"]))
-    for group in groups:
-        tile_w, chunks = _layout(group.columns, group.optical, width)
-        panels = [PortPanel(chunk, group.optical, width, tile_w) for chunk in chunks]
-        title = Paragraph(f"{_escape(group.title)} · {len(group.ports)} {t['ports']}", styles["group"])
-        block = [title, Spacer(0, 0.8 * mm)]
-        for panel in panels:
-            block.extend([panel, Spacer(0, 1.2 * mm)])
-        story.append(KeepTogether(block))
-        story.append(Spacer(0, 1.5 * mm))
+    for unit, unit_ports in units:
+        groups = switch_ports.build_groups(unit_ports)
+        if members:
+            story.append(Paragraph(_escape(unit.name), styles["group"]))
+        for group in groups:
+            tile_w, chunks = _layout(group.columns, group.optical, width)
+            panels = [PortPanel(chunk, group.optical, width, tile_w) for chunk in chunks]
+            title = Paragraph(f"{_escape(group.title)} · {len(group.ports)} {t['ports']}", styles["group"])
+            block = [title, Spacer(0, 0.8 * mm)]
+            for panel in panels:
+                block.extend([panel, Spacer(0, 1.2 * mm)])
+            story.append(KeepTogether(block))
+            story.append(Spacer(0, 1.5 * mm))
 
     # Keep the explanation and the VLAN legend on one page.
     story.append(
@@ -433,7 +441,13 @@ def build_pdf(device, ports, lang="de", generated=None):
     )
     story.append(CondPageBreak(40 * mm))
     story.append(Paragraph(t["list"], styles["h2"]))
-    story.append(_port_table(ports, t, styles))
+    if members:
+        for unit, unit_ports in members:
+            story.append(Paragraph(_escape(unit.name), styles["group"]))
+            story.append(_port_table(unit_ports, t, styles))
+            story.append(Spacer(0, 2 * mm))
+    else:
+        story.append(_port_table(ports, t, styles))
 
     document.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
