@@ -22,7 +22,7 @@
     {% else %}
       {% for unit in units %}
         {% if stack %}
-          <div class="nbu-stack-member small fw-semibold{% if not forloop.first %} mt-3{% endif %}">
+          <div class="nbu-stack-member small fw-semibold mb-2{% if not forloop.first %} mt-3{% endif %}">
             <a href="{{ unit.device.get_absolute_url }}">{{ unit.device }}</a>{% if unit.current %} <span class="badge text-bg-secondary">{{ texts.this_device }}</span>{% endif %}
           </div>
         {% endif %}
