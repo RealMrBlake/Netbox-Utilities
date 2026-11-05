@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.25.0"
+__version__ = "0.26.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -31,6 +31,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "hardware_vcpu_ratio_warning": 4,
         "switch_ports_enabled": True,
         "switch_device_roles": ["Switch"],
+        "wireless_trace_enabled": True,
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
@@ -67,6 +68,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .connection_scope import install_connection_scope_filter
 
             install_connection_scope_filter()
+        if get_plugin_config("netbox_utilities", "wireless_trace_enabled"):
+            from .wireless_trace import install_wireless_trace
+
+            install_wireless_trace()
         if self.apps.is_installed("netbox_export"):
             from .netbox_export import install_netbox_export_rack_width_support
 

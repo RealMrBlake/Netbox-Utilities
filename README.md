@@ -225,6 +225,7 @@ sudo systemctl restart netbox netbox-rq
 | `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
 | `switch_ports_enabled` | `True` | Front panel and **Export switch port usage** button for switches |
 | `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the front panel and export button |
+| `wireless_trace_enabled` | `True` | Cable trace continues across wireless links (radio bridges) to the cabled port of the peer radio |
 
 ## Usage
 
