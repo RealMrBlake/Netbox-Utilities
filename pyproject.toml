@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "netbox-utilities"
-version = "0.26.1"
+version = "0.26.2"
 description = "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM, switch port export and bulk operations for NetBox 4.6/4.7"
 readme = "README.md"
 requires-python = ">=3.12"
