@@ -432,7 +432,8 @@ def _install_device_form():
                     reordered["utilities_rack_width"] = self.fields["utilities_rack_width"]
                     reordered["utilities_horizontal_position"] = self.fields["utilities_horizontal_position"]
             for name in STACK_FORM_FIELDS:
-                reordered[name] = self.fields[name]
+                if name in self.fields:
+                    reordered[name] = self.fields[name]
             self.fields = reordered
 
         def clean(self):
