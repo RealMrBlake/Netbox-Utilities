@@ -7,7 +7,7 @@ from django.forms.models import BaseModelForm
 from tenancy.models import Tenant
 
 from .runtime import tenant_required
-from .tenant_autofill import apply_cable_instance_tenant, apply_tenant_autofill
+from .tenant_autofill import apply_asset_instance_tenant, apply_cable_instance_tenant, apply_tenant_autofill
 
 VALIDATION_MESSAGE = "Für dieses Objekt muss ein Mandant angegeben werden."
 
@@ -37,6 +37,7 @@ def _install_model_clean_validation(model):
     @wraps(original_clean)
     def tenant_aware_clean(instance, *args, **kwargs):
         apply_cable_instance_tenant(instance)
+        apply_asset_instance_tenant(instance)
         result = original_clean(instance, *args, **kwargs)
         validate_tenant_assignment(instance)
         return result
@@ -65,6 +66,8 @@ def _install_form_validation():
 
 def _enforce_before_save(sender, instance, raw=False, **kwargs):
     if not raw:
+        # netbox-inventory saves assets in several views without calling clean()
+        apply_asset_instance_tenant(instance)
         validate_tenant_assignment(instance)
 
 

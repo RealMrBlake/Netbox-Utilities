@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 from tenancy.models import TenantGroup
 
 from netbox_utilities.tenant_autofill import (
+    apply_asset_instance_tenant,
     apply_cable_instance_tenant,
     apply_tenant_autofill,
     infer_tenant_id,
@@ -42,6 +43,20 @@ class FakeCable(FakeObject):
         self._meta = FakeCableMeta("tenant")
         self.a_terminations = a_terminations or []
         self.b_terminations = b_terminations or []
+
+
+class FakeAssetMeta(FakeMeta):
+    app_label = "netbox_inventory"
+    model_name = "asset"
+
+
+class FakeAsset(FakeObject):
+    """netbox-inventory asset: tenant plus one of device, module, inventoryitem or rack."""
+
+    def __init__(self, *, tenant_id=None, device=None, module=None, inventoryitem=None, rack=None):
+        super().__init__(tenant_id=tenant_id)
+        self._meta = FakeAssetMeta("tenant", "device", "module", "inventoryitem", "rack")
+        self.device, self.module, self.inventoryitem, self.rack = device, module, inventoryitem, rack
 
 
 class FakeQuerySet:
@@ -98,6 +113,36 @@ class TenantAutofillTest(SimpleTestCase):
 
         self.assertEqual(apply_cable_instance_tenant(cable), 42)
         self.assertEqual(cable.tenant_id, 42)
+
+    def test_asset_takes_tenant_of_assigned_device(self):
+        asset = FakeAsset(device=FakeObject(tenant_id=42))
+
+        self.assertEqual(apply_asset_instance_tenant(asset), 42)
+        self.assertEqual(asset.tenant_id, 42)
+
+    def test_asset_takes_tenant_of_module_device_inventory_item_and_rack(self):
+        device = FakeObject(tenant_id=7)
+        for asset in (
+            FakeAsset(module=FakeObject(device=device)),
+            FakeAsset(inventoryitem=FakeObject(device=device)),
+            FakeAsset(rack=FakeObject(tenant_id=7)),
+        ):
+            self.assertEqual(apply_asset_instance_tenant(asset), 7)
+
+    def test_asset_keeps_existing_tenant_and_stays_empty_without_hardware(self):
+        asset = FakeAsset(tenant_id=5, device=FakeObject(tenant_id=42))
+        self.assertIsNone(apply_asset_instance_tenant(asset))
+        self.assertEqual(asset.tenant_id, 5)
+
+        stored = FakeAsset()
+        self.assertIsNone(apply_asset_instance_tenant(stored))
+        self.assertIsNone(stored.tenant_id)
+
+    def test_other_models_are_not_assigned_a_tenant_from_their_device(self):
+        interface_like = FakeObject(device=FakeObject(tenant_id=42))
+
+        self.assertIsNone(apply_asset_instance_tenant(interface_like))
+        self.assertIsNone(interface_like.tenant_id)
 
     def test_prefers_cable_terminations_over_global_scope(self):
         form = SimpleNamespace(

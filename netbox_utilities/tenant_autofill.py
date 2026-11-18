@@ -16,7 +16,13 @@ PARENT_RELATIONS = (
     "l2vpn",
     "wireless_lan",
     "power_panel",
+    # netbox-inventory assets: modules and inventory items belong to a device
+    "module",
+    "inventoryitem",
 )
+
+# Hardware a netbox-inventory asset can be assigned to, in the plugin's order.
+ASSET_HARDWARE_RELATIONS = ("device", "module", "inventoryitem", "rack")
 
 
 def tenant_id_from_object(obj, depth=0):
@@ -131,6 +137,35 @@ def _cable_form_tenant_result(form):
     if len(tenant_ids) > 1:
         return None, True
     return None, False
+
+
+def _is_inventory_asset(instance):
+    meta = getattr(instance, "_meta", None)
+    return bool(
+        meta and getattr(meta, "app_label", None) == "netbox_inventory" and getattr(meta, "model_name", None) == "asset"
+    )
+
+
+def apply_asset_instance_tenant(instance):
+    """
+    Give a netbox-inventory asset without tenant the tenant of its assigned hardware.
+
+    The plugin's "assign", "reassign" and "create hardware from asset" views save the
+    asset without a tenant field; with mandatory tenancy they would fail although the
+    tenant of the device, module, inventory item or rack is known. Existing tenants are
+    never overwritten.
+    """
+    if not _is_inventory_asset(instance) or getattr(instance, "tenant_id", None):
+        return None
+    for relation in ASSET_HARDWARE_RELATIONS:
+        try:
+            hardware = getattr(instance, relation, None)
+        except (AttributeError, ObjectDoesNotExist, ValueError):
+            continue
+        if tenant_id := tenant_id_from_object(hardware):
+            instance.tenant_id = tenant_id
+            return tenant_id
+    return None
 
 
 def apply_cable_instance_tenant(instance):

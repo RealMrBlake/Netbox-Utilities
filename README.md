@@ -783,6 +783,15 @@ cable ends are evaluated; the tenant is only set if it is unambiguous. If an
 automatically set tenant is saved unchanged, the browser asks for an explicit
 confirmation.
 
+Assets of the optional [netbox-inventory](https://github.com/ArnesSI/netbox-inventory)
+plugin are tenant-aware as well: the asset forms are pre-filled like core
+objects (also from an assigned module or inventory item), and an asset without
+a tenant takes the tenant of the device, module, inventory item or rack it is
+assigned to when it is saved. This keeps the plugin's *assign*, *reassign* and
+*create hardware from asset* views working with mandatory tenancy, which save
+the asset without a tenant field. An asset that is in stock and has no
+assigned hardware still needs a tenant.
+
 `tenant_required = False` disables the feature permanently and takes precedence
 over the UI setting.
 
