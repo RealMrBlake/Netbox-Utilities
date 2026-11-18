@@ -1,0 +1,41 @@
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // Liste filtern: Zeilen ausblenden, deren Suchtext nicht passt
+    for (const input of document.querySelectorAll("[data-nbu-sw-search]")) {
+      const rows = document.querySelectorAll(`${input.dataset.nbuSwSearch} tbody tr`);
+      input.addEventListener("input", () => {
+        const terms = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+        for (const row of rows) {
+          const text = row.dataset.nbuSearch || row.textContent.toLowerCase();
+          row.hidden = !terms.every((term) => text.includes(term));
+        }
+      });
+    }
+    // Sortieren per Klick auf den Spaltenkopf
+    for (const header of document.querySelectorAll("th[data-nbu-sort]")) {
+      header.classList.add("nbu-sw-sortable");
+      header.tabIndex = 0;
+      const sort = () => {
+        const table = header.closest("table");
+        const index = [...header.parentElement.children].indexOf(header);
+        const numeric = header.dataset.nbuSort === "number";
+        const ascending = header.getAttribute("aria-sort") !== "ascending";
+        for (const other of header.parentElement.children) other.removeAttribute("aria-sort");
+        header.setAttribute("aria-sort", ascending ? "ascending" : "descending");
+        const body = table.tBodies[0];
+        const value = (row) => {
+          const cell = row.children[index];
+          return numeric ? Number(cell.dataset.value ?? cell.textContent) || 0 : cell.textContent.trim().toLowerCase();
+        };
+        const rows = [...body.rows].sort((a, b) => {
+          const [x, y] = [value(a), value(b)];
+          const result = numeric ? x - y : x.localeCompare(y, "de", { numeric: true });
+          return ascending ? result : -result;
+        });
+        body.append(...rows);
+      };
+      header.addEventListener("click", sort);
+      header.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); sort(); } });
+    }
+  });
+</script>

@@ -1,12 +1,12 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.27.3"
+__version__ = "0.28.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
     name = "netbox_utilities"
     verbose_name = "NetBox Utilities"
-    description = "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM, switch port export and bulk operations"
+    description = "Navigation, tenant utilities, connection VLANs, partial-width racks, disks, CPU & RAM, switch port export, client software overview and bulk operations"
     version = __version__
     author = "LKE"
     base_url = "utilities"
@@ -32,6 +32,8 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "switch_ports_enabled": True,
         "switch_device_roles": ["Switch"],
         "wireless_trace_enabled": True,
+        "software_enabled": True,
+        "software_device_roles": ["Clients"],
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",
@@ -80,6 +82,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
             from .inventory_assets import install_asset_tenant_column
 
             install_asset_tenant_column()
+        if get_plugin_config("netbox_utilities", "software_enabled") and self.apps.is_installed("netbox_slm"):
+            from .software_integration import install_software_support
+
+            install_software_support()
         if get_plugin_config("netbox_utilities", "reorder_rack_bulk_save_enabled"):
             from .reorder_rack import install_reorder_rack_bulk_save
 

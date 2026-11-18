@@ -1,0 +1,115 @@
+{% load helpers %}
+<nav class="mb-2" aria-label="Navigation">
+  <a href="?{{ filter_query }}" class="btn btn-sm btn-outline-secondary">
+    <i class="mdi mdi-arrow-left" aria-hidden="true"></i> Alle Software-Produkte
+  </a>
+</nav>
+
+<div class="row row-cards mb-3">
+  <div class="col-12 col-xl-5">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center">
+        <div class="me-auto">
+          <h2 class="card-title mb-0">{{ product.name }}</h2>
+          <div class="text-muted small">{{ product.manufacturer|default:"Kein Hersteller" }}</div>
+        </div>
+        {% if product_obj %}
+          <a href="{{ product_obj.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Produkt in netbox-slm öffnen">
+            <i class="mdi mdi-open-in-new" aria-hidden="true"></i> Produkt
+          </a>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div class="row text-center mb-3">
+          <div class="col"><div class="nbu-sw-kpi-value">{{ product.device_count }}</div><div class="nbu-sw-kpi-label">Rechner</div></div>
+          <div class="col"><div class="nbu-sw-kpi-value">{{ product.share }} %</div><div class="nbu-sw-kpi-label">der Rechner</div></div>
+          <div class="col"><div class="nbu-sw-kpi-value">{{ product.version_count }}</div><div class="nbu-sw-kpi-label">Versionen</div></div>
+        </div>
+        {% with item=product %}{% include 'netbox_utilities/inc/software_version_stack.html' %}{% endwith %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-7">
+    <div class="card h-100">
+      <h2 class="card-header">Rechner je Version <span class="text-muted fw-normal small ms-1">anklicken zum Filtern</span></h2>
+      <div class="card-body">
+        <ul class="nbu-sw-bars list-unstyled mb-0">
+          {% for version in product.versions_by_name %}
+            <li>
+              <a href="?{{ filter_query }}&product={{ product.id }}{% if selected_version.id != version.id %}&version={{ version.id }}{% endif %}"
+                 class="nbu-sw-bar-row{% if selected_version.id == version.id %} active{% endif %}"
+                 aria-current="{% if selected_version.id == version.id %}true{% else %}false{% endif %}">
+                <span class="nbu-sw-bar-label">
+                  {{ version.name }}
+                  {% if forloop.first %}<span class="badge text-bg-green ms-1">neueste</span>{% endif %}
+                  {% if version.support_expired %}<span class="badge text-bg-danger ms-1" title="Support-Ende {{ version.end_of_support|isodate }}">EoS</span>{% endif %}
+                </span>
+                <span class="nbu-sw-bar-track"><span class="nbu-sw-bar-fill{% if version.support_expired %} nbu-sw-expired{% endif %}" style="width: {{ version.share }}%; --nbu-sw-shade: {{ version.shade }}%"></span></span>
+                <span class="nbu-sw-bar-value">{{ version.device_count }}<span class="text-muted"> · {{ version.share }} %</span></span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+    <h2 class="card-title me-auto mb-0">
+      Installiert auf
+      <span class="badge text-bg-secondary ms-1">{{ entries|length }}</span>
+      {% if selected_version %}
+        <a href="?{{ filter_query }}&product={{ product.id }}" class="badge text-bg-primary ms-1 text-decoration-none" title="Versionsfilter entfernen">
+          Version {{ selected_version.name }} <i class="mdi mdi-close" aria-hidden="true"></i>
+        </a>
+      {% endif %}
+    </h2>
+    <input type="search" class="form-control form-control-sm w-auto" data-nbu-sw-search="#nbu-sw-devices"
+           placeholder="Rechner, Mandant, Standort …" aria-label="Rechnerliste filtern">
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-vcenter mb-0" id="nbu-sw-devices">
+      <thead>
+        <tr>
+          <th data-nbu-sort="text">Rechner</th>
+          <th data-nbu-sort="text">Mandant</th>
+          <th data-nbu-sort="text">Standort</th>
+          <th data-nbu-sort="text">Rolle</th>
+          <th data-nbu-sort="text">Version</th>
+          <th data-nbu-sort="text">Support-Ende</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+          {% with device=entry.device version=entry.version %}
+          <tr>
+            <td><a href="{% url 'dcim:device_software' pk=device.pk %}" class="fw-bold">{{ device }}</a></td>
+            <td>{{ device.tenant|linkify|placeholder }}</td>
+            <td>{{ device.site|linkify|placeholder }}</td>
+            <td>{{ device.role|placeholder }}</td>
+            <td>
+              {{ version.name }}
+              {% if product.latest_version.id == version.id %}<span class="badge text-bg-green ms-1">neueste</span>{% endif %}
+            </td>
+            <td>
+              {% if version.end_of_support %}
+                <span class="{% if version.end_of_support < today %}text-danger fw-bold{% endif %}">{{ version.end_of_support|isodate }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ entry.get_absolute_url }}" class="btn btn-sm btn-outline-secondary" title="Installation öffnen">
+                <i class="mdi mdi-open-in-new" aria-hidden="true"></i>
+              </a>
+            </td>
+          </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="7" class="text-muted text-center py-4">Keine Installationen.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -49,6 +49,7 @@ Plugin settings:
 - A **Disks** tab for servers, NAS, SAN and MSA devices: slot layout, disks, RAID groups, warranty and age warnings, replacement history, CSV import, HPE MSA disk export import, REST API and GraphQL.
 - **CPU & RAM** per server from a built-in catalogue of 700+ Intel and AMD server CPUs since 2012, with cluster capacity and overcommit for NetBox virtualization.
 - **Switch front panel** on the device page (Aruba-style, status or VLAN colours) and **switch port usage as PDF**, in the user's NetBox language.
+- **Client Software Übersicht** (with the optional [netbox-slm](https://github.com/ICTU/netbox_slm) plugin): software products, versions and the clients they are installed on per tenant or tenant group, with charts and CSV export, plus a **Software** tab for clients.
 
 Navigation settings are stored per user. The active tenant or tenant-group
 selection is stored in the browser session.
@@ -225,6 +226,8 @@ sudo systemctl restart netbox netbox-rq
 | `hardware_vcpu_ratio_warning` | `4` | Warn when a host or cluster has more vCPUs per physical core |
 | `switch_ports_enabled` | `True` | Front panel and **Export switch port usage** button for switches |
 | `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the front panel and export button |
+| `software_enabled` | `True` | Client software overview and **Software** device tab (requires netbox-slm) |
+| `software_device_roles` | `["Clients"]` | Device roles (case-insensitive) that show the **Software** tab and are pre-selected in the overview |
 | `wireless_trace_enabled` | `True` | Cable trace continues across wireless links (radio bridges) to the cabled port of the peer radio |
 
 ## Usage
@@ -505,6 +508,31 @@ esx02,EPYC 9354,2,24,32,ddr5,4800
 recording and editing use `netbox_utilities.add_devicehardware` and
 `netbox_utilities.change_devicehardware`. The catalogue uses the
 `netbox_utilities.*_cpumodel` permissions.
+
+### Client software overview
+
+Requires the [netbox-slm](https://github.com/ICTU/netbox_slm) plugin, which stores
+software products, versions and installations. *Inventory → Software → Client
+Software Übersicht* (in the menu of netbox-inventory, otherwise in the
+*Hardware* menu of this plugin) shows for the selected tenants and tenant groups
+(including subgroups):
+
+- key figures: clients, share with recorded software, products, versions and
+  clients running a version past its end of support,
+- charts of the most widespread products and their version distribution
+  (newest version strongest, expired versions hatched red),
+- a sortable, searchable list of all products.
+
+Clicking a product shows how many clients run each version and the list of
+clients; clicking a version filters that list. The current selection can be
+exported as CSV. Without an own selection the global tenant filter applies.
+The device role filter is pre-set to `software_device_roles`; clearing it
+includes all devices.
+
+Devices with one of these roles get a **Software** tab listing their
+installations with add, edit and delete buttons. Other devices show the tab
+only if software is recorded for them. Permissions are those of netbox-slm
+(`netbox_slm.view_softwareproductinstallation` and friends).
 
 ### Switch front panel
 

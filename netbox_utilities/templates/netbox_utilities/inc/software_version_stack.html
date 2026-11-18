@@ -1,0 +1,7 @@
+<span class="nbu-sw-stack" role="img" aria-label="Versionsverteilung {{ item.name }}: {% for version in item.versions_by_name %}{{ version.name }} {{ version.device_count }} Rechner{% if not forloop.last %}, {% endif %}{% endfor %}">
+  {% for version in item.versions_by_name %}
+    <span class="nbu-sw-stack-part{% if version.support_expired %} nbu-sw-expired{% endif %}"
+          style="flex-grow: {{ version.device_count }}; --nbu-sw-shade: {{ version.shade }}%"
+          title="{{ version.name }}: {{ version.device_count }} Rechner ({{ version.share }} %){% if version.support_expired %} · Support abgelaufen{% endif %}"></span>
+  {% endfor %}
+</span>

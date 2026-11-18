@@ -1,0 +1,77 @@
+{% extends 'dcim/device/base.html' %}
+{% load helpers %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+    <h2 class="card-title me-auto mb-0">
+      <i class="mdi mdi-package-variant me-1" aria-hidden="true"></i>Installierte Software
+      <span class="badge text-bg-secondary ms-1">{{ entries|length }}</span>
+    </h2>
+    {% if entries|length > 8 %}
+      <input type="search" class="form-control form-control-sm w-auto" data-nbu-sw-search="#nbu-sw-device-software"
+             placeholder="Software filtern …" aria-label="Software filtern">
+    {% endif %}
+    <a href="{{ overview_url }}" class="btn btn-sm btn-outline-secondary" title="Client Software Übersicht für den Mandanten dieses Geräts">
+      <i class="mdi mdi-chart-bar" aria-hidden="true"></i> Übersicht{% if object.tenant %} {{ object.tenant }}{% endif %}
+    </a>
+    {% if can_add %}
+      <a href="{{ add_url }}" class="btn btn-sm btn-primary"><i class="mdi mdi-plus-thick" aria-hidden="true"></i> Software hinzufügen</a>
+    {% endif %}
+  </div>
+  {% if entries %}
+    <div class="table-responsive">
+      <table class="table table-hover table-vcenter mb-0" id="nbu-sw-device-software">
+        <thead>
+          <tr>
+            <th data-nbu-sort="text">Software</th>
+            <th data-nbu-sort="text">Hersteller</th>
+            <th data-nbu-sort="text">Version</th>
+            <th>Release</th>
+            <th data-nbu-sort="text">Support-Ende</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+            {% with product=entry.software_product version=entry.version %}
+            <tr>
+              <td><a href="{{ product.get_absolute_url }}" class="fw-bold">{{ product }}</a></td>
+              <td>{{ product.manufacturer|placeholder }}</td>
+              <td><a href="{{ version.get_absolute_url }}">{{ version }}</a></td>
+              <td>{{ version.get_release_type_display|placeholder }}</td>
+              <td>
+                {% if version.end_of_support %}
+                  {% if version.end_of_support < today %}
+                    <span class="badge text-bg-danger" title="Support abgelaufen">{{ version.end_of_support|isodate }}</span>
+                  {% else %}{{ version.end_of_support|isodate }}{% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end text-nowrap">
+                {% if can_change %}
+                  <a href="{% url 'plugins:netbox_slm:softwareproductinstallation_edit' pk=entry.pk %}?return_url={{ tab_url|urlencode }}" class="btn btn-sm btn-warning" title="Bearbeiten">
+                    <i class="mdi mdi-pencil" aria-hidden="true"></i>
+                  </a>
+                {% endif %}
+                {% if can_delete %}
+                  <a href="{% url 'plugins:netbox_slm:softwareproductinstallation_delete' pk=entry.pk %}?return_url={{ tab_url|urlencode }}" class="btn btn-sm btn-danger" title="Entfernen">
+                    <i class="mdi mdi-trash-can-outline" aria-hidden="true"></i>
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-body text-center text-muted py-5">
+      <i class="mdi mdi-package-variant-closed mdi-48px d-block mb-2" aria-hidden="true"></i>
+      Für dieses Gerät ist noch keine Software erfasst.
+      {% if can_add %}<div class="mt-3"><a href="{{ add_url }}" class="btn btn-primary"><i class="mdi mdi-plus-thick" aria-hidden="true"></i> Software hinzufügen</a></div>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% include 'netbox_utilities/inc/software_table_js.html' %}
+{% endblock %}

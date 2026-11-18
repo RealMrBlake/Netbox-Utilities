@@ -19,6 +19,12 @@ def hardware_enabled():
     return bool(get_plugin_config("netbox_utilities", "hardware_enabled"))
 
 
+def software_enabled():
+    from django.apps import apps
+
+    return bool(get_plugin_config("netbox_utilities", "software_enabled")) and apps.is_installed("netbox_slm")
+
+
 def switch_ports_enabled():
     return bool(get_plugin_config("netbox_utilities", "switch_ports_enabled"))
 

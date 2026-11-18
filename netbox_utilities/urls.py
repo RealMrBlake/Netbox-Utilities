@@ -1,4 +1,6 @@
+from django.apps import apps
 from django.urls import include, path
+from netbox.plugins import get_plugin_config
 from utilities.urls import get_model_urls
 
 from . import disk_views, hardware_views, switch_port_views, views  # noqa: F401 - hardware_views registers its model views
@@ -41,3 +43,10 @@ urlpatterns = [
     path("devices/<int:pk>/disks/fill/", disk_views.DeviceDiskBulkFillView.as_view(), name="device_disk_fill"),
     path("devices/<int:pk>/disks/move/", disk_views.DeviceDiskMoveView.as_view(), name="device_disk_move"),
 ]
+
+if get_plugin_config("netbox_utilities", "software_enabled") and apps.is_installed("netbox_slm"):
+    from . import software_views
+
+    urlpatterns.append(
+        path("software/", software_views.SoftwareOverviewView.as_view(), name="software_overview"),
+    )
