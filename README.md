@@ -790,7 +790,9 @@ a tenant takes the tenant of the device, module, inventory item or rack it is
 assigned to when it is saved. This keeps the plugin's *assign*, *reassign* and
 *create hardware from asset* views working with mandatory tenancy, which save
 the asset without a tenant field. An asset that is in stock and has no
-assigned hardware still needs a tenant.
+assigned hardware still needs a tenant. The asset list shows a **Tenant**
+column next to the status by default; users with a saved table configuration
+can add it via *Configure Table*.
 
 `tenant_required = False` disables the feature permanently and takes precedence
 over the UI setting.
