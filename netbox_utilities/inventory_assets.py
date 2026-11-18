@@ -1,4 +1,5 @@
 import django_tables2 as tables
+from django.db.models import Q
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
@@ -33,6 +34,48 @@ class AssetTenantColumn(tables.Column):
         return format_html('<a href="{}">{}</a>', url, tenant) if url else str(tenant)
 
 
+def asset_tenant_query(tenant_ids):
+    """Assets whose own tenant, or (without own tenant) whose hardware's tenant, is one of tenant_ids."""
+    inherited = Q()
+    for path in ("device", "module__device", "inventoryitem__device", "rack"):
+        inherited |= Q(**{f"{path}__tenant_id__in": tenant_ids})
+    return Q(tenant_id__in=tenant_ids) | (Q(tenant__isnull=True) & inherited)
+
+
+def _ids(values):
+    return [int(getattr(value, "pk", value)) for value in values or () if value not in (None, "")]
+
+
+def filter_asset_tenant(queryset, name, value):
+    tenant_ids = _ids(value)
+    return queryset.filter(asset_tenant_query(tenant_ids)) if tenant_ids else queryset
+
+
+def filter_asset_tenant_group(queryset, name, value):
+    from tenancy.models import Tenant, TenantGroup
+
+    group_ids = set()
+    for group in TenantGroup.objects.filter(pk__in=_ids(value)):
+        group_ids.update(group.get_descendants(include_self=True).values_list("pk", flat=True))
+    if not group_ids:
+        return queryset
+    tenant_ids = list(Tenant.objects.filter(group_id__in=group_ids).values_list("pk", flat=True))
+    return queryset.filter(asset_tenant_query(tenant_ids))
+
+
+def install_asset_tenant_filters():
+    """Tenant filters (also used by the global tenant filter) include inherited tenants."""
+    from netbox_inventory.filtersets import AssetFilterSet
+    from utilities.filters import MultiValueNumberFilter
+
+    AssetFilterSet.base_filters["tenant_id"] = MultiValueNumberFilter(
+        method=filter_asset_tenant, label="Tenant (ID), including the tenant of the assigned hardware"
+    )
+    AssetFilterSet.base_filters["tenant_group_id"] = MultiValueNumberFilter(
+        method=filter_asset_tenant_group, label="Tenant group (ID), including the tenant of the assigned hardware"
+    )
+
+
 def add_to_default_columns(table, column=COLUMN_NAME, after=("status", "asset_tag", "hardware_type")):
     """Show the column by default (users without saved table preferences), next to the status."""
     defaults = [name for name in table.Meta.default_columns if name != column]
@@ -57,3 +100,4 @@ def install_asset_tenant_column():
     AssetTable.base_columns.pop(COLUMN_NAME, None)
     register_table_column(column, COLUMN_NAME, AssetTable)
     add_to_default_columns(AssetTable)
+    install_asset_tenant_filters()

@@ -38,3 +38,14 @@ class AssetTenantFallbackTest(SimpleTestCase):
         module = SimpleNamespace(device=SimpleNamespace(tenant="C"))
         self.assertEqual(asset_tenant(asset(module=module)), "C")
         self.assertIsNone(asset_tenant(asset()))
+
+
+class AssetTenantQueryTest(SimpleTestCase):
+    def test_query_includes_inherited_tenants_only_without_own_tenant(self):
+        from netbox_utilities.inventory_assets import asset_tenant_query
+
+        query = str(asset_tenant_query([7]))
+
+        for lookup in ("tenant_id__in", "tenant__isnull", "device__tenant_id__in", "module__device__tenant_id__in",
+                       "inventoryitem__device__tenant_id__in", "rack__tenant_id__in"):
+            self.assertIn(f"'{lookup}'", query)
