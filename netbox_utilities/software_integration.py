@@ -60,5 +60,9 @@ def _install_menu_on_first_request(**kwargs):
 def install_software_support():
     # Registers the device "Software" tab before NetBox builds the dcim URLs.
     from . import software_views  # noqa: F401
+    from .software_sync import install_software_sync
+
+    # Software lists of the Windows agent and the NetBox Synchronizer arrive in the device comments.
+    install_software_sync()
 
     request_started.connect(_install_menu_on_first_request, dispatch_uid=__name__)

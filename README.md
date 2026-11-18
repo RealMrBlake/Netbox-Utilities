@@ -529,6 +529,25 @@ exported as CSV. Without an own selection the global tenant filter applies.
 The device role filter is pre-set to `software_device_roles`; clearing it
 includes all devices.
 
+Software lists of the **NetBox Windows Agent** (mode `netbox`) and the
+**NetBox Synchronizer** desktop app (agent scan) arrive as an inventory report
+in the device comments. Every time such a device is saved, its software list is
+transferred into netbox-slm: missing products, versions and installations are
+created, and installations that disappeared from the report are removed. Only
+installations created this way (comment *Automatisch aus dem
+Inventarbericht übernommen*) are removed; entries made by hand stay. A product
+gets the dcim manufacturer of the same name as the publisher, if one exists,
+otherwise the publisher goes into its description. Agent lines without a
+recognisable version (at least one dot) get the version `unbekannt`. Deleting a
+device removes its automatic installations first, so netbox-slm does not block
+the deletion.
+
+Devices that already have a report are transferred once with:
+
+```bash
+/opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py netbox_utilities_sync_software
+```
+
 Devices with one of these roles get a **Software** tab listing their
 installations with add, edit and delete buttons. Other devices show the tab
 only if software is recorded for them. Permissions are those of netbox-slm
