@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.29.0"
+__version__ = "0.29.1"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -33,7 +33,7 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "switch_device_roles": ["Switch"],
         "wireless_trace_enabled": True,
         "software_enabled": True,
-        "software_device_roles": ["Clients"],
+        "software_device_roles": ["Client", "Windows Client"],
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",

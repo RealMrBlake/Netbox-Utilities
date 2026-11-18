@@ -227,7 +227,7 @@ sudo systemctl restart netbox netbox-rq
 | `switch_ports_enabled` | `True` | Front panel and **Export switch port usage** button for switches |
 | `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the front panel and export button |
 | `software_enabled` | `True` | Client software overview and **Software** device tab (requires netbox-slm) |
-| `software_device_roles` | `["Clients"]` | Device roles (case-insensitive) that show the **Software** tab and are pre-selected in the overview |
+| `software_device_roles` | `["Client", "Windows Client"]` | Device roles (name or slug, case-insensitive) shown in the client software overview and given the **Software** tab |
 | `wireless_trace_enabled` | `True` | Cable trace continues across wireless links (radio bridges) to the cabled port of the peer radio |
 
 ## Usage
@@ -526,8 +526,9 @@ Software Übersicht* (in the menu of netbox-inventory, otherwise in the
 Clicking a product shows how many clients run each version and the list of
 clients; clicking a version filters that list. The current selection can be
 exported as CSV. Without an own selection the global tenant filter applies.
-The device role filter is pre-set to `software_device_roles`; clearing it
-includes all devices.
+Only devices with a role from `software_device_roles` (name or slug, e.g.
+`Windows Client` / `windows-client`) are included; servers and other devices
+never appear. The role checkboxes narrow the selection to single client roles.
 
 Software lists of the **NetBox Windows Agent** (mode `netbox`) and the
 **NetBox Synchronizer** desktop app (agent scan) arrive as an inventory report

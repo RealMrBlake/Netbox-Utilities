@@ -39,8 +39,11 @@ def installation_model():
 
 
 def client_role_ids():
-    roles = software.configured_roles()
-    return [role.pk for role in DeviceRole.objects.all() if role.name.casefold() in roles]
+    return [role.pk for role in DeviceRole.objects.all() if software.is_client_role(role)]
+
+
+def client_roles():
+    return DeviceRole.objects.filter(pk__in=client_role_ids()).order_by("name")
 
 
 class SoftwareOverviewFilterForm(forms.Form):
@@ -53,8 +56,18 @@ class SoftwareOverviewFilterForm(forms.Form):
         label="Mandant",
         query_params={"group_id": "$tenant_group_id"},
     )
-    role_id = DynamicModelMultipleChoiceField(queryset=DeviceRole.objects.all(), required=False, label="Gerätrolle")
+    # Only client roles: servers and other devices never appear in the overview.
+    role_id = forms.ModelMultipleChoiceField(
+        queryset=DeviceRole.objects.none(),
+        required=False,
+        label="Gerätrolle",
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+    )
     q = forms.CharField(required=False, label="Software suchen")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["role_id"].queryset = client_roles()
 
 
 def group_tenant_ids(groups):
@@ -74,10 +87,7 @@ class SoftwareOverviewView(ContentTypePermissionRequiredMixin, View):
 
     def get(self, request):
         params = request.GET.copy()
-        submitted = params.pop("submitted", None) is not None
-        if not submitted and "role_id" not in params:
-            # First visit: clients only. An emptied role field afterwards means all roles.
-            params.setlist("role_id", [str(pk) for pk in client_role_ids()])
+        params.pop("submitted", None)
         form = SoftwareOverviewFilterForm(params)
         form.is_valid()
         data = getattr(form, "cleaned_data", {})
@@ -86,8 +96,8 @@ class SoftwareOverviewView(ContentTypePermissionRequiredMixin, View):
         tenant_ids, scope_label = self.selected_tenant_ids(request, data)
         if tenant_ids is not None:
             devices = devices.filter(tenant_id__in=tenant_ids)
-        if roles := data.get("role_id"):
-            devices = devices.filter(role__in=roles)
+        # Always clients only; no role ticked means all client roles.
+        devices = devices.filter(role__in=data.get("role_id") or client_role_ids())
 
         installations = (
             installation_model()

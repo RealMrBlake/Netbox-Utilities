@@ -73,3 +73,13 @@ class SoftwareSummaryTest(SimpleTestCase):
         self.assertTrue(software.supports_software(client, roles=["Clients"]))
         self.assertFalse(software.supports_software(server, roles=["Clients"]))
         self.assertFalse(software.supports_software(SimpleNamespace(role=None), roles=["Clients"]))
+
+    def test_default_client_roles_match_name_or_slug_but_not_servers(self):
+        def role(name, slug):
+            return SimpleNamespace(name=name, slug=slug)
+
+        roles = software.DEFAULT_SOFTWARE_DEVICE_ROLES
+        self.assertTrue(software.is_client_role(role("Client", "client"), roles))
+        self.assertTrue(software.is_client_role(role("Windows Client", "windows-client"), roles))
+        self.assertTrue(software.is_client_role(role("Windows-Clients", "windows-client"), roles))
+        self.assertFalse(software.is_client_role(role("Server", "server"), roles))

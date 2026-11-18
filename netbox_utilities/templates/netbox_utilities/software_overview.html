@@ -33,8 +33,15 @@
           {{ form.tenant_id }}
         </div>
         <div class="col-12 col-md-6 col-xl-2">
-          <label class="form-label" for="{{ form.role_id.id_for_label }}">Gerätrolle</label>
-          {{ form.role_id }}
+          <span class="form-label d-block">Gerätrolle</span>
+          {% for choice in form.role_id %}
+            <div class="form-check form-check-inline">
+              {{ choice.tag }}
+              <label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+            </div>
+          {% empty %}
+            <div class="text-danger small">Keine Client-Rolle gefunden (<code>software_device_roles</code>)</div>
+          {% endfor %}
         </div>
         <div class="col-12 col-md-6 col-xl-2">
           <label class="form-label" for="id_q">Software suchen</label>

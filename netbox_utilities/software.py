@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-DEFAULT_SOFTWARE_DEVICE_ROLES = ("Clients",)
+DEFAULT_SOFTWARE_DEVICE_ROLES = ("Client", "Windows Client")
 # Number of products in the "top products" chart.
 TOP_PRODUCTS = 10
 
@@ -20,10 +20,21 @@ def configured_roles(roles=None):
     return {str(role).casefold() for role in (roles if roles is not None else DEFAULT_SOFTWARE_DEVICE_ROLES)}
 
 
+def is_client_role(role, roles=None):
+    """A role counts as client role if its name or slug is configured ("Windows Client" or "windows-client")."""
+    if role is None:
+        return False
+    configured = configured_roles(roles)
+    slugs = {name.replace(" ", "-") for name in configured}
+    return (
+        str(getattr(role, "name", "")).casefold() in configured
+        or str(getattr(role, "slug", "")).casefold() in configured | slugs
+    )
+
+
 def supports_software(device, roles=None):
     """Devices with a configured client role get the "Software" tab."""
-    role = getattr(device, "role", None)
-    return bool(role and str(getattr(role, "name", "")).casefold() in configured_roles(roles))
+    return is_client_role(getattr(device, "role", None), roles)
 
 
 def version_key(name):
