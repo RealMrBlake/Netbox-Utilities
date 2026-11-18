@@ -64,16 +64,46 @@ def filter_asset_tenant_group(queryset, name, value):
 
 
 def install_asset_tenant_filters():
-    """Tenant filters (also used by the global tenant filter) include inherited tenants."""
-    from netbox_inventory.filtersets import AssetFilterSet
-    from utilities.filters import MultiValueNumberFilter
+    """
+    Tenant filters include inherited tenants, and the global tenant scope is applied directly.
 
-    AssetFilterSet.base_filters["tenant_id"] = MultiValueNumberFilter(
-        method=filter_asset_tenant, label="Tenant (ID), including the tenant of the assigned hardware"
+    The global filter does not rely on the URL parameter injected by the middleware here: any
+    invalid or ignored parameter would otherwise silently show all assets.
+    """
+    from django_filters import ModelMultipleChoiceFilter
+    from netbox_inventory.filtersets import AssetFilterSet
+    from tenancy.models import Tenant, TenantGroup
+
+    from .tenant_scope import active_tenant_scope
+
+    AssetFilterSet.base_filters["tenant_id"] = ModelMultipleChoiceFilter(
+        queryset=Tenant.objects.all(),
+        field_name="tenant",
+        method=filter_asset_tenant,
+        label="Tenant (ID), including the tenant of the assigned hardware",
     )
-    AssetFilterSet.base_filters["tenant_group_id"] = MultiValueNumberFilter(
-        method=filter_asset_tenant_group, label="Tenant group (ID), including the tenant of the assigned hardware"
+    AssetFilterSet.base_filters["tenant_group_id"] = ModelMultipleChoiceFilter(
+        queryset=TenantGroup.objects.all(),
+        field_name="tenant__group",
+        method=filter_asset_tenant_group,
+        label="Tenant group (ID), including the tenant of the assigned hardware",
     )
+
+    if getattr(AssetFilterSet, "_netbox_utilities_scoped", False):
+        return
+    original_filter_queryset = AssetFilterSet.filter_queryset
+
+    def scoped_filter_queryset(self, queryset):
+        queryset = original_filter_queryset(self, queryset)
+        scope = active_tenant_scope.get()
+        request = getattr(self, "request", None)
+        # Like the middleware: the REST API is never filtered implicitly.
+        if scope is None or request is None or request.path_info.startswith("/api/"):
+            return queryset
+        return queryset.filter(asset_tenant_query(list(scope.tenant_ids)))
+
+    AssetFilterSet.filter_queryset = scoped_filter_queryset
+    AssetFilterSet._netbox_utilities_scoped = True
 
 
 def add_to_default_columns(table, column=COLUMN_NAME, after=("status", "asset_tag", "hardware_type")):
