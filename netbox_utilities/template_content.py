@@ -213,6 +213,29 @@ class ConnectionVLANContent(PluginTemplateExtension):
         )
 
 
+class DeviceTypeExportContent(PluginTemplateExtension):
+    models = ["dcim.devicetype"]
+
+    def _label(self, bulk=False):
+        german = (translation.get_language() or "").startswith("de")
+        return "YAML exportieren" if german else "Export YAML"
+
+    def buttons(self):
+        device_type = self.context["object"]
+        url = reverse("plugins:netbox_utilities:devicetype_yaml", kwargs={"pk": device_type.pk})
+        return self.render("netbox_utilities/devicetype_yaml_button.html", {"url": url, "label": self._label()})
+
+    def list_buttons(self):
+        request = self.context["request"]
+        url = reverse("plugins:netbox_utilities:devicetype_bulk_yaml")
+        query = request.GET.copy()
+        for key in ("page", "per_page", "sort", "export"):
+            query.pop(key, None)
+        if query:
+            url = f"{url}?{query.urlencode()}"
+        return self.render("netbox_utilities/devicetype_yaml_button.html", {"url": url, "label": self._label(True)})
+
+
 class RackUtilitiesContent(PluginTemplateExtension):
     models = ["dcim.rack"]
 
@@ -235,6 +258,7 @@ template_extensions = [
     DeviceUtilitiesContent,
     ConnectionVLANContent,
     RackUtilitiesContent,
+    DeviceTypeExportContent,
     ClusterHardwareContent,
     VirtualMachineHardwareContent,
 ]

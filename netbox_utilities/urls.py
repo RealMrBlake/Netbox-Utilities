@@ -3,7 +3,7 @@ from django.urls import include, path
 from netbox.plugins import get_plugin_config
 from utilities.urls import get_model_urls
 
-from . import disk_views, hardware_views, switch_port_views, views  # noqa: F401 - hardware_views registers its model views
+from . import devicetype_views, disk_views, hardware_views, switch_port_views, views  # noqa: F401 - hardware_views registers its model views
 
 app_name = "netbox_utilities"
 
@@ -16,6 +16,16 @@ urlpatterns = [
         "racks/<int:pk>/elevation-svg/",
         views.RackElevationOfflineSVGView.as_view(),
         name="rack_elevation_offline_svg",
+    ),
+    path(
+        "device-types/export-yaml/",
+        devicetype_views.DeviceTypeBulkYAMLExportView.as_view(),
+        name="devicetype_bulk_yaml",
+    ),
+    path(
+        "device-types/<int:pk>/export.yaml",
+        devicetype_views.DeviceTypeYAMLExportView.as_view(),
+        name="devicetype_yaml",
     ),
     path("settings/", views.UtilitiesSettingsView.as_view(), name="settings"),
     path("tenant/select/", views.SelectTenantView.as_view(), name="select_tenant"),

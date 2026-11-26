@@ -41,6 +41,7 @@ Plugin settings:
 - The rack view of the optional [MrBlake NetBox Topology Views](https://git.mrblake.cc/MrBlake/mrb-netbox-topology-views) plugin renders partial-width devices correctly.
 - Upload multiple images at once in an object's **Images** tab.
 - Install multiple modules of the same type into free module bays in one step.
+- Export device types as YAML in the devicetype-library format (single type or the filtered list as ZIP).
 - Optional bulk save for devices moved in NetBox Reorder Rack.
 - Rack widths are preserved by the optional [NetBox-Export](https://git.mrblake.cc/MrBlake/NetBox-Export) export/import.
 - Cables and wireless links can be assigned to one or more VLANs.
@@ -762,6 +763,18 @@ normal NetBox model validation. If any placement, validation or permission
 error occurs, the whole rack stays unchanged. Every moved device still gets a
 normal changelog entry. Versions other than `1.1.4` are left untouched and only
 produce a log message.
+
+### Exporting device types as YAML
+
+Device type detail pages get an **Export YAML** button that downloads the type
+in the [devicetype-library](https://github.com/netbox-community/devicetype-library)
+format (manufacturer, model, slug, dimensions, airflow, weight and all component
+templates: console/power ports, outlets, interfaces, front/rear ports incl. their
+mapping, module/device bays and inventory items). Fields at their default value are
+omitted. The file can be imported again via *Device Types → Import*.
+
+The device type list gets the same button: it exports every type matching the
+current filters as `device-types.zip`, laid out as `<Manufacturer>/<slug>.yaml`.
 
 ### Uploading multiple images
 
