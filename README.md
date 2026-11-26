@@ -667,6 +667,10 @@ interfaces, since both ends can use different interface modes.
 - An optional **VLAN group** field acts as a dynamic filter for the VLAN selection; it is not stored.
 - Empty selections create no record; deleting a connection removes its VLAN assignment.
 - With NetBox-Export installed, the assignments are exported and imported together with connections and VLANs.
+- Cable VLANs can be read and written through `/api/plugins/utilities/cable-vlans/`
+  (`cable` = cable ID, `vlans` = VLAN IDs, filter with `?cable_id=`; permissions
+  `netbox_utilities.*_cablevlanassignment`). NetBox Synchronizer uses it to keep
+  the cable VLANs of switch ports in step with the port.
 
 ### Multiple devices in one rack unit
 

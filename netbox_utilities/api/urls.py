@@ -12,5 +12,6 @@ router.register("disk-bay-templates", views.DiskBayTemplateViewSet)
 router.register("cpu-models", views.CPUModelViewSet)
 router.register("device-hardware", views.DeviceHardwareViewSet)
 router.register("switch-stacks", views.SwitchStackViewSet)
+router.register("cable-vlans", views.CableVLANAssignmentViewSet)
 
 urlpatterns = router.urls

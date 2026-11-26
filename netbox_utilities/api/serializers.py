@@ -3,9 +3,10 @@ from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
 
-from dcim.models import Device
+from dcim.models import Cable, Device
+from ipam.models import VLAN
 
-from ..models import CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup, SwitchStack
+from ..models import CableVLANAssignment, CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup, SwitchStack
 
 LAYOUT_FIELDS = ("name", "weight", "slot_count", "rows", "first_slot", "numbering", "form_factor")
 
@@ -215,3 +216,14 @@ class SwitchStackSerializer(serializers.ModelSerializer):
         if device is not None and any(member.pk == device.pk for member in data.get("members") or []):
             raise serializers.ValidationError({"members": "Der Switch kann nicht sein eigenes Mitglied sein."})
         return data
+
+
+class CableVLANAssignmentSerializer(serializers.ModelSerializer):
+    """VLANs of a cable connection as VLAN IDs (one assignment per cable)."""
+
+    cable = serializers.PrimaryKeyRelatedField(queryset=Cable.objects.all())
+    vlans = serializers.PrimaryKeyRelatedField(queryset=VLAN.objects.all(), many=True, required=False)
+
+    class Meta:
+        model = CableVLANAssignment
+        fields = ("id", "cable", "vlans", "updated")

@@ -3,7 +3,7 @@ from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework.viewsets import ModelViewSet
 
 from .. import disk_filtersets, hardware_filtersets
-from ..models import CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup, SwitchStack
+from ..models import CableVLANAssignment, CPUModel, DeviceHardware, Disk, DiskBayLayout, DiskBayTemplate, RAIDGroup, SwitchStack
 from . import serializers
 
 
@@ -57,4 +57,18 @@ class SwitchStackViewSet(ModelViewSet):
             queryset = queryset.filter(device_id__in=params.getlist("device_id"))
         if params.get("member_id"):
             queryset = queryset.filter(members__in=params.getlist("member_id")).distinct()
+        return queryset
+
+
+class CableVLANAssignmentViewSet(ModelViewSet):
+    """VLANs of cable connections; filter with ``?cable_id=``."""
+
+    queryset = CableVLANAssignment.objects.prefetch_related("vlans").order_by("pk")
+    serializer_class = serializers.CableVLANAssignmentSerializer
+    permission_classes = [TokenPermissions]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.query_params.get("cable_id"):
+            queryset = queryset.filter(cable_id__in=self.request.query_params.getlist("cable_id"))
         return queryset
