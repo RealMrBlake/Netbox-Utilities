@@ -108,3 +108,14 @@ class FindLatestTest(SimpleTestCase):
 
         self.assertIsNone(result["latest"])
         self.assertIn("endoflife.date: timeout", result["errors"])
+
+
+class SslContextTest(SimpleTestCase):
+    def test_verifies_certificates_without_strict_x509_checks(self):
+        import ssl
+
+        context = latest.ssl_context()
+
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(context.check_hostname)
+        self.assertFalse(context.verify_flags & getattr(ssl, "VERIFY_X509_STRICT", 0))

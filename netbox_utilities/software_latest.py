@@ -13,6 +13,7 @@ dependency; lookup() adds HTTP, NetBox's HTTP_PROXIES and the Django cache.
 import hashlib
 import json
 import re
+import ssl
 import threading
 import time
 import urllib.error
@@ -169,8 +170,20 @@ def user_agent():
     return f"netbox-utilities/{__version__} (software version check)"
 
 
+def ssl_context():
+    """
+    Certificates are verified against the system CA store, like curl and requests do.
+
+    Python 3.13 turned on VERIFY_X509_STRICT, which rejects CA certificates of many TLS-inspecting
+    firewalls ("Basic Constraints of CA cert not marked critical") that the rest of the system accepts.
+    """
+    context = ssl.create_default_context()
+    context.verify_flags &= ~getattr(ssl, "VERIFY_X509_STRICT", 0)
+    return context
+
+
 def opener():
-    handlers = []
+    handlers = [urllib.request.HTTPSHandler(context=ssl_context())]
     try:
         from django.conf import settings
 
