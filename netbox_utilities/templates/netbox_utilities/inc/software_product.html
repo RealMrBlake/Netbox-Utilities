@@ -26,6 +26,13 @@
           <div class="col"><div class="nbu-sw-kpi-value">{{ product.version_count }}</div><div class="nbu-sw-kpi-label">Versionen</div></div>
         </div>
         {% with item=product %}{% include 'netbox_utilities/inc/software_version_stack.html' %}{% endwith %}
+        {% if latest_enabled %}
+          <div class="nbu-sw-online mt-3" data-nbu-sw-latest="{% url 'plugins:netbox_utilities:software_latest_version' pk=product.id %}"
+               data-nbu-sw-counts='{ {% for version in product.versions_by_name %}"{{ version.id }}": {{ version.device_count }}{% if not forloop.last %}, {% endif %}{% endfor %} }'
+               data-nbu-sw-detail>
+            <span class="text-muted small"><i class="mdi mdi-web" aria-hidden="true"></i> Neueste Version laut Internet wird abgefragt …</span>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -42,6 +49,7 @@
                 <span class="nbu-sw-bar-label">
                   {{ version.name }}
                   {% if forloop.first %}<span class="badge text-bg-green ms-1">neueste</span>{% endif %}
+                  <span data-nbu-sw-state="{{ version.id }}"></span>
                   {% if version.support_expired %}<span class="badge text-bg-danger ms-1" title="Support-Ende {{ version.end_of_support|isodate }}">EoS</span>{% endif %}
                 </span>
                 <span class="nbu-sw-bar-track"><span class="nbu-sw-bar-fill{% if version.support_expired %} nbu-sw-expired{% endif %}" style="width: {{ version.share }}%; --nbu-sw-shade: {{ version.shade }}%"></span></span>
@@ -93,6 +101,7 @@
             <td>
               {{ version.name }}
               {% if product.latest_version.id == version.id %}<span class="badge text-bg-green ms-1">neueste</span>{% endif %}
+              <span data-nbu-sw-state="{{ version.id }}"></span>
             </td>
             <td>
               {% if version.end_of_support %}

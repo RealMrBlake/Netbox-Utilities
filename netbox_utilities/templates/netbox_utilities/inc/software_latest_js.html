@@ -1,0 +1,83 @@
+<script>
+  // Neueste Version laut Internet (endoflife.date, Repology) nachladen und mit den installierten Versionen vergleichen.
+  document.addEventListener("DOMContentLoaded", () => {
+    const targets = [...document.querySelectorAll("[data-nbu-sw-latest]")];
+    if (!targets.length) return;
+    const PARALLEL = 3;
+    const STATE = {
+      current: '<span class="badge text-bg-green ms-1" title="Entspricht der neuesten Version laut Internet">aktuell</span>',
+      outdated: '<span class="badge text-bg-warning ms-1" title="Älter als die neueste Version laut Internet">veraltet</span>',
+      unknown: "",
+    };
+    const escape = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    const links = (data) => data.found.map((hit) =>
+      `<a href="${escape(hit.url)}" target="_blank" rel="noopener noreferrer" title="${escape(hit.label)}: ${escape(hit.version)} (Projekt ${escape(hit.project)})">${escape(hit.label)}</a>`
+    ).join(", ");
+
+    const render = (cell, data) => {
+      const counts = JSON.parse(cell.dataset.nbuSwCounts || "{}");
+      let outdated = 0;
+      for (const [id, state] of Object.entries(data.versions || {})) {
+        if (state === "outdated") outdated += counts[id] || 0;
+      }
+      for (const slot of document.querySelectorAll("[data-nbu-sw-state]")) {
+        if (cell.dataset.nbuSwDetail !== undefined && data.versions?.[slot.dataset.nbuSwState]) {
+          slot.innerHTML = STATE[data.versions[slot.dataset.nbuSwState]] || "";
+        }
+      }
+      const outdatedCell = cell.parentElement.querySelector("[data-nbu-sw-outdated]");
+      if (!data.latest) {
+        const reason = data.disabled ? "Abfrage abgeschaltet" : data.errors?.length ? `Fehler: ${data.errors.join("; ")}` : "Keine Quelle kennt dieses Produkt";
+        cell.innerHTML = `<span class="text-muted small" title="${escape(reason)}">${data.errors?.length && !data.found?.length ? '<i class="mdi mdi-alert-outline text-warning"></i> nicht erreichbar' : "nicht gefunden"}</span>`;
+        if (outdatedCell) { outdatedCell.dataset.value = "-1"; outdatedCell.innerHTML = '<span class="text-muted">—</span>'; }
+        return;
+      }
+      const badge = outdated
+        ? `<span class="badge text-bg-warning ms-1">${outdated} veraltet</span>`
+        : '<span class="badge text-bg-green ms-1">alle aktuell</span>';
+      if (cell.dataset.nbuSwDetail !== undefined) {
+        cell.innerHTML = `<div class="d-flex flex-wrap align-items-center gap-1">
+            <i class="mdi mdi-web" aria-hidden="true"></i> Neueste Version laut Internet:
+            <strong>${escape(data.latest)}</strong>${badge}</div>
+          <div class="text-muted small">Quelle: ${links(data)} · geprüft ${escape((data.checked || "").replace("T", " "))}</div>`;
+      } else {
+        cell.innerHTML = `<strong>${escape(data.latest)}</strong> <span class="small text-muted">${links(data)}</span>`;
+        if (outdatedCell) {
+          outdatedCell.dataset.value = String(outdated);
+          outdatedCell.innerHTML = outdated ? badge.replace(" veraltet", "") : '<span class="badge text-bg-green">0</span>';
+        }
+      }
+    };
+
+    const load = async (refresh) => {
+      const queue = [...targets];
+      for (const cell of queue) {
+        if (refresh) cell.innerHTML = '<span class="text-muted small">wartet …</span>';
+      }
+      const worker = async () => {
+        while (queue.length) {
+          const cell = queue.shift();
+          cell.innerHTML = '<span class="spinner-border spinner-border-sm text-muted" role="status"></span>';
+          try {
+            const response = await fetch(cell.dataset.nbuSwLatest + (refresh ? "?refresh=1" : ""), { headers: { Accept: "application/json" } });
+            if (!response.ok) throw new Error(response.status);
+            render(cell, await response.json());
+          } catch (error) {
+            cell.innerHTML = `<span class="text-muted small" title="${escape(error)}">nicht abrufbar</span>`;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: PARALLEL }, worker));
+    };
+
+    load(false);
+    const button = document.querySelector("[data-nbu-sw-refresh]");
+    if (button) {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        await load(true);
+        button.disabled = false;
+      });
+    }
+  });
+</script>

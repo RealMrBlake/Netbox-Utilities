@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig, get_plugin_config
 
-__version__ = "0.31.0"
+__version__ = "0.32.0"
 
 
 class NetBoxUtilitiesConfig(PluginConfig):
@@ -34,6 +34,10 @@ class NetBoxUtilitiesConfig(PluginConfig):
         "wireless_trace_enabled": True,
         "software_enabled": True,
         "software_device_roles": ["Client", "Windows Client"],
+        "software_latest_enabled": True,
+        "software_latest_sources": ["endoflife", "repology"],
+        "software_latest_mapping": {},
+        "software_latest_cache_hours": 24,
     }
     middleware = [
         "netbox_utilities.middleware.GlobalTenantFilterMiddleware",

@@ -5,7 +5,7 @@ import csv
 from dcim.models import Device, DeviceRole
 from django import forms
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -133,6 +133,7 @@ class SoftwareOverviewView(ContentTypePermissionRequiredMixin, View):
             "filter_query": filter_query,
             "today": timezone.localdate(),
             "can_add": request.user.has_perm("netbox_slm.add_softwareproductinstallation"),
+            "latest_enabled": software_latest_enabled(),
         }
         if product_id:
             product = next((item for item in summary.products if item.id == product_id), None)
@@ -157,6 +158,12 @@ class SoftwareOverviewView(ContentTypePermissionRequiredMixin, View):
         return set(scope.tenant_ids), str(selected) if selected else "aktiv"
 
 
+def software_latest_enabled():
+    from . import software_latest
+
+    return software_latest.lookup_enabled()
+
+
 def product_context(request, installations, product, version_id):
     """Drill-down of one product: its versions and the devices it is installed on."""
     if product is None:
@@ -175,6 +182,32 @@ def product_context(request, installations, product, version_id):
         "selected_version": selected,
         "entries": entries,
     }
+
+
+class SoftwareLatestVersionView(ContentTypePermissionRequiredMixin, View):
+    """JSON: newest version of a product according to the online sources, and the state of each version."""
+
+    def get_required_permission(self):
+        return INSTALLATION_PERMISSION
+
+    def get(self, request, pk):
+        from netbox_slm.models import SoftwareProductVersion
+
+        from . import software_latest
+
+        product = product_object(request, pk)
+        if product is None:
+            return JsonResponse({"error": "not found"}, status=404)
+        if not software_latest.lookup_enabled():
+            return JsonResponse({"error": "disabled"}, status=404)
+        manufacturer = str(product.manufacturer or "") if getattr(product, "manufacturer_id", None) else ""
+        result = software_latest.lookup(product.name, manufacturer, refresh=request.GET.get("refresh") == "1")
+        latest = result.get("latest")
+        versions = SoftwareProductVersion.objects.filter(software_product=product).values_list("pk", "name")
+        result["versions"] = {
+            str(version_id): software_latest.compare(name, latest) if latest else "unknown" for version_id, name in versions
+        }
+        return JsonResponse(result)
 
 
 def product_object(request, product_id):

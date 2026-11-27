@@ -229,6 +229,10 @@ sudo systemctl restart netbox netbox-rq
 | `switch_device_roles` | `["Switch"]` | Device roles (case-insensitive) that get the front panel and export button |
 | `software_enabled` | `True` | Client software overview and **Software** device tab (requires netbox-slm) |
 | `software_device_roles` | `["Client", "Windows Client"]` | Device roles (name or slug, case-insensitive) shown in the client software overview and given the **Software** tab |
+| `software_latest_enabled` | `True` | Look up the newest version of each product online (endoflife.date, Repology) |
+| `software_latest_sources` | `["endoflife", "repology"]` | Online sources to ask |
+| `software_latest_mapping` | `{}` | Project names per product name, e.g. `{"Google Chrome": {"endoflife": "chrome", "repology": "chromium"}}`; `False` skips a product |
+| `software_latest_cache_hours` | `24` | How long online results are cached |
 | `wireless_trace_enabled` | `True` | Cable trace continues across wireless links (radio bridges) to the cabled port of the peer radio |
 
 ## Usage
@@ -543,6 +547,20 @@ otherwise the publisher goes into its description. Agent lines without a
 recognisable version (at least one dot) get the version `unbekannt`. Deleting a
 device removes its automatic installations first, so netbox-slm does not block
 the deletion.
+
+**Newest version according to the internet.** The product list gets the columns
+*Laut Internet* and *Veraltet*, and a product's page shows the newest version
+next to its own versions, each marked *aktuell* or *veraltet*. The versions come
+from [endoflife.date](https://endoflife.date) (latest patch of the supported
+release cycles) and [Repology](https://repology.org) (newest upstream version,
+preferring winget, Chocolatey and Scoop); the newer of both wins. Product names
+are guessed (`Mozilla Firefox (x64 de)` → `firefox`, then `mozilla-firefox`);
+where the guess fails, set `software_latest_mapping`. Only the precision of the
+online version counts: `128.0.3.8945` is current against `128.0.3`. Results are
+loaded in the background after the page and cached (`software_latest_cache_hours`,
+failed lookups one hour); *Online neu prüfen* asks again. NetBox needs outbound
+HTTPS to `endoflife.date` and `repology.org`; `HTTP_PROXIES` from the NetBox
+configuration is used. Repology is queried at most once per second.
 
 Devices that already have a report are transferred once with:
 

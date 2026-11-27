@@ -57,6 +57,13 @@ urlpatterns = [
 if get_plugin_config("netbox_utilities", "software_enabled") and apps.is_installed("netbox_slm"):
     from . import software_views
 
-    urlpatterns.append(
-        path("software/", software_views.SoftwareOverviewView.as_view(), name="software_overview"),
+    urlpatterns.extend(
+        [
+            path("software/", software_views.SoftwareOverviewView.as_view(), name="software_overview"),
+            path(
+                "software/<int:pk>/latest/",
+                software_views.SoftwareLatestVersionView.as_view(),
+                name="software_latest_version",
+            ),
+        ]
     )

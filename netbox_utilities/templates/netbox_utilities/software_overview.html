@@ -5,6 +5,12 @@
 
 {% block controls %}
   <div class="btn-list">
+    {% if latest_enabled and summary.products %}
+      <button type="button" class="btn btn-outline-primary" data-nbu-sw-refresh
+              title="Neueste Versionen erneut bei endoflife.date und Repology abfragen (Ergebnisse werden sonst zwischengespeichert)">
+        <i class="mdi mdi-web-refresh" aria-hidden="true"></i> Online neu prüfen
+      </button>
+    {% endif %}
     <a href="?{{ filter_query }}{% if product %}&product={{ product.id }}{% if selected_version %}&version={{ selected_version.id }}{% endif %}{% endif %}&export=csv"
        class="btn btn-purple" title="Aktuelle Auswahl als CSV (Excel) herunterladen">
       <i class="mdi mdi-download" aria-hidden="true"></i> CSV exportieren
@@ -179,6 +185,8 @@
               <th data-nbu-sort="number" class="text-end">Versionen</th>
               <th style="min-width: 12rem">Verteilung</th>
               <th>Neueste Version</th>
+              {% if latest_enabled %}<th data-nbu-sort="text" title="Neueste Version laut endoflife.date und Repology">Laut Internet</th>
+              <th data-nbu-sort="number" class="text-end" title="Rechner mit einer älteren Version als der neuesten laut Internet">Veraltet</th>{% endif %}
               <th data-nbu-sort="number" class="text-end">Support abgelaufen</th>
             </tr>
           </thead>
@@ -192,6 +200,13 @@
                 <td class="text-end" data-value="{{ item.version_count }}">{{ item.version_count }}</td>
                 <td>{% include 'netbox_utilities/inc/software_version_stack.html' %}</td>
                 <td>{% with latest=item.latest_version %}{{ latest.name }} <span class="text-muted small">({{ latest.device_count }})</span>{% endwith %}</td>
+                {% if latest_enabled %}
+                  <td data-nbu-sw-latest="{% url 'plugins:netbox_utilities:software_latest_version' pk=item.id %}"
+                      data-nbu-sw-counts='{ {% for version in item.versions_by_name %}"{{ version.id }}": {{ version.device_count }}{% if not forloop.last %}, {% endif %}{% endfor %} }'>
+                    <span class="text-muted small">wartet …</span>
+                  </td>
+                  <td class="text-end" data-value="-1" data-nbu-sw-outdated><span class="text-muted">—</span></td>
+                {% endif %}
                 {% with expired=item.expired_devices|length %}
                   <td class="text-end" data-value="{{ expired }}">{% if expired %}<span class="badge text-bg-danger">{{ expired }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                 {% endwith %}
@@ -216,4 +231,5 @@
   {% endif %}
 
   {% include 'netbox_utilities/inc/software_table_js.html' %}
+  {% if latest_enabled %}{% include 'netbox_utilities/inc/software_latest_js.html' %}{% endif %}
 {% endblock content %}
